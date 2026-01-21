@@ -29,7 +29,7 @@
   </style>
 </head>
 <body>
-<div id="updateBanner" onclick="localStorage.setItem('postcard_version', APP_VERSION); this.style.display='none'; location.reload(true);">New version available! Tap to update.</div>
+<div id="updateBanner" onclick="localStorage.setItem('postcard_banner_dismissed', 'true'); this.style.display='none'; location.reload(true);">New version available! Tap to update.</div>
 <div class="app">
   <div id="loading">
     <div class="spinner">📮</div>
@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.0';
+var APP_VERSION = '1.5.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -54,11 +54,12 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
 // Force update check for iOS PWA
 (function checkForUpdates() {
   var storedVersion = localStorage.getItem('postcard_version');
+  var bannerDismissed = localStorage.getItem('postcard_banner_dismissed');
   
-  console.log('[Update] Current version:', APP_VERSION, 'Stored version:', storedVersion);
+  console.log('[Update] Current version:', APP_VERSION, 'Stored version:', storedVersion, 'Banner dismissed:', bannerDismissed);
   
-  // If version changed, show update banner
-  if (storedVersion && storedVersion !== APP_VERSION) {
+  // If version changed and banner not dismissed, show banner
+  if (storedVersion && storedVersion !== APP_VERSION && !bannerDismissed) {
     console.log('[Update] Update available! Showing banner');
     document.getElementById('updateBanner').style.display = 'block';
     // Clear any caches we can
@@ -69,11 +70,12 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
         }
       });
     }
-    // DON'T save version yet - only save when banner is tapped
   } else {
-    // Only store current version if no update banner shown
-    console.log('[Update] No update needed, saving version:', APP_VERSION);
+    // Save current version (always, even if banner was shown)
+    console.log('[Update] Saving version:', APP_VERSION);
     localStorage.setItem('postcard_version', APP_VERSION);
+    // Clear dismissed flag for next update
+    localStorage.removeItem('postcard_banner_dismissed');
   }
   
   // For iOS: check for updates when app becomes visible
@@ -211,7 +213,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.',
     '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!',
     '1.4.9': '🔔 FIXED: Update notifications NO LONGER count toward badge. Green update banner now works on first tap (not second). Debug logging enhanced to show "Updates NOT counted". Badge now accurate!',
-    '1.5.0': '🎵 FIXED: Song title and artist text below album cover now perfectly centered! Added max-width (280px) and proper padding to ensure text is balanced on both sides of the postcard middle. Applies to feed, downloads, and preview!'
+    '1.5.0': '🎵 FIXED: Song title and artist text below album cover now perfectly centered! Added max-width (280px) and proper padding to ensure text is balanced on both sides of the postcard middle. Applies to feed, downloads, and preview!',
+    '1.5.1': '🔔 FIXED (AGAIN): Update banner FINALLY works on first tap! Uses dismissed flag instead of version on click. Banner onclick sets "dismissed=true", reload saves new version and clears flag. No more double tap!'
   };
 
   var state = {
