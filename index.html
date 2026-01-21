@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.5';
+var APP_VERSION = '1.4.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -204,7 +204,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.2': '🎵 Audio stops when you leave the app (no more background playback). Fixed duplicate post bug with stronger submit protection. Button now properly disabled while uploading.',
     '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.',
     '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!',
-    '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).'
+    '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).',
+    '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!'
   };
 
   var state = {
@@ -3848,7 +3849,6 @@ window.onerror = function(msg, url, line, col, error) {
           (function(memberId) {
             var memberItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: t.bg, borderRadius: '10px', marginBottom: '6px'}});
             
-            // We need to show member info - for now show placeholder
             var isMe = memberId === state.user.uid;
             var isMeCreator = memberId === group.createdBy;
             
@@ -3896,7 +3896,7 @@ window.onerror = function(msg, url, line, col, error) {
         // Pending invites
         var pendingInvites = group.pendingInvites || [];
         if (pendingInvites.length > 0) {
-          membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Pending Invites (' + pendingInvites.length + ')'));
+          manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Pending Invites (' + pendingInvites.length + ')'));
           var pendingList = el('div', {style: {marginBottom: '20px'}});
           for (var i = 0; i < pendingInvites.length; i++) {
             (function(inviteId) {
@@ -3915,11 +3915,11 @@ window.onerror = function(msg, url, line, col, error) {
               pendingList.appendChild(inviteItem);
             })(pendingInvites[i]);
           }
-          membersBox.appendChild(pendingList);
+          manageMembersBox.appendChild(pendingList);
         }
         
-        // Add new member
-        membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Invite New Member'));
+        // Invite New Member - MOVED HERE, ABOVE THE FRIENDS LIST
+        manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, '➕ Invite New Member'));
         
         // Show friends not already in group
         var availableFriends = state.friends.filter(function(f) {
@@ -4113,11 +4113,26 @@ window.onerror = function(msg, url, line, col, error) {
               setState({currentGroup: group, groupView: 'detail'});
             }});
             
-            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, '👥'));
+            // Use custom icon if available
+            var groupIcon = (group.customTheme && group.customTheme.icon) || '👥';
+            var boxColor = (group.customTheme && group.customTheme.boxColor) || (t.accent + '22');
+            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: boxColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, groupIcon));
             
             var info = el('div', {style: {flex: '1'}});
             info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, group.name));
-            info.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+            
+            // Show theme chooser and member count
+            var themeChooserText = el('p', {style: {margin: '4px 0 0', fontSize: '12px', color: t.muted}}, group.members.length + ' members · Loading...');
+            info.appendChild(themeChooserText);
+            
+            // Fetch theme chooser name
+            if (group.themeChooserId) {
+              getMemberInfo(group.themeChooserId, function(chooserInfo) {
+                var isMe = group.themeChooserId === state.user.uid;
+                themeChooserText.textContent = group.members.length + ' members · 👑 ' + (isMe ? 'You' : chooserInfo.username || 'Theme Chooser');
+              });
+            }
+            item.appendChild(info);
             
             var hasSubmitted = hasSubmittedToday(group);
             item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: hasSubmitted ? '#4CAF50' : t.bg, color: hasSubmitted ? '#fff' : t.muted, fontWeight: '500'}}, hasSubmitted ? '✓ Done' : 'Pending'));
