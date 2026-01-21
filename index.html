@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.2.3';
+var APP_VERSION = '1.3.0';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -183,7 +183,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.2.0': 'New friend code system! Each user now has a unique 8-character friend code (case-sensitive). Find yours on your profile page and share it with friends to connect!',
     '1.2.1': 'Fixed duplicate posting bug. Delete button is now more visible on your postcards. Deleting today\'s post lets you create a new one!',
     '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.',
-    '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".'
+    '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".',
+    '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and collages are created at the end of each day. All times are UTC-based with local time conversions shown.'
   };
 
   var state = {
@@ -220,7 +221,16 @@ window.onerror = function(msg, url, line, col, error) {
     birthdayPopup: null,
     notifications: loadedNotifications,
     weeklyLookbackPosts: null,
-    deleteConfirm: null  // Post to confirm deletion
+    deleteConfirm: null,  // Post to confirm deletion
+    // Groups feature
+    groups: [],
+    currentGroup: null,
+    groupView: 'list', // 'list', 'detail', 'create', 'camera', 'history', 'info'
+    newGroup: {name: '', members: []},
+    groupPhoto: null,
+    groupPhotoOrientation: null, // 'portrait' or 'landscape'
+    groupTheme: '',
+    showGroupInfo: false
   };
 
   function setState(updates) {
@@ -298,6 +308,8 @@ window.onerror = function(msg, url, line, col, error) {
         loadPosts(uid);
         loadFriends(uid);
         loadFriendRequests(uid);
+        loadGroups(uid);
+        loadGroupNotifications(uid);
         
         // Check for update notification (only once on load)
         checkForUpdateNotification();
@@ -1135,6 +1147,316 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
 
+  // ===== GROUPS FEATURE =====
+  
+  // Get today's date in UTC (YYYY-MM-DD)
+  function getUTCDate() {
+    var now = new Date();
+    return now.toISOString().split('T')[0];
+  }
+  
+  // Convert UTC time to local time string
+  function utcToLocalTime(utcHour) {
+    var utcDate = new Date();
+    utcDate.setUTCHours(utcHour, 0, 0, 0);
+    var hours = utcDate.getHours();
+    var ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return hours + ':00 ' + ampm;
+  }
+  
+  // Generate a random group code
+  function generateGroupCode() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var code = '';
+    for (var i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+  
+  // Load user's groups
+  function loadGroups(uid) {
+    db.collection('groups').where('members', 'array-contains', uid).onSnapshot(function(snap) {
+      var groups = [];
+      snap.forEach(function(doc) {
+        var g = doc.data();
+        g.id = doc.id;
+        groups.push(g);
+      });
+      state.groups = groups;
+      render();
+    });
+  }
+  
+  // Create a new group
+  function createGroup() {
+    if (!state.newGroup.name.trim()) {
+      alert('Please enter a group name');
+      return;
+    }
+    if (state.newGroup.members.length < 2) {
+      alert('You need at least 2 friends to create a group (3 members total including you)');
+      return;
+    }
+    
+    var uid = state.user.uid;
+    var allMembers = [uid].concat(state.newGroup.members);
+    var today = getUTCDate();
+    
+    // Randomly select first theme chooser
+    var themeChooserIndex = Math.floor(Math.random() * allMembers.length);
+    var themeChooserId = allMembers[themeChooserIndex];
+    
+    // Assign random orientations to each member
+    var orientations = {};
+    var shuffledMembers = allMembers.slice().sort(function() { return Math.random() - 0.5; });
+    var half = Math.ceil(shuffledMembers.length / 2);
+    for (var i = 0; i < shuffledMembers.length; i++) {
+      orientations[shuffledMembers[i]] = i < half ? 'portrait' : 'landscape';
+    }
+    
+    var groupData = {
+      name: state.newGroup.name.trim(),
+      members: allMembers,
+      createdBy: uid,
+      createdAt: new Date().toISOString(),
+      code: generateGroupCode(),
+      currentDate: today,
+      themeChooserId: themeChooserId,
+      theme: '',
+      orientations: orientations,
+      photos: {}, // { odDate: { odUserId: {url, orientation, createdAt} } }
+      collages: {} // { date: collageUrl }
+    };
+    
+    db.collection('groups').add(groupData).then(function(ref) {
+      // Send notifications to all members
+      for (var i = 0; i < allMembers.length; i++) {
+        if (allMembers[i] !== uid) {
+          addGroupNotification(allMembers[i], 'group_invite', {
+            groupId: ref.id,
+            groupName: groupData.name,
+            invitedBy: state.userData.username
+          });
+        }
+      }
+      
+      // Notify theme chooser
+      if (themeChooserId === uid) {
+        addNotification('group_theme_chooser', {
+          groupId: ref.id,
+          groupName: groupData.name,
+          date: today
+        });
+      } else {
+        addGroupNotification(themeChooserId, 'group_theme_chooser', {
+          groupId: ref.id,
+          groupName: groupData.name,
+          date: today
+        });
+      }
+      
+      setState({
+        newGroup: {name: '', members: []},
+        groupView: 'list'
+      });
+    });
+  }
+  
+  // Add notification to another user (stored in their user doc or a notifications collection)
+  function addGroupNotification(userId, type, data) {
+    db.collection('notifications').add({
+      userId: userId,
+      type: type,
+      data: data,
+      createdAt: new Date().toISOString(),
+      read: false
+    });
+  }
+  
+  // Load group notifications for current user
+  function loadGroupNotifications(uid) {
+    db.collection('notifications').where('userId', '==', uid).where('read', '==', false).onSnapshot(function(snap) {
+      snap.forEach(function(doc) {
+        var notif = doc.data();
+        notif.id = doc.id;
+        // Add to local notifications if not already there
+        var exists = false;
+        for (var i = 0; i < state.notifications.length; i++) {
+          if (state.notifications[i].id === notif.id) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists && (notif.type === 'group_theme_chooser' || notif.type === 'group_invite' || notif.type === 'group_theme_set')) {
+          state.notifications.push({
+            id: notif.id,
+            type: notif.type,
+            data: notif.data,
+            ts: notif.createdAt
+          });
+          // Mark as read
+          db.collection('notifications').doc(notif.id).update({read: true});
+        }
+      });
+      render();
+    });
+  }
+  
+  // Check and reset group for new day (should be called when viewing a group)
+  function checkGroupDayReset(group) {
+    var today = getUTCDate();
+    if (group.currentDate !== today) {
+      // New day - reset theme chooser and orientations
+      var members = group.members;
+      var newThemeChooserIndex = Math.floor(Math.random() * members.length);
+      var newThemeChooserId = members[newThemeChooserIndex];
+      
+      // New random orientations
+      var orientations = {};
+      var shuffledMembers = members.slice().sort(function() { return Math.random() - 0.5; });
+      var half = Math.ceil(shuffledMembers.length / 2);
+      for (var i = 0; i < shuffledMembers.length; i++) {
+        orientations[shuffledMembers[i]] = i < half ? 'portrait' : 'landscape';
+      }
+      
+      db.collection('groups').doc(group.id).update({
+        currentDate: today,
+        themeChooserId: newThemeChooserId,
+        theme: '',
+        orientations: orientations
+      }).then(function() {
+        // Notify new theme chooser
+        addGroupNotification(newThemeChooserId, 'group_theme_chooser', {
+          groupId: group.id,
+          groupName: group.name,
+          date: today
+        });
+        // Notify others about who is theme chooser
+        for (var i = 0; i < members.length; i++) {
+          if (members[i] !== newThemeChooserId) {
+            // Get theme chooser username
+            db.collection('users').doc(newThemeChooserId).get().then(function(doc) {
+              var chooserName = doc.exists ? doc.data().username : 'Someone';
+              addGroupNotification(members[i], 'group_theme_set', {
+                groupId: group.id,
+                groupName: group.name,
+                chooserName: chooserName,
+                date: today
+              });
+            });
+          }
+        }
+      });
+    }
+  }
+  
+  // Set theme for today (only theme chooser can do this)
+  function setGroupTheme(groupId, theme) {
+    if (theme.length > 100) {
+      alert('Theme must be 100 characters or less');
+      return;
+    }
+    db.collection('groups').doc(groupId).update({
+      theme: theme
+    }).then(function() {
+      // Notify other members
+      var group = null;
+      for (var i = 0; i < state.groups.length; i++) {
+        if (state.groups[i].id === groupId) {
+          group = state.groups[i];
+          break;
+        }
+      }
+      if (group) {
+        for (var i = 0; i < group.members.length; i++) {
+          if (group.members[i] !== state.user.uid) {
+            addGroupNotification(group.members[i], 'group_theme_set', {
+              groupId: groupId,
+              groupName: group.name,
+              theme: theme,
+              chooserName: state.userData.username,
+              date: getUTCDate()
+            });
+          }
+        }
+      }
+      setState({groupTheme: ''});
+    });
+  }
+  
+  // Upload photo to group
+  function uploadGroupPhoto(groupId, photoData, orientation) {
+    var uid = state.user.uid;
+    var today = getUTCDate();
+    var ts = Date.now();
+    
+    // Upload to storage
+    var ref = storage.ref('groups/' + groupId + '/' + today + '/' + uid + '_' + ts);
+    ref.putString(photoData, 'data_url').then(function() {
+      return ref.getDownloadURL();
+    }).then(function(url) {
+      // Update group photos
+      var updatePath = 'photos.' + today + '.' + uid;
+      var updateData = {};
+      updateData[updatePath] = {
+        url: url,
+        orientation: orientation,
+        createdAt: new Date().toISOString(),
+        username: state.userData.username
+      };
+      return db.collection('groups').doc(groupId).update(updateData);
+    }).then(function() {
+      setState({groupPhoto: null, groupPhotoOrientation: null, groupView: 'detail'});
+    }).catch(function(e) {
+      console.error(e);
+      alert('Failed to upload photo');
+    });
+  }
+  
+  // Check if user has submitted photo today
+  function hasSubmittedToday(group) {
+    if (!group || !group.photos) return false;
+    var today = getUTCDate();
+    var todayPhotos = group.photos[today];
+    if (!todayPhotos) return false;
+    return !!todayPhotos[state.user.uid];
+  }
+  
+  // Get member info from friends list or fetch
+  function getMemberInfo(memberId, callback) {
+    // Check if it's current user
+    if (memberId === state.user.uid) {
+      callback({
+        id: memberId,
+        username: state.userData.username,
+        avatar: state.userData.avatar
+      });
+      return;
+    }
+    // Check friends list
+    for (var i = 0; i < state.friends.length; i++) {
+      if (state.friends[i].id === memberId) {
+        callback(state.friends[i]);
+        return;
+      }
+    }
+    // Fetch from db
+    db.collection('users').doc(memberId).get().then(function(doc) {
+      if (doc.exists) {
+        var data = doc.data();
+        data.id = memberId;
+        callback(data);
+      } else {
+        callback({id: memberId, username: 'Unknown'});
+      }
+    });
+  }
+  
+  // ===== END GROUPS FEATURE =====
+
   function setReaction(postId, ownerId, emoji) {
     if (!state.user) return;
     var uid = state.user.uid;
@@ -1901,18 +2223,21 @@ window.onerror = function(msg, url, line, col, error) {
         }
       }
       
-      var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '16px 20px 34px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)', pointerEvents: 'auto'}});
-      navbar.appendChild(el('span', {style: {fontSize: '24px', padding: '12px'}}, '🏠'));
+      var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '12px 16px 30px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)', pointerEvents: 'auto'}});
+      navbar.appendChild(el('span', {style: {fontSize: '22px', padding: '10px'}}, '🏠'));
+      
+      // Groups button
+      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '22px', padding: '10px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('groups'); }}, '👥'));
       
       // + button - disabled if already posted today
       if (state.posted) {
-        var disabledBtn = el('span', {style: {width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', color: '#fff', background: t.border, opacity: '0.5'}}, '✓');
+        var disabledBtn = el('span', {style: {width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#fff', background: t.border, opacity: '0.5'}}, '✓');
         navbar.appendChild(disabledBtn);
       } else {
-        navbar.appendChild(el('span', {className: 'tap', style: {width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', color: '#fff', background: t.accent, position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('post'); }}, '+'));
+        navbar.appendChild(el('span', {className: 'tap', style: {width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#fff', background: t.accent, position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('post'); }}, '+'));
       }
       
-      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '24px', padding: '12px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }}, '👤'));
+      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '22px', padding: '10px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }}, '👤'));
       
       app.appendChild(page);
       app.appendChild(navbar);
@@ -2290,6 +2615,65 @@ window.onerror = function(msg, url, line, col, error) {
       }
       page.appendChild(reactSection);
       
+      // Groups Section
+      var groupNotifs = state.notifications.filter(function(n) { 
+        return n && (n.type === 'group_theme_chooser' || n.type === 'group_invite' || n.type === 'group_theme_set') && n.data && !n.read; 
+      });
+      var groupSection = el('div', {style: {marginBottom: '24px'}});
+      groupSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👥 Groups'));
+      
+      if (groupNotifs.length > 0) {
+        for (var i = 0; i < groupNotifs.length; i++) {
+          (function(notif) {
+            if (!notif || !notif.data) return;
+            
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
+              removeNotification(notif.id);
+              // Navigate to the group
+              for (var gi = 0; gi < state.groups.length; gi++) {
+                if (state.groups[gi].id === notif.data.groupId) {
+                  setState({currentGroup: state.groups[gi], groupView: 'detail', view: 'groups'});
+                  return;
+                }
+              }
+              nav('groups');
+            }});
+            
+            var icon = '👥';
+            var title = '';
+            var subtitle = '';
+            
+            if (notif.type === 'group_theme_chooser') {
+              icon = '👑';
+              title = 'You\'re today\'s Theme Chooser!';
+              subtitle = notif.data.groupName;
+            } else if (notif.type === 'group_invite') {
+              icon = '🎉';
+              title = 'Added to ' + notif.data.groupName;
+              subtitle = 'by ' + (notif.data.invitedBy || 'someone');
+            } else if (notif.type === 'group_theme_set') {
+              icon = '🎯';
+              title = 'New theme: "' + (notif.data.theme || '...') + '"';
+              subtitle = notif.data.groupName + ' by ' + (notif.data.chooserName || 'Theme Chooser');
+            }
+            
+            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, icon));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '500', color: t.text}}, title));
+            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, subtitle));
+            item.appendChild(info);
+            
+            item.appendChild(el('span', {style: {fontSize: '20px', color: t.muted}}, '›'));
+            
+            groupSection.appendChild(item);
+          })(groupNotifs[i]);
+        }
+      } else {
+        groupSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No group notifications'));
+      }
+      page.appendChild(groupSection);
+      
       // Updates Section - Show all updates from UPDATE_NOTES (changelog)
       var updateSection = el('div', {style: {marginBottom: '24px'}});
       updateSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '🆕 Updates'));
@@ -2502,6 +2886,380 @@ window.onerror = function(msg, url, line, col, error) {
       
       // Log out button
       page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600', marginTop: '20px'}, onClick: handleLogout}, 'Log Out'));
+      app.appendChild(page);
+      return;
+    }
+    
+    // Groups
+    if (state.view === 'groups') {
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 120px'}});
+      var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('feed'); }}, '←'));
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '👥 Groups'));
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { setState({groupView: 'info'}); }}, 'ℹ️'));
+      page.appendChild(header);
+      
+      // Group Info View
+      if (state.groupView === 'info') {
+        var infoBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '20px', border: '1px solid ' + t.border}});
+        infoBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: t.text, textAlign: 'center'}}, '📖 How Groups Work'));
+        
+        var sections = [
+          {title: '🎯 Purpose', text: 'Groups run a daily photo challenge between friends. Each day, one member sets a theme and everyone takes a photo matching it.'},
+          {title: '👑 Theme Chooser', text: 'Every day at midnight UTC, a random member becomes the Theme Chooser. Only they can set the day\'s theme (max 100 characters).'},
+          {title: '📸 Photo Rules', text: '• Photos must be taken in-app (no uploads from camera roll)\n• Each member is randomly assigned portrait or landscape orientation\n• You can only submit ONE photo per day\n• Uploads are FINAL - no deleting!'},
+          {title: '🔒 Visibility', text: 'You can only see other members\' photos AFTER you\'ve submitted yours.'},
+          {title: '🖼️ Daily Collage', text: 'At 11:00 PM UTC, all photos are combined into a collage that\'s saved to the group history.'},
+          {title: '🔄 Daily Reset', text: 'At midnight UTC:\n• New Theme Chooser is selected\n• New orientations are assigned\n• Previous day\'s collage is saved'}
+        ];
+        
+        for (var i = 0; i < sections.length; i++) {
+          var sec = el('div', {style: {marginBottom: '16px', paddingBottom: '16px', borderBottom: i < sections.length - 1 ? '1px solid ' + t.border : 'none'}});
+          sec.appendChild(el('p', {style: {margin: '0 0 6px', fontSize: '14px', fontWeight: '600', color: t.accent}}, sections[i].title));
+          sec.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.text, whiteSpace: 'pre-line', lineHeight: '1.5'}}, sections[i].text));
+          infoBox.appendChild(sec);
+        }
+        
+        // Time conversion info
+        var timeBox = el('div', {style: {background: t.bg, borderRadius: '12px', padding: '14px', marginTop: '8px'}});
+        timeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, '🕐 Times in Your Timezone'));
+        timeBox.appendChild(el('p', {style: {margin: '0', fontSize: '12px', color: t.muted}}, 'Theme reset: 12:00 AM UTC = ' + utcToLocalTime(0) + ' local'));
+        timeBox.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '12px', color: t.muted}}, 'Collage created: 11:00 PM UTC = ' + utcToLocalTime(23) + ' local'));
+        infoBox.appendChild(timeBox);
+        
+        infoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', marginTop: '20px', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupView: 'list'}); }}, 'Got it!'));
+        
+        page.appendChild(infoBox);
+        app.appendChild(page);
+        return;
+      }
+      
+      // Create Group View
+      if (state.groupView === 'create') {
+        var createBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '20px', border: '1px solid ' + t.border}});
+        createBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '✨ Create New Group'));
+        
+        // Group name
+        var nameField = el('div', {style: {marginBottom: '16px'}});
+        nameField.appendChild(el('label', {style: {display: 'block', fontSize: '13px', fontWeight: '600', color: t.muted, marginBottom: '6px'}}, 'Group Name'));
+        var nameInput = el('input', {placeholder: 'e.g. Morning Crew', value: state.newGroup.name, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box'}});
+        nameInput.oninput = function(e) { state.newGroup.name = e.target.value; };
+        nameField.appendChild(nameInput);
+        createBox.appendChild(nameField);
+        
+        // Select friends
+        createBox.appendChild(el('label', {style: {display: 'block', fontSize: '13px', fontWeight: '600', color: t.muted, marginBottom: '10px'}}, 'Select Friends (min 2)'));
+        
+        if (state.friends.length === 0) {
+          createBox.appendChild(el('p', {style: {color: t.muted, fontSize: '14px', fontStyle: 'italic', padding: '20px', textAlign: 'center', background: t.bg, borderRadius: '10px'}}, 'Add some friends first to create a group!'));
+        } else {
+          var friendsList = el('div', {style: {maxHeight: '200px', overflowY: 'auto', background: t.bg, borderRadius: '10px', padding: '8px'}});
+          for (var i = 0; i < state.friends.length; i++) {
+            (function(friend) {
+              var isSelected = state.newGroup.members.indexOf(friend.id) !== -1;
+              var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', background: isSelected ? t.accent + '22' : 'transparent', marginBottom: '4px'}, onClick: function() {
+                var members = state.newGroup.members.slice();
+                var idx = members.indexOf(friend.id);
+                if (idx === -1) {
+                  members.push(friend.id);
+                } else {
+                  members.splice(idx, 1);
+                }
+                state.newGroup.members = members;
+                render();
+              }});
+              
+              if (friend.avatar) {
+                friendItem.appendChild(el('img', {src: friend.avatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
+              } else {
+                friendItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+              }
+              friendItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, friend.username));
+              friendItem.appendChild(el('span', {style: {fontSize: '18px'}}, isSelected ? '✅' : '○'));
+              
+              friendsList.appendChild(friendItem);
+            })(state.friends[i]);
+          }
+          createBox.appendChild(friendsList);
+        }
+        
+        createBox.appendChild(el('p', {style: {margin: '12px 0 0', fontSize: '12px', color: t.muted, textAlign: 'center'}}, 'Selected: ' + state.newGroup.members.length + ' friend' + (state.newGroup.members.length !== 1 ? 's' : '') + ' (+ you = ' + (state.newGroup.members.length + 1) + ' members)'));
+        
+        var btns = el('div', {style: {display: 'flex', gap: '10px', marginTop: '20px'}});
+        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', borderRadius: '12px', background: t.bg, color: t.text, textAlign: 'center', fontWeight: '600', border: '1px solid ' + t.border}, onClick: function() { setState({groupView: 'list', newGroup: {name: '', members: []}}); }}, 'Cancel'));
+        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', borderRadius: '12px', background: state.newGroup.members.length >= 2 && state.newGroup.name.trim() ? t.accent : t.border, color: '#fff', textAlign: 'center', fontWeight: '600', opacity: state.newGroup.members.length >= 2 && state.newGroup.name.trim() ? '1' : '0.5'}, onClick: createGroup}, 'Create'));
+        createBox.appendChild(btns);
+        
+        page.appendChild(createBox);
+        app.appendChild(page);
+        return;
+      }
+      
+      // Group Detail View
+      if (state.groupView === 'detail' && state.currentGroup) {
+        var group = state.currentGroup;
+        var today = getUTCDate();
+        var isThemeChooser = group.themeChooserId === state.user.uid;
+        var hasSubmitted = hasSubmittedToday(group);
+        var todayPhotos = group.photos && group.photos[today] ? group.photos[today] : {};
+        var myOrientation = group.orientations ? group.orientations[state.user.uid] : 'portrait';
+        
+        // Group header
+        var groupHeader = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        groupHeader.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: t.text}}, group.name));
+        groupHeader.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+        
+        // Time info
+        var timeInfo = el('div', {style: {marginTop: '12px', padding: '10px', background: t.bg, borderRadius: '10px', fontSize: '11px', color: t.muted}});
+        timeInfo.appendChild(el('span', null, '🕐 Next reset: 12:00 AM UTC (' + utcToLocalTime(0) + ' local)'));
+        groupHeader.appendChild(timeInfo);
+        
+        page.appendChild(groupHeader);
+        
+        // Today's Challenge
+        var challengeBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, "📅 Today's Challenge"));
+        
+        // Theme Chooser info
+        if (isThemeChooser) {
+          challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', color: t.accent, fontWeight: '600'}}, '👑 You are today\'s Theme Chooser!'));
+          
+          if (!group.theme) {
+            // Theme input
+            var themeInput = el('input', {placeholder: 'Set today\'s theme (max 100 chars)', value: state.groupTheme, maxLength: 100, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.accent, background: t.bg, fontSize: '14px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '10px'}});
+            themeInput.oninput = function(e) { state.groupTheme = e.target.value; };
+            challengeBox.appendChild(themeInput);
+            challengeBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '12px', borderRadius: '10px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: '14px'}, onClick: function() { if (state.groupTheme.trim()) setGroupTheme(group.id, state.groupTheme.trim()); }}, 'Set Theme'));
+          } else {
+            challengeBox.appendChild(el('p', {style: {margin: '0', fontSize: '18px', fontWeight: '600', color: t.text, textAlign: 'center', padding: '12px', background: t.bg, borderRadius: '10px'}}, '🎯 "' + group.theme + '"'));
+          }
+        } else {
+          // Show who is theme chooser
+          var chooserName = 'Loading...';
+          challengeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', color: t.muted}}, '👑 Theme Chooser: Loading...'));
+          getMemberInfo(group.themeChooserId, function(info) {
+            // This is async so we can't update the element directly, but for now show placeholder
+          });
+          
+          if (group.theme) {
+            challengeBox.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '18px', fontWeight: '600', color: t.text, textAlign: 'center', padding: '12px', background: t.bg, borderRadius: '10px'}}, '🎯 "' + group.theme + '"'));
+          } else {
+            challengeBox.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '14px', color: t.muted, fontStyle: 'italic', textAlign: 'center'}}, 'Waiting for theme to be set...'));
+          }
+        }
+        
+        page.appendChild(challengeBox);
+        
+        // Your Photo Section
+        var photoBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        photoBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📸 Your Photo'));
+        
+        if (hasSubmitted) {
+          var myPhoto = todayPhotos[state.user.uid];
+          photoBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: '#4CAF50', fontWeight: '500'}}, '✅ Photo submitted!'));
+          photoBox.appendChild(el('img', {src: myPhoto.url, style: {width: '100%', borderRadius: '10px', maxHeight: '200px', objectFit: 'cover'}}));
+        } else {
+          photoBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', color: t.text}}, 'Your orientation: ' + (myOrientation === 'portrait' ? '📱 Portrait' : '🖼️ Landscape')));
+          photoBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: t.muted}}, '⚠️ Upload is FINAL - no deleting!'));
+          
+          if (group.theme || isThemeChooser) {
+            photoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupPhotoOrientation: myOrientation, groupView: 'camera'}); }}, '📷 Take Photo'));
+          } else {
+            photoBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '20px', background: t.bg, borderRadius: '10px'}}, 'Wait for the theme to be set before taking your photo'));
+          }
+        }
+        page.appendChild(photoBox);
+        
+        // Other Members' Photos
+        var othersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        othersBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👥 Group Photos'));
+        
+        if (!hasSubmitted) {
+          othersBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '30px 20px', background: t.bg, borderRadius: '10px'}}, '🔒 Submit your photo to see others\' photos'));
+        } else {
+          var photoCount = Object.keys(todayPhotos).length;
+          if (photoCount <= 1) {
+            othersBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '20px', background: t.bg, borderRadius: '10px'}}, 'No other photos yet today'));
+          } else {
+            var photosGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px'}});
+            for (var odUserId in todayPhotos) {
+              if (odUserId !== state.user.uid) {
+                (function(odUserId, photo) {
+                  var photoItem = el('div', {style: {position: 'relative'}});
+                  photoItem.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: photo.orientation === 'portrait' ? '3/4' : '4/3', objectFit: 'cover', borderRadius: '10px'}}));
+                  photoItem.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '11px', color: t.muted, textAlign: 'center'}}, photo.username || 'Member'));
+                  photosGrid.appendChild(photoItem);
+                })(odUserId, todayPhotos[odUserId]);
+              }
+            }
+            othersBox.appendChild(photosGrid);
+          }
+        }
+        page.appendChild(othersBox);
+        
+        // History Button
+        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() { setState({groupView: 'history'}); }}, '📅 View Past Collages'));
+        
+        // Back button
+        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.card, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500'}, onClick: function() { setState({groupView: 'list', currentGroup: null}); }}, '← Back to Groups'));
+        
+        app.appendChild(page);
+        return;
+      }
+      
+      // Group Camera View
+      if (state.groupView === 'camera' && state.currentGroup) {
+        var camPage = el('div', {style: {minHeight: '100vh', background: '#000', display: 'flex', flexDirection: 'column'}});
+        
+        var camHeader = el('div', {style: {padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}});
+        camHeader.appendChild(el('span', {className: 'tap', style: {color: '#fff', fontSize: '16px', padding: '8px'}, onClick: function() { setState({groupView: 'detail', groupPhoto: null}); }}, '✕ Cancel'));
+        camHeader.appendChild(el('span', {style: {color: '#fff', fontSize: '14px', fontWeight: '600'}}, state.groupPhotoOrientation === 'portrait' ? '📱 Portrait' : '🖼️ Landscape'));
+        camHeader.appendChild(el('div', {style: {width: '60px'}}));
+        camPage.appendChild(camHeader);
+        
+        if (state.groupPhoto) {
+          // Preview
+          var previewWrap = el('div', {style: {flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}});
+          previewWrap.appendChild(el('img', {src: state.groupPhoto, style: {maxWidth: '100%', maxHeight: '60vh', borderRadius: '12px', transform: state.groupPhotoOrientation === 'landscape' ? 'none' : 'none'}}));
+          camPage.appendChild(previewWrap);
+          
+          var confirmBtns = el('div', {style: {padding: '20px', display: 'flex', gap: '12px'}});
+          confirmBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '16px', borderRadius: '12px', background: '#333', color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupPhoto: null}); }}, 'Retake'));
+          confirmBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '16px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { uploadGroupPhoto(state.currentGroup.id, state.groupPhoto, state.groupPhotoOrientation); }}, 'Submit ✓'));
+          camPage.appendChild(confirmBtns);
+          
+          camPage.appendChild(el('p', {style: {color: '#888', fontSize: '12px', textAlign: 'center', padding: '0 20px 30px'}}, '⚠️ This upload is FINAL and cannot be deleted'));
+        } else {
+          // Camera input
+          var camWrap = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'}});
+          
+          var orientGuide = el('div', {style: {width: state.groupPhotoOrientation === 'portrait' ? '200px' : '280px', height: state.groupPhotoOrientation === 'portrait' ? '280px' : '200px', border: '3px dashed #444', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'}});
+          orientGuide.appendChild(el('span', {style: {color: '#666', fontSize: '14px'}}, 'Hold phone ' + (state.groupPhotoOrientation === 'portrait' ? 'vertically' : 'horizontally')));
+          camWrap.appendChild(orientGuide);
+          
+          var fileInput = el('input', {type: 'file', accept: 'image/*', capture: 'environment', style: {display: 'none'}, id: 'groupCameraInput'});
+          fileInput.onchange = function(e) {
+            var f = e.target.files[0];
+            if (f) {
+              var r = new FileReader();
+              r.onloadend = function() {
+                // Resize image
+                var img = new Image();
+                img.onload = function() {
+                  var canvas = document.createElement('canvas');
+                  var maxSize = 1200;
+                  var w = img.width;
+                  var h = img.height;
+                  if (w > h && w > maxSize) {
+                    h = h * maxSize / w;
+                    w = maxSize;
+                  } else if (h > maxSize) {
+                    w = w * maxSize / h;
+                    h = maxSize;
+                  }
+                  canvas.width = w;
+                  canvas.height = h;
+                  var ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, w, h);
+                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85)});
+                };
+                img.src = r.result;
+              };
+              r.readAsDataURL(f);
+            }
+          };
+          camWrap.appendChild(fileInput);
+          
+          var camBtn = el('label', {className: 'tap', for: 'groupCameraInput', style: {width: '80px', height: '80px', borderRadius: '50%', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'}});
+          camBtn.appendChild(el('span', null, '📷'));
+          camWrap.appendChild(camBtn);
+          
+          camWrap.appendChild(el('p', {style: {color: '#888', fontSize: '13px', marginTop: '16px', textAlign: 'center'}}, 'Take a ' + state.groupPhotoOrientation + ' photo'));
+          
+          camPage.appendChild(camWrap);
+        }
+        
+        app.appendChild(camPage);
+        return;
+      }
+      
+      // Group History View
+      if (state.groupView === 'history' && state.currentGroup) {
+        var group = state.currentGroup;
+        var historyBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
+        historyBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '📅 Past Collages - ' + group.name));
+        
+        // Get all dates with photos
+        var dates = group.photos ? Object.keys(group.photos).sort().reverse() : [];
+        var today = getUTCDate();
+        dates = dates.filter(function(d) { return d !== today; }); // Exclude today
+        
+        if (dates.length === 0) {
+          historyBox.appendChild(el('p', {style: {color: t.muted, fontSize: '14px', textAlign: 'center', padding: '40px 20px', background: t.bg, borderRadius: '10px'}}, 'No past collages yet. Check back tomorrow!'));
+        } else {
+          for (var i = 0; i < dates.length; i++) {
+            (function(date) {
+              var dayPhotos = group.photos[date];
+              var photoCount = Object.keys(dayPhotos).length;
+              
+              var dayItem = el('div', {style: {marginBottom: '16px', padding: '12px', background: t.bg, borderRadius: '10px'}});
+              dayItem.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '📅 ' + date));
+              dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
+              
+              // Show photos grid
+              var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px'}});
+              for (var odUserId in dayPhotos) {
+                var photo = dayPhotos[odUserId];
+                grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px'}}));
+              }
+              dayItem.appendChild(grid);
+              
+              historyBox.appendChild(dayItem);
+            })(dates[i]);
+          }
+        }
+        
+        historyBox.appendChild(el('span', {className: 'tap', style: {display: 'block', marginTop: '16px', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500'}, onClick: function() { setState({groupView: 'detail'}); }}, '← Back'));
+        
+        page.appendChild(historyBox);
+        app.appendChild(page);
+        return;
+      }
+      
+      // Groups List (default)
+      page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '14px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600', marginBottom: '20px'}, onClick: function() { setState({groupView: 'create'}); }}, '+ Create New Group'));
+      
+      if (state.groups.length === 0) {
+        var empty = el('div', {style: {textAlign: 'center', padding: '60px 20px'}});
+        empty.appendChild(el('div', {style: {fontSize: '64px', marginBottom: '16px'}}, '👥'));
+        empty.appendChild(el('p', {style: {margin: '0', fontSize: '18px', fontWeight: '600', color: t.text}}, 'No groups yet'));
+        empty.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '14px', color: t.muted}}, 'Create a group to start daily photo challenges with friends!'));
+        page.appendChild(empty);
+      } else {
+        for (var i = 0; i < state.groups.length; i++) {
+          (function(group) {
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', background: t.card, borderRadius: '14px', border: '1px solid ' + t.border, marginBottom: '12px'}, onClick: function() {
+              // Check for day reset when entering group
+              checkGroupDayReset(group);
+              setState({currentGroup: group, groupView: 'detail'});
+            }});
+            
+            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, '👥'));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, group.name));
+            info.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+            
+            var hasSubmitted = hasSubmittedToday(group);
+            item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: hasSubmitted ? '#4CAF50' : t.bg, color: hasSubmitted ? '#fff' : t.muted, fontWeight: '500'}}, hasSubmitted ? '✓ Done' : 'Pending'));
+            
+            item.appendChild(el('span', {style: {fontSize: '20px', color: t.muted}}, '›'));
+            
+            page.appendChild(item);
+          })(state.groups[i]);
+        }
+      }
+      
       app.appendChild(page);
       return;
     }
