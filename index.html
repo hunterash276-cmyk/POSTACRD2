@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.1.9';
+var APP_VERSION = '1.2.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -179,7 +179,9 @@ window.onerror = function(msg, url, line, col, error) {
     '1.1.6': 'Added custom app icon! When you add Postcard to your home screen, it now shows the beautiful new logo.',
     '1.1.7': 'Fixed navigation buttons at the bottom of the screen - they now work properly even when postcards are displayed.',
     '1.1.8': 'Fixed birthday picker on signup - should now work properly on all devices including iOS and Android.',
-    '1.1.9': 'Fixed bottom navigation buttons - profile and post buttons now work reliably when postcards are on screen.'
+    '1.1.9': 'Fixed bottom navigation buttons - profile and post buttons now work reliably when postcards are on screen.',
+    '1.2.0': 'New friend code system! Each user now has a unique 8-character friend code (case-sensitive). Find yours on your profile page and share it with friends to connect!',
+    '1.2.1': 'Fixed duplicate posting bug. Delete button is now more visible on your postcards. Deleting today\'s post lets you create a new one!'
   };
 
   var state = {
@@ -215,7 +217,8 @@ window.onerror = function(msg, url, line, col, error) {
     savingProfile: false,
     birthdayPopup: null,
     notifications: loadedNotifications,
-    weeklyLookbackPosts: null
+    weeklyLookbackPosts: null,
+    deleteConfirm: null  // Post to confirm deletion
   };
 
   function setState(updates) {
@@ -262,6 +265,34 @@ window.onerror = function(msg, url, line, col, error) {
         var data = doc.data();
         state.userData = {id: uid};
         for (var k in data) state.userData[k] = data[k];
+        
+        // Generate friend code for existing users who don't have one
+        if (!data.friendCode) {
+          var generateAndSaveCode = function(attempt) {
+            if (attempt > 10) {
+              // Fallback: use uid prefix
+              var code = uid.substring(0, 8);
+              db.collection('users').doc(uid).update({friendCode: code}).then(function() {
+                state.userData.friendCode = code;
+                render();
+              });
+              return;
+            }
+            var code = generateFriendCode();
+            db.collection('users').where('friendCode', '==', code).get().then(function(snap) {
+              if (snap.empty) {
+                db.collection('users').doc(uid).update({friendCode: code}).then(function() {
+                  state.userData.friendCode = code;
+                  render();
+                });
+              } else {
+                generateAndSaveCode(attempt + 1);
+              }
+            });
+          };
+          generateAndSaveCode(1);
+        }
+        
         loadPosts(uid);
         loadFriends(uid);
         loadFriendRequests(uid);
@@ -695,6 +726,16 @@ window.onerror = function(msg, url, line, col, error) {
     return false;
   }
 
+  // Generate a unique 8-character friend code (case-sensitive: uppercase, lowercase, numbers)
+  function generateFriendCode() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // Excluded confusing chars: I,l,O,0,1
+    var code = '';
+    for (var i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
   function handleSignup() {
     var a = state.authData;
     if (!a.email || !a.password || !a.username || !a.birthday) {
@@ -703,13 +744,14 @@ window.onerror = function(msg, url, line, col, error) {
     }
     setState({authLoading: true, authError: ''});
     auth.createUserWithEmailAndPassword(a.email, a.password).then(function(cred) {
-      var saveUser = function(avatarUrl) {
+      var saveUser = function(avatarUrl, friendCode) {
         var userData = {
           username: a.username,
           email: a.email,
           birthday: a.birthday,
           avatar: avatarUrl,
           friends: [],
+          friendCode: friendCode,
           createdAt: new Date().toISOString()
         };
         db.collection('users').doc(cred.user.uid).set(userData).then(function() {
@@ -717,14 +759,41 @@ window.onerror = function(msg, url, line, col, error) {
           setState({userData: userData, authLoading: false});
         });
       };
-      if (a.avatar) {
-        var ref = storage.ref('avatars/' + cred.user.uid);
-        ref.putString(a.avatar, 'data_url').then(function() {
-          ref.getDownloadURL().then(saveUser);
+      
+      // Generate unique friend code - check for collisions
+      var tryCode = function(attempt) {
+        if (attempt > 10) {
+          // Fallback: use uid prefix if too many collisions
+          var code = cred.user.uid.substring(0, 8);
+          if (a.avatar) {
+            var ref = storage.ref('avatars/' + cred.user.uid);
+            ref.putString(a.avatar, 'data_url').then(function() {
+              ref.getDownloadURL().then(function(url) { saveUser(url, code); });
+            });
+          } else {
+            saveUser(null, code);
+          }
+          return;
+        }
+        var code = generateFriendCode();
+        db.collection('users').where('friendCode', '==', code).get().then(function(snap) {
+          if (snap.empty) {
+            // Code is unique, proceed
+            if (a.avatar) {
+              var ref = storage.ref('avatars/' + cred.user.uid);
+              ref.putString(a.avatar, 'data_url').then(function() {
+                ref.getDownloadURL().then(function(url) { saveUser(url, code); });
+              });
+            } else {
+              saveUser(null, code);
+            }
+          } else {
+            // Collision, try again
+            tryCode(attempt + 1);
+          }
         });
-      } else {
-        saveUser(null);
-      }
+      };
+      tryCode(1);
     }).catch(function(e) {
       setState({authError: e.message, authLoading: false});
     });
@@ -880,6 +949,8 @@ window.onerror = function(msg, url, line, col, error) {
   function submit() {
     var n = state.np;
     if (!n.photo || !n.outfit || !n.songTitle || !n.songArtist || !n.loc) return;
+    // Prevent double-submit
+    if (state.uploading) return;
     setState({uploading: true});
     var ts = Date.now();
     var photoUrl, outfitUrl;
@@ -925,15 +996,16 @@ window.onerror = function(msg, url, line, col, error) {
   function addFriend() {
     var code = state.friendCode.trim();
     if (!code) return;
-    db.collection('users').where('username', '==', code).get().then(function(snap) {
+    // Search by friend code (case-sensitive)
+    db.collection('users').where('friendCode', '==', code).get().then(function(snap) {
       if (snap.empty) {
-        alert('User not found');
+        alert('Friend code not found. Make sure to enter it exactly as shown (codes are case-sensitive).');
         setState({friendCode: ''});
         return;
       }
       var fid = snap.docs[0].id;
       if (fid === state.user.uid) {
-        alert("That's you!");
+        alert("That's your own code!");
         setState({friendCode: ''});
         return;
       }
@@ -1009,9 +1081,12 @@ window.onerror = function(msg, url, line, col, error) {
     }
   }
 
+  function showDeleteConfirm(post) {
+    setState({deleteConfirm: post, showMenu: false});
+  }
+  
   function deletePost(id) {
-    if (!confirm('Delete this postcard?')) return;
-    setState({showMenu: false});
+    setState({deleteConfirm: null});
     db.collection('posts').doc(id).delete().then(function() {
       var newPosts = [];
       for (var i = 0; i < state.myPosts.length; i++) {
@@ -1414,35 +1489,18 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Menu
     if (opts.showMenu && opts.isOwner) {
-      var menuWrap = el('div', {style: {display: 'flex', justifyContent: 'center', marginTop: '12px'}});
-      var menuRel = el('div', {style: {position: 'relative'}});
+      var menuWrap = el('div', {style: {display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '12px'}});
       
-      var dots = el('span', {className: 'tap', style: {display: 'flex', gap: '4px', padding: '8px 16px', background: t.card, borderRadius: '20px', border: '1px solid ' + t.border, alignItems: 'center'}, onClick: function() { setState({showMenu: !state.showMenu}); }});
-      dots.appendChild(el('span', {style: {width: '5px', height: '5px', borderRadius: '50%', background: t.muted}}));
-      dots.appendChild(el('span', {style: {width: '5px', height: '5px', borderRadius: '50%', background: t.muted}}));
-      dots.appendChild(el('span', {style: {width: '5px', height: '5px', borderRadius: '50%', background: t.muted}}));
-      menuRel.appendChild(dots);
+      var saveBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border, color: t.text, fontSize: '13px', fontWeight: '500'}, onClick: function() { saveToCamera(post, owner); }});
+      saveBtn.appendChild(el('span', {style: {fontSize: '16px'}}, '💾'));
+      saveBtn.appendChild(document.createTextNode('Save'));
       
-      if (state.showMenu) {
-        var backdrop = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', zIndex: '99'}, onClick: function() { setState({showMenu: false}); }});
-        menuRel.appendChild(backdrop);
-        
-        var dropdown = el('div', {style: {position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '8px', background: t.card, borderRadius: '14px', border: '1px solid ' + t.border, boxShadow: '0 4px 20px rgba(0,0,0,.15)', overflow: 'hidden', zIndex: '100', minWidth: '200px'}});
-        
-        var saveBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', color: t.text, fontSize: '14px', fontWeight: '500', borderBottom: '1px solid ' + t.border}, onClick: function() { saveToCamera(post, owner); }});
-        saveBtn.appendChild(el('span', {style: {fontSize: '18px'}}, '💾'));
-        saveBtn.appendChild(document.createTextNode('Save to Photos'));
-        
-        var delBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', color: '#e53935', fontSize: '14px', fontWeight: '500'}, onClick: function() { deletePost(post.id); }});
-        delBtn.appendChild(el('span', {style: {fontSize: '18px'}}, '🗑️'));
-        delBtn.appendChild(document.createTextNode('Delete Post'));
-        
-        dropdown.appendChild(saveBtn);
-        dropdown.appendChild(delBtn);
-        menuRel.appendChild(dropdown);
-      }
+      var delBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: '#ffebee', borderRadius: '12px', border: '1px solid #ffcdd2', color: '#c62828', fontSize: '13px', fontWeight: '500'}, onClick: function() { showDeleteConfirm(post); }});
+      delBtn.appendChild(el('span', {style: {fontSize: '16px'}}, '🗑️'));
+      delBtn.appendChild(document.createTextNode('Delete'));
       
-      menuWrap.appendChild(menuRel);
+      menuWrap.appendChild(saveBtn);
+      menuWrap.appendChild(delBtn);
       wrap.appendChild(menuWrap);
     }
     
@@ -1479,6 +1537,32 @@ window.onerror = function(msg, url, line, col, error) {
       var closeBtn = el('span', {className: 'tap', style: {marginTop: '20px', padding: '14px 32px', background: t.accent, color: '#fff', borderRadius: '12px', fontSize: '15px', fontWeight: '600'}, onClick: function() { setState({savedImage: null}); }}, 'Done');
       overlay.appendChild(closeBtn);
       
+      app.appendChild(overlay);
+    }
+    
+    // Delete confirmation modal
+    if (state.deleteConfirm) {
+      var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '1000', padding: '20px'}, onClick: function(e) { if (e.target === overlay) setState({deleteConfirm: null}); }});
+      
+      var box = el('div', {style: {background: t.card, padding: '24px', borderRadius: '20px', textAlign: 'center', maxWidth: '320px', width: '100%'}});
+      box.appendChild(el('div', {style: {fontSize: '48px', marginBottom: '12px'}}, '🗑️'));
+      box.appendChild(el('h3', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '600', color: t.text}}, 'Delete Postcard?'));
+      box.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', color: t.muted}}, 'This action cannot be undone.'));
+      
+      // Check if this is today's post
+      var today = new Date().toISOString().split('T')[0];
+      if (state.deleteConfirm.date === today) {
+        box.appendChild(el('p', {style: {margin: '0 0 20px', fontSize: '13px', color: t.accent, fontWeight: '500'}}, "✨ You'll be able to post a new postcard today if you delete this one."));
+      } else {
+        box.appendChild(el('div', {style: {height: '12px'}}));
+      }
+      
+      var btns = el('div', {style: {display: 'flex', gap: '12px'}});
+      btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', borderRadius: '12px', background: t.bg, color: t.text, fontSize: '15px', fontWeight: '600', border: '1px solid ' + t.border}, onClick: function() { setState({deleteConfirm: null}); }}, 'Cancel'));
+      btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', borderRadius: '12px', background: '#e53935', color: '#fff', fontSize: '15px', fontWeight: '600'}, onClick: function() { deletePost(state.deleteConfirm.id); }}, 'Delete'));
+      box.appendChild(btns);
+      
+      overlay.appendChild(box);
       app.appendChild(overlay);
     }
     
@@ -2411,6 +2495,34 @@ window.onerror = function(msg, url, line, col, error) {
       stats.appendChild(stat2);
       info.appendChild(stats);
       
+      // Your Friend Code (for sharing)
+      var codeSection = el('div', {style: {width: '100%', marginBottom: '20px', padding: '16px', borderRadius: '16px', border: '2px dashed ' + t.accent, background: t.card, textAlign: 'center'}});
+      codeSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, '🔗 Your Friend Code'));
+      var codeDisplay = el('div', {style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}});
+      var friendCodeValue = (state.userData && state.userData.friendCode) ? state.userData.friendCode : 'Loading...';
+      codeDisplay.appendChild(el('span', {style: {fontSize: '24px', fontWeight: '700', color: t.accent, letterSpacing: '2px', fontFamily: 'monospace'}}, friendCodeValue));
+      if (state.userData && state.userData.friendCode) {
+        codeDisplay.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '8px', background: t.bg, fontSize: '12px', color: t.muted}, onClick: function() {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(state.userData.friendCode).then(function() {
+              alert('Friend code copied!');
+            });
+          } else {
+            // Fallback for older browsers
+            var ta = document.createElement('textarea');
+            ta.value = state.userData.friendCode;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            alert('Friend code copied!');
+          }
+        }}, '📋 Copy'));
+      }
+      codeSection.appendChild(codeDisplay);
+      codeSection.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '11px', color: t.muted}}, 'Share this code with friends (case-sensitive)'));
+      info.appendChild(codeSection);
+      
       // Friend Requests
       if (state.friendRequests.length > 0) {
         var reqSection = el('div', {style: {width: '100%', marginBottom: '20px', padding: '16px', borderRadius: '16px', background: '#fff8e1', border: '1px solid #ffcc80'}});
@@ -2447,13 +2559,14 @@ window.onerror = function(msg, url, line, col, error) {
       addWrap.appendChild(el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '14px', background: t.accent, color: '#fff', fontWeight: '600', fontSize: '14px'}, onClick: function() { setState({showAddFriend: !state.showAddFriend}); }}, state.showAddFriend ? '✕ Close' : '👥 Add Friends'));
       if (state.showAddFriend) {
         var addBox = el('div', {style: {marginTop: '12px', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card}});
-        addBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, 'Add by username:'));
+        addBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, 'Enter friend code:'));
         var addRow = el('div', {style: {display: 'flex', gap: '8px'}});
-        var addInput = el('input', {placeholder: 'Username', value: state.friendCode, style: {flex: '1', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '14px', color: t.text, outline: 'none'}});
+        var addInput = el('input', {placeholder: 'e.g. AbC12xYz', value: state.friendCode, style: {flex: '1', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '16px', color: t.text, outline: 'none', fontFamily: 'monospace', letterSpacing: '1px'}});
         addInput.oninput = function(e) { state.friendCode = e.target.value; };
         addRow.appendChild(addInput);
         addRow.appendChild(el('span', {className: 'tap', style: {padding: '12px 16px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600'}, onClick: addFriend}, 'Add'));
         addBox.appendChild(addRow);
+        addBox.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '11px', color: t.muted}}, 'Codes are case-sensitive'));
         addWrap.appendChild(addBox);
       }
       info.appendChild(addWrap);
