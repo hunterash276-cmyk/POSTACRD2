@@ -2058,11 +2058,11 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(el('div', {style: {width: '48px'}}));
       page.appendChild(header);
       
-      // Separate notifications by type
+      // Separate notifications by type (with null safety)
       var friendRequestNotifs = state.friendRequests || [];
-      var reactionNotifs = state.notifications.filter(function(n) { return n.type === 'reaction'; });
-      var weeklyNotifs = state.notifications.filter(function(n) { return n.type === 'weeklyLookback'; });
-      var updateNotifs = state.notifications.filter(function(n) { return n.type === 'update'; });
+      var reactionNotifs = state.notifications.filter(function(n) { return n && n.type === 'reaction' && n.data; });
+      var weeklyNotifs = state.notifications.filter(function(n) { return n && n.type === 'weeklyLookback' && n.data; });
+      var updateNotifs = state.notifications.filter(function(n) { return n && n.type === 'update' && n.data; });
       
       // Friend Requests Section - ALWAYS SHOW HEADER
       var frSection = el('div', {style: {marginBottom: '24px'}});
@@ -2128,15 +2128,17 @@ window.onerror = function(msg, url, line, col, error) {
       if (unreadReactions.length > 0) {
         for (var i = 0; i < unreadReactions.length; i++) {
           (function(notif) {
+            if (!notif || !notif.data) return; // Skip invalid notifications
+            
             var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
               // Mark as read and remove from notifications
               removeNotification(notif.id);
             }});
             
-            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, notif.data.emoji));
+            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, notif.data.emoji || '❤️'));
             
             var info = el('div', {style: {flex: '1'}});
-            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '500', color: t.text}}, notif.data.fromUsername + ' reacted ' + notif.data.emoji));
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '500', color: t.text}}, (notif.data.fromUsername || 'Someone') + ' reacted ' + (notif.data.emoji || '❤️')));
             info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'to your postcard'));
             item.appendChild(info);
             
@@ -2180,7 +2182,7 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Weekly Recaps List View
     if (state.view === 'weeklyRecapsList') {
-      var weeklyNotifs = state.notifications.filter(function(n) { return n.type === 'weeklyLookback'; });
+      var weeklyNotifs = state.notifications.filter(function(n) { return n && n.type === 'weeklyLookback' && n.data; });
       
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
