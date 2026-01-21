@@ -43,6 +43,14 @@
 // App version - CHANGE THIS when you update the app
 var APP_VERSION = '1.4.0';
 
+// iTunes API Proxy Configuration
+// Using allOrigins - a free public CORS proxy (no setup needed!)
+// Alternative options:
+//   'https://corsproxy.io/?' 
+//   'https://cors-anywhere.herokuapp.com/'
+//   null (direct API - will be blocked by CORS)
+var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
+
 // Force update check for iOS PWA
 (function checkForUpdates() {
   var storedVersion = localStorage.getItem('postcard_version');
@@ -1113,8 +1121,19 @@ window.onerror = function(msg, url, line, col, error) {
     }
     setState({itunesSearching: true, itunesResults: []});
     
-    var url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=10';
-    console.log('[iTunes] Fetching URL:', url);
+    // Build iTunes URL
+    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=10';
+    
+    // Use proxy if configured
+    var url;
+    if (ITUNES_PROXY_URL) {
+      // For allOrigins or similar proxies that need the full URL encoded
+      url = ITUNES_PROXY_URL + encodeURIComponent(itunesUrl);
+      console.log('[iTunes] Using CORS proxy:', url);
+    } else {
+      url = itunesUrl;
+      console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
+    }
     
     fetch(url)
       .then(function(response) { 
@@ -1133,7 +1152,11 @@ window.onerror = function(msg, url, line, col, error) {
         // Provide helpful error message based on error type
         var errorMsg = 'iTunes search is not available';
         if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed')) {
-          errorMsg = 'iTunes API is blocked by your network or browser. Switching to manual entry...';
+          if (ITUNES_PROXY_URL) {
+            errorMsg = 'Could not reach iTunes proxy. Switching to manual entry...';
+          } else {
+            errorMsg = 'iTunes API is blocked by CORS. Switching to manual entry...';
+          }
           console.log('[iTunes] Network/CORS error detected - auto-switching to manual entry');
           // Auto-switch to manual entry after 1 second
           setTimeout(function() {
