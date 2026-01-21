@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.0';
+var APP_VERSION = '1.4.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -199,7 +199,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.3.4': 'Improved group collage layout - photos now properly fill assigned spaces with better aspect ratios.',
     '1.3.5': 'Fixed pending invites display in group settings. Pending members now show correct status.',
     '1.3.6': 'Added theme color picker with 6 rainbow colors (Red, Orange, Yellow, Green, Blue, Purple) for group boxes and backgrounds.',
-    '1.4.0': '🎵 Song Entry: iTunes search available (may be blocked by network restrictions). Manual song entry works offline and is always available. Fixed group customization visibility and navigation bugs. Added comprehensive error handling and auto-fallback.'
+    '1.4.0': '🎵 Song Entry: iTunes search available (may be blocked by network restrictions). Manual song entry works offline and is always available. Fixed group customization visibility and navigation bugs. Added comprehensive error handling and auto-fallback.',
+    '1.4.1': '🔔 FIXED: Update notifications now show badge on mailbox icon! Song search now uses free CORS proxy (allOrigins) - no setup needed. Improved forgot password with better error messages and validation.'
   };
 
   var state = {
@@ -702,8 +703,8 @@ window.onerror = function(msg, url, line, col, error) {
   function getUnreadCount() {
     var count = 0;
     for (var i = 0; i < state.notifications.length; i++) {
-      // Don't count update notifications in badge
-      if (!state.notifications[i].read && state.notifications[i].type !== 'update') count++;
+      // Count ALL unread notifications including updates
+      if (!state.notifications[i].read) count++;
     }
     // Also add pending friend requests
     count += state.friendRequests.length;
