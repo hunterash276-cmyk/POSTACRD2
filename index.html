@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.1.8';
+var APP_VERSION = '1.1.9';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -178,7 +178,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.1.5': 'Updates section now shows full changelog with all version history. Current version is highlighted.',
     '1.1.6': 'Added custom app icon! When you add Postcard to your home screen, it now shows the beautiful new logo.',
     '1.1.7': 'Fixed navigation buttons at the bottom of the screen - they now work properly even when postcards are displayed.',
-    '1.1.8': 'Fixed birthday picker on signup - should now work properly on all devices including iOS and Android.'
+    '1.1.8': 'Fixed birthday picker on signup - should now work properly on all devices including iOS and Android.',
+    '1.1.9': 'Fixed bottom navigation buttons - profile and post buttons now work reliably when postcards are on screen.'
   };
 
   var state = {
@@ -1584,7 +1585,7 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Feed
     if (state.view === 'feed') {
-      var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px'}});
+      var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px', position: 'relative', zIndex: '1', isolation: 'isolate'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px'}});
       var logoWrap = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px'}});
@@ -1777,7 +1778,7 @@ window.onerror = function(msg, url, line, col, error) {
         }
       }
       
-      var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', padding: '16px 20px 34px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)'}});
+      var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '16px 20px 34px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)', pointerEvents: 'auto'}});
       navbar.appendChild(el('span', {style: {fontSize: '24px', padding: '12px'}}, '🏠'));
       
       // + button - disabled if already posted today
@@ -1785,10 +1786,10 @@ window.onerror = function(msg, url, line, col, error) {
         var disabledBtn = el('span', {style: {width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', color: '#fff', background: t.border, opacity: '0.5'}}, '✓');
         navbar.appendChild(disabledBtn);
       } else {
-        navbar.appendChild(el('span', {className: 'tap', style: {width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', color: '#fff', background: t.accent}, onClick: function() { nav('post'); }}, '+'));
+        navbar.appendChild(el('span', {className: 'tap', style: {width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', color: '#fff', background: t.accent, position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('post'); }}, '+'));
       }
       
-      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '24px', padding: '12px', opacity: '0.5'}, onClick: function() { nav('profile'); }}, '👤'));
+      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '24px', padding: '12px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }}, '👤'));
       
       app.appendChild(page);
       app.appendChild(navbar);
