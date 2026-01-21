@@ -322,10 +322,16 @@ window.onerror = function(msg, url, line, col, error) {
         loadGroups(uid);
         loadGroupNotifications(uid);
         
-        // Check for update notification (only once on load)
-        checkForUpdateNotification();
+        // Check for update notification and trigger render if notification was added
+        var notificationAdded = checkForUpdateNotification();
         
         setState({view: 'feed'});
+        
+        // If notification was added, trigger an additional render to update badge
+        if (notificationAdded) {
+          console.log('[Update Check] Triggering render for new notification');
+          setTimeout(function() { render(); }, 100);
+        }
       }
     });
   }
@@ -752,14 +758,21 @@ window.onerror = function(msg, url, line, col, error) {
   
   function checkForUpdateNotification() {
     var lastSeenVersion = localStorage.getItem('postcard_last_seen_version');
+    console.log('[Update Check] Last seen:', lastSeenVersion, 'Current:', APP_VERSION);
+    
+    // If versions are different AND we have notes for this version
     if (lastSeenVersion !== APP_VERSION && UPDATE_NOTES[APP_VERSION]) {
+      console.log('[Update Check] New version detected!');
+      
       // Check if we already have a notification for this version
       var alreadyHasNotif = state.notifications.some(function(n) {
         return n.type === 'update' && n.data && n.data.version === APP_VERSION;
       });
       
       if (!alreadyHasNotif) {
-        // Add notification directly without calling setState
+        console.log('[Update Check] Creating notification for version', APP_VERSION);
+        
+        // Create the notification
         var notif = {
           id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           type: 'update',
@@ -770,14 +783,33 @@ window.onerror = function(msg, url, line, col, error) {
           createdAt: new Date().toISOString(),
           read: false
         };
+        
+        // Add to notifications array
         state.notifications = [notif].concat(state.notifications);
         if (state.notifications.length > 50) state.notifications = state.notifications.slice(0, 50);
+        
+        // Save to localStorage
         localStorage.setItem('postcard_notifications', JSON.stringify(state.notifications));
+        console.log('[Update Check] Notification saved to localStorage');
+        
+        // Update the stored version AFTER creating notification
+        localStorage.setItem('postcard_last_seen_version', APP_VERSION);
+        console.log('[Update Check] Updated last_seen_version to', APP_VERSION);
+        
+        return true; // Indicates a notification was added
+      } else {
+        console.log('[Update Check] Notification already exists for this version');
+        // Still update the stored version
+        localStorage.setItem('postcard_last_seen_version', APP_VERSION);
       }
-      
+    } else if (!lastSeenVersion) {
+      // First time user - just set version without notification
+      console.log('[Update Check] First time user, setting version to', APP_VERSION);
       localStorage.setItem('postcard_last_seen_version', APP_VERSION);
-      return true; // Indicates a notification was added
+    } else {
+      console.log('[Update Check] No update detected');
     }
+    
     return false;
   }
 
