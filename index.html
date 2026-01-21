@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.3';
+var APP_VERSION = '1.4.4';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -202,7 +202,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.0': '🎵 Song Entry: iTunes search available (may be blocked by network restrictions). Manual song entry works offline and is always available. Fixed group customization visibility and navigation bugs. Added comprehensive error handling and auto-fallback.',
     '1.4.1': '🔔 FIXED: Update notifications now show badge on mailbox icon! Song search now uses free CORS proxy (allOrigins) - no setup needed. Improved forgot password with better error messages and validation.',
     '1.4.2': '🎵 Audio stops when you leave the app (no more background playback). Fixed duplicate post bug with stronger submit protection. Button now properly disabled while uploading.',
-    '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.'
+    '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.',
+    '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!'
   };
 
   var state = {
@@ -4510,6 +4511,16 @@ window.onerror = function(msg, url, line, col, error) {
     }
   });
   
+  // Stop audio immediately when page is being unloaded (fastest)
+  window.addEventListener('pagehide', function() {
+    if (currentlyPlayingAudio) {
+      console.log('[Audio] Stopping audio - page hide');
+      currentlyPlayingAudio.pause();
+      currentlyPlayingAudio.currentTime = 0;
+      currentlyPlayingAudio = null;
+    }
+  });
+  
   function setupAudioObserver() {
     // Clean up existing observer
     if (audioObserver) {
@@ -4528,8 +4539,9 @@ window.onerror = function(msg, url, line, col, error) {
         var audio = entry.target.querySelector('audio');
         if (!audio) return;
         
-        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-          // Post is in view, play audio
+        // Play as soon as 30% of card is visible (was 50%)
+        if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
+          // Post is in view, play audio immediately
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
@@ -4540,7 +4552,7 @@ window.onerror = function(msg, url, line, col, error) {
           });
           currentlyPlayingAudio = audio;
         } else {
-          // Post is out of view, stop audio
+          // Post is out of view, stop audio immediately
           if (currentlyPlayingAudio === audio) {
             audio.pause();
             audio.currentTime = 0;
@@ -4549,17 +4561,15 @@ window.onerror = function(msg, url, line, col, error) {
         }
       });
     }, {
-      threshold: [0, 0.5, 1],
-      rootMargin: '-10% 0px'
+      threshold: [0, 0.3, 0.5, 1], // More threshold points for faster detection
+      rootMargin: '0px' // No margin delay (was -10%)
     });
     
-    // Observe all postcards with audio
-    setTimeout(function() {
-      var postcards = document.querySelectorAll('[data-postcard-with-audio]');
-      postcards.forEach(function(card) {
-        audioObserver.observe(card);
-      });
-    }, 100);
+    // Observe all postcards with audio immediately (no delay)
+    var postcards = document.querySelectorAll('[data-postcard-with-audio]');
+    postcards.forEach(function(card) {
+      audioObserver.observe(card);
+    });
   }
   
   // Call setupAudioObserver after each render
