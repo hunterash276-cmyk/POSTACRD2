@@ -184,7 +184,7 @@ window.onerror = function(msg, url, line, col, error) {
     '1.2.1': 'Fixed duplicate posting bug. Delete button is now more visible on your postcards. Deleting today\'s post lets you create a new one!',
     '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.',
     '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".',
-    '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and collages are created at the end of each day. All times are UTC-based with local time conversions shown.'
+    '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and at midnight UTC a beautiful collage is automatically created from all submitted photos (no blank spaces!). All times are UTC-based with local time conversions shown.'
   };
 
   var state = {
@@ -1309,6 +1309,18 @@ window.onerror = function(msg, url, line, col, error) {
   function checkGroupDayReset(group) {
     var today = getUTCDate();
     if (group.currentDate !== today) {
+      var previousDate = group.currentDate;
+      
+      // First, generate collage for the previous day if there are photos
+      if (group.photos && group.photos[previousDate]) {
+        var prevPhotos = group.photos[previousDate];
+        var photoCount = Object.keys(prevPhotos).length;
+        if (photoCount > 0 && (!group.collages || !group.collages[previousDate])) {
+          // Generate collage for previous day
+          generateGroupCollage(group.id, previousDate, prevPhotos);
+        }
+      }
+      
       // New day - reset theme chooser and orientations
       var members = group.members;
       var newThemeChooserIndex = Math.floor(Math.random() * members.length);
@@ -1350,6 +1362,145 @@ window.onerror = function(msg, url, line, col, error) {
           }
         }
       });
+    }
+  }
+  
+  // Generate a collage from the day's photos
+  function generateGroupCollage(groupId, date, photos) {
+    var photoList = [];
+    for (var odUserId in photos) {
+      photoList.push(photos[odUserId]);
+    }
+    
+    if (photoList.length === 0) return;
+    
+    // Calculate grid dimensions based on number of photos
+    var cols, rows;
+    var count = photoList.length;
+    if (count === 1) { cols = 1; rows = 1; }
+    else if (count === 2) { cols = 2; rows = 1; }
+    else if (count <= 4) { cols = 2; rows = 2; }
+    else if (count <= 6) { cols = 3; rows = 2; }
+    else if (count <= 9) { cols = 3; rows = 3; }
+    else { cols = 4; rows = Math.ceil(count / 4); }
+    
+    var cellSize = 300;
+    var canvasWidth = cols * cellSize;
+    var canvasHeight = rows * cellSize;
+    
+    // Create canvas
+    var canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    var ctx = canvas.getContext('2d');
+    
+    // Fill background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Load all images first
+    var loadedImages = [];
+    var loadedCount = 0;
+    
+    function drawCollage() {
+      for (var i = 0; i < loadedImages.length; i++) {
+        var col = i % cols;
+        var row = Math.floor(i / cols);
+        var x = col * cellSize;
+        var y = row * cellSize;
+        var img = loadedImages[i].img;
+        var photo = loadedImages[i].photo;
+        
+        // Calculate cover fit
+        var imgRatio = img.width / img.height;
+        var cellRatio = 1; // Square cells
+        var drawWidth, drawHeight, offsetX, offsetY;
+        
+        if (imgRatio > cellRatio) {
+          drawHeight = cellSize;
+          drawWidth = cellSize * imgRatio;
+          offsetX = -(drawWidth - cellSize) / 2;
+          offsetY = 0;
+        } else {
+          drawWidth = cellSize;
+          drawHeight = cellSize / imgRatio;
+          offsetX = 0;
+          offsetY = -(drawHeight - cellSize) / 2;
+        }
+        
+        // Clip to cell
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, cellSize, cellSize);
+        ctx.clip();
+        ctx.drawImage(img, x + offsetX, y + offsetY, drawWidth, drawHeight);
+        ctx.restore();
+        
+        // Add subtle border
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cellSize, cellSize);
+        
+        // Add username label
+        if (photo.username) {
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(x, y + cellSize - 30, cellSize, 30);
+          ctx.fillStyle = '#fff';
+          ctx.font = '14px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(photo.username, x + cellSize/2, y + cellSize - 10);
+        }
+      }
+      
+      // Add date header
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, canvasWidth, 40);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('📸 ' + date, canvasWidth/2, 27);
+      
+      // Convert to data URL and save
+      var collageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      
+      // Upload collage to storage
+      var ref = storage.ref('groups/' + groupId + '/collages/' + date);
+      ref.putString(collageDataUrl, 'data_url').then(function() {
+        return ref.getDownloadURL();
+      }).then(function(url) {
+        // Save collage URL to group
+        var updateData = {};
+        updateData['collages.' + date] = {
+          url: url,
+          photoCount: photoList.length,
+          createdAt: new Date().toISOString()
+        };
+        return db.collection('groups').doc(groupId).update(updateData);
+      }).catch(function(e) {
+        console.error('Error saving collage:', e);
+      });
+    }
+    
+    // Load images
+    for (var i = 0; i < photoList.length; i++) {
+      (function(photo) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+          loadedImages.push({img: img, photo: photo});
+          loadedCount++;
+          if (loadedCount === photoList.length) {
+            drawCollage();
+          }
+        };
+        img.onerror = function() {
+          loadedCount++;
+          if (loadedCount === photoList.length) {
+            drawCollage();
+          }
+        };
+        img.src = photo.url;
+      })(photoList[i]);
     }
   }
   
@@ -2909,8 +3060,8 @@ window.onerror = function(msg, url, line, col, error) {
           {title: '👑 Theme Chooser', text: 'Every day at midnight UTC, a random member becomes the Theme Chooser. Only they can set the day\'s theme (max 100 characters).'},
           {title: '📸 Photo Rules', text: '• Photos must be taken in-app (no uploads from camera roll)\n• Each member is randomly assigned portrait or landscape orientation\n• You can only submit ONE photo per day\n• Uploads are FINAL - no deleting!'},
           {title: '🔒 Visibility', text: 'You can only see other members\' photos AFTER you\'ve submitted yours.'},
-          {title: '🖼️ Daily Collage', text: 'At 11:00 PM UTC, all photos are combined into a collage that\'s saved to the group history.'},
-          {title: '🔄 Daily Reset', text: 'At midnight UTC:\n• New Theme Chooser is selected\n• New orientations are assigned\n• Previous day\'s collage is saved'}
+          {title: '🖼️ Daily Collage', text: 'At midnight UTC, all submitted photos from the previous day are combined into a collage. The collage only includes photos that were actually submitted - no blank spaces!'},
+          {title: '🔄 Daily Reset', text: 'At midnight UTC:\n• Previous day\'s collage is generated\n• New Theme Chooser is selected\n• New orientations are assigned\n• A fresh challenge begins!'}
         ];
         
         for (var i = 0; i < sections.length; i++) {
@@ -2923,8 +3074,7 @@ window.onerror = function(msg, url, line, col, error) {
         // Time conversion info
         var timeBox = el('div', {style: {background: t.bg, borderRadius: '12px', padding: '14px', marginTop: '8px'}});
         timeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, '🕐 Times in Your Timezone'));
-        timeBox.appendChild(el('p', {style: {margin: '0', fontSize: '12px', color: t.muted}}, 'Theme reset: 12:00 AM UTC = ' + utcToLocalTime(0) + ' local'));
-        timeBox.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '12px', color: t.muted}}, 'Collage created: 11:00 PM UTC = ' + utcToLocalTime(23) + ' local'));
+        timeBox.appendChild(el('p', {style: {margin: '0', fontSize: '12px', color: t.muted}}, 'Daily reset & collage: 12:00 AM UTC = ' + utcToLocalTime(0) + ' local'));
         infoBox.appendChild(timeBox);
         
         infoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', marginTop: '20px', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupView: 'list'}); }}, 'Got it!'));
@@ -3189,8 +3339,15 @@ window.onerror = function(msg, url, line, col, error) {
         var historyBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
         historyBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '📅 Past Collages - ' + group.name));
         
-        // Get all dates with photos
-        var dates = group.photos ? Object.keys(group.photos).sort().reverse() : [];
+        // Get all dates with photos or collages
+        var allDates = {};
+        if (group.photos) {
+          for (var d in group.photos) allDates[d] = true;
+        }
+        if (group.collages) {
+          for (var d in group.collages) allDates[d] = true;
+        }
+        var dates = Object.keys(allDates).sort().reverse();
         var today = getUTCDate();
         dates = dates.filter(function(d) { return d !== today; }); // Exclude today
         
@@ -3199,20 +3356,34 @@ window.onerror = function(msg, url, line, col, error) {
         } else {
           for (var i = 0; i < dates.length; i++) {
             (function(date) {
-              var dayPhotos = group.photos[date];
-              var photoCount = Object.keys(dayPhotos).length;
+              var dayItem = el('div', {style: {marginBottom: '20px', padding: '12px', background: t.bg, borderRadius: '12px'}});
               
-              var dayItem = el('div', {style: {marginBottom: '16px', padding: '12px', background: t.bg, borderRadius: '10px'}});
+              // Check if we have a collage for this date
+              var collage = group.collages && group.collages[date];
+              var dayPhotos = group.photos && group.photos[date];
+              var photoCount = dayPhotos ? Object.keys(dayPhotos).length : 0;
+              
               dayItem.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '📅 ' + date));
               dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
               
-              // Show photos grid
-              var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px'}});
-              for (var odUserId in dayPhotos) {
-                var photo = dayPhotos[odUserId];
-                grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px'}}));
+              if (collage && collage.url) {
+                // Show the collage image
+                dayItem.appendChild(el('img', {src: collage.url, style: {width: '100%', borderRadius: '10px', display: 'block'}}));
+              } else if (dayPhotos && photoCount > 0) {
+                // No collage yet, show photos grid and generate button
+                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px'}});
+                for (var odUserId in dayPhotos) {
+                  var photo = dayPhotos[odUserId];
+                  grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px'}}));
+                }
+                dayItem.appendChild(grid);
+                
+                // Button to generate collage
+                dayItem.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.accent, color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '500'}, onClick: function() {
+                  generateGroupCollage(group.id, date, dayPhotos);
+                  alert('Generating collage... Please check back in a moment!');
+                }}, '🖼️ Generate Collage'));
               }
-              dayItem.appendChild(grid);
               
               historyBox.appendChild(dayItem);
             })(dates[i]);
