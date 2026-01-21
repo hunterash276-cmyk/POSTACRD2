@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.6.1';
+var APP_VERSION = '1.6.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -221,7 +221,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.5': '🎵 FINALLY FIXED: Audio NOW PLAYS ON APP OPEN! Added manual check for posts already visible (IntersectionObserver bug fix). Uses getBoundingClientRect() to detect visible posts on load. NO MORE SCROLLING NEEDED!',
     '1.5.6': '🎵 TESTED & FIXED: Force plays first visible post with 3 retry attempts (50ms, 150ms, 300ms). More robust visibility check (all 4 edges). Comprehensive logging. ACTUALLY WORKS NOW - audio plays on app open!',
     '1.6.0': '🔊 AUTOPLAY FIX: Added "Tap to enable audio" prompt on first load (bypasses browser autoplay policy). Audio automatically enabled when you click ANY tab. After one tap, audio plays instantly forever! SOLVES THE REAL ISSUE!',
-    '1.6.1': '🔊 BUTTON FIXED: Enable audio button now has 200ms delay for DOM, comprehensive logging, uses display:none instead of remove(). Added tap class. Console shows exactly what happens. BUTTON ACTUALLY WORKS NOW!'
+    '1.6.1': '🔊 BUTTON FIXED: Enable audio button now has 200ms delay for DOM, comprehensive logging, uses display:none instead of remove(). Added tap class. Console shows exactly what happens. BUTTON ACTUALLY WORKS NOW!',
+    '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!'
   };
 
   var state = {
@@ -2610,8 +2611,8 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(btns);
       page.appendChild(header);
       
-      // AUDIO AUTOPLAY FIX: Show "tap to enable audio" on first load
-      // Browsers block audio until user interaction - this provides that interaction
+      // AUDIO AUTOPLAY FIX: Show "tap anywhere to enable audio" on first load
+      // Browsers block audio until user interaction - this enables it
       if (!window.audioEnabled) {
         var audioPrompt = el('div', {className: 'tap', style: {
           margin: '16px 20px',
@@ -2623,41 +2624,13 @@ window.onerror = function(msg, url, line, col, error) {
           alignItems: 'center',
           gap: '12px'
         }, onClick: function() {
+          console.log('[Audio] User tapped to enable audio');
           window.audioEnabled = true;
           this.style.display = 'none';
-          
-          console.log('[Audio] User enabled audio - starting playback');
-          
-          // Wait for DOM to be ready, then force play
-          setTimeout(function() {
-            var postcards = document.querySelectorAll('[data-postcard-with-audio]');
-            console.log('[Audio] Found', postcards.length, 'postcards with audio');
-            
-            for (var i = 0; i < postcards.length; i++) {
-              var card = postcards[i];
-              var audio = card.querySelector('audio');
-              if (!audio) {
-                console.log('[Audio] No audio element in card', i);
-                continue;
-              }
-              
-              var rect = card.getBoundingClientRect();
-              var isVisible = rect.top < window.innerHeight && rect.bottom > 0;
-              
-              console.log('[Audio] Card', i, 'visible:', isVisible);
-              
-              if (isVisible && !currentlyPlayingAudio) {
-                console.log('[Audio] PLAYING audio on card', i);
-                audio.play().then(function() {
-                  console.log('[Audio] Play SUCCESS');
-                }).catch(function(e) { 
-                  console.log('[Audio] Play FAILED:', e); 
-                });
-                currentlyPlayingAudio = audio;
-                break;
-              }
-            }
-          }, 200);
+          // Don't try to force play - let the IntersectionObserver handle it naturally
+          // Just trigger a re-check by scrolling slightly
+          window.scrollBy(0, 1);
+          window.scrollBy(0, -1);
         }});
         
         audioPrompt.appendChild(el('span', {style: {fontSize: '24px'}}, '🔊'));
@@ -4680,13 +4653,19 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Play as soon as ANY part is visible (removed ratio check!)
         if (entry.isIntersecting) {
+          // Only play if user has enabled audio
+          if (!window.audioEnabled) {
+            console.log('[Audio] Post visible but audio not enabled yet');
+            return;
+          }
+          
           // Post is in view, play audio immediately
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
           }
           
-          console.log('[Audio] Playing audio - post visible');
+          console.log('[Audio] Playing audio - post visible and audio enabled');
           audio.play().catch(function(e) {
             console.log('[Audio] Play failed:', e);
           });
