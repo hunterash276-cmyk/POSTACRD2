@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.4.0';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -185,7 +185,13 @@ window.onerror = function(msg, url, line, col, error) {
     '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.',
     '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".',
     '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and at midnight UTC a beautiful collage is automatically created from all submitted photos (no blank spaces!). All times are UTC-based with local time conversions shown.',
-    '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.'
+    '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.',
+    '1.3.2': 'Fixed camera guidance labels showing placeholder text. Labels now display proper orientation guidance ("Stand/Lay/Sit").',
+    '1.3.3': 'Group customization: Creators can now customize group name, icon (emoji), box color, and background color via settings.',
+    '1.3.4': 'Improved group collage layout - photos now properly fill assigned spaces with better aspect ratios.',
+    '1.3.5': 'Fixed pending invites display in group settings. Pending members now show correct status.',
+    '1.3.6': 'Added theme color picker with 6 rainbow colors (Red, Orange, Yellow, Green, Blue, Purple) for group boxes and backgrounds.',
+    '1.4.0': '🎵 iTunes Integration: Search and select songs from Apple Music library with album artwork and 30-second previews. Manual entry fallback available. Fixed group customization visibility and navigation bugs.'
   };
 
   var state = {
@@ -1052,24 +1058,36 @@ window.onerror = function(msg, url, line, col, error) {
 
   function searchItunes() {
     var query = state.itunesSearch.trim();
-    if (!query) return;
+    console.log('[iTunes] Search initiated with query:', query);
+    if (!query) {
+      console.log('[iTunes] Search aborted: empty query');
+      return;
+    }
     setState({itunesSearching: true, itunesResults: []});
     
     var url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=10';
+    console.log('[iTunes] Fetching URL:', url);
     
     fetch(url)
-      .then(function(response) { return response.json(); })
+      .then(function(response) { 
+        console.log('[iTunes] Response received, status:', response.status);
+        return response.json(); 
+      })
       .then(function(data) {
+        console.log('[iTunes] Data parsed, results count:', data.results ? data.results.length : 0);
         var results = data.results || [];
         setState({itunesResults: results, itunesSearching: false});
+        console.log('[iTunes] State updated with results');
       })
       .catch(function(e) {
-        console.error('iTunes search error:', e);
+        console.error('[iTunes] Search error:', e);
+        alert('iTunes search failed: ' + e.message + '. Please try manual entry.');
         setState({itunesSearching: false, itunesResults: []});
       });
   }
 
   function selectSong(song) {
+    console.log('[iTunes] Song selected:', song.trackName, 'by', song.artistName);
     setNp({
       songTitle: song.trackName,
       songArtist: song.artistName,
@@ -1080,6 +1098,7 @@ window.onerror = function(msg, url, line, col, error) {
       itunesSearch: '',
       itunesResults: []
     });
+    console.log('[iTunes] Song data saved to state');
   }
 
   function addFriend() {
