@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.7';
+var APP_VERSION = '1.4.8';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -206,7 +206,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!',
     '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).',
     '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!',
-    '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.'
+    '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.',
+    '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!'
   };
 
   var state = {
@@ -3791,69 +3792,29 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Group Name
         membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Name'));
-        var nameInput = el('input', {value: group.name, placeholder: 'Group name', maxLength: 50, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '16px'}});
+        var nameInput = el('input', {value: group.name, placeholder: 'Group name', maxLength: 50, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px'}});
         nameInput.oninput = function(e) { state.editGroupName = e.target.value; };
-        var nameBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '16px'}, onClick: function() {
+        membersBox.appendChild(nameInput);
+        
+        var nameBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
           if (state.editGroupName && state.editGroupName.trim() && state.editGroupName !== group.name) {
             updateGroupName(group.id, state.editGroupName.trim());
           }
         }}, 'Update Name');
-        membersBox.appendChild(nameInput);
         membersBox.appendChild(nameBtn);
         
         // Group Icon (emoji, max 2 characters)
         membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Icon (emoji, max 2 chars)'));
-        var iconInput = el('input', {value: (group.customTheme && group.customTheme.icon) || '👥', placeholder: '👥', maxLength: 2, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '16px', textAlign: 'center'}});
+        var iconInput = el('input', {value: (group.customTheme && group.customTheme.icon) || '👥', placeholder: '👥', maxLength: 2, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px', textAlign: 'center'}});
         iconInput.oninput = function(e) { state.editGroupIcon = e.target.value; };
-        var iconBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
+        membersBox.appendChild(iconInput);
+        
+        var iconBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
           if (state.editGroupIcon && state.editGroupIcon.length <= 2) {
             updateGroupIcon(group.id, state.editGroupIcon);
           }
         }}, 'Update Icon');
-        membersBox.appendChild(iconInput);
         membersBox.appendChild(iconBtn);
-        
-        // Theme Colors
-        membersBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Theme Colors'));
-        
-        var rainbowColors = [
-          {name: 'Red', hex: '#ef4444', emoji: '🔴'},
-          {name: 'Orange', hex: '#f97316', emoji: '🟠'},
-          {name: 'Yellow', hex: '#eab308', emoji: '🟡'},
-          {name: 'Green', hex: '#22c55e', emoji: '🟢'},
-          {name: 'Blue', hex: '#3b82f6', emoji: '🔵'},
-          {name: 'Purple', hex: '#a855f7', emoji: '🟣'}
-        ];
-        
-        // Box Color
-        membersBox.appendChild(el('p', {style: {margin: '12px 0 8px', fontSize: '12px', fontWeight: '600', color: t.text}}, 'Box Color'));
-        var boxColorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginBottom: '16px'}});
-        for (var ci = 0; ci < rainbowColors.length; ci++) {
-          (function(colorObj) {
-            var currentBoxColor = (group.customTheme && group.customTheme.boxColor) || '#3b82f6';
-            var isSelected = currentBoxColor === colorObj.hex;
-            var colorBox = el('div', {className: 'tap', style: {aspectRatio: '1', borderRadius: '10px', background: colorObj.hex, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: isSelected ? '3px solid ' + t.text : '2px solid transparent', cursor: 'pointer'}, onClick: function() {
-              updateGroupTheme(group.id, {boxColor: colorObj.hex});
-            }}, isSelected ? '✓' : colorObj.emoji);
-            boxColorGrid.appendChild(colorBox);
-          })(rainbowColors[ci]);
-        }
-        membersBox.appendChild(boxColorGrid);
-        
-        // Background Color
-        membersBox.appendChild(el('p', {style: {margin: '12px 0 8px', fontSize: '12px', fontWeight: '600', color: t.text}}, 'Background Color'));
-        var bgColorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginBottom: '16px'}});
-        for (var ci = 0; ci < rainbowColors.length; ci++) {
-          (function(colorObj) {
-            var currentBgColor = (group.customTheme && group.customTheme.bgColor) || '#1e293b';
-            var isSelected = currentBgColor === colorObj.hex;
-            var colorBox = el('div', {className: 'tap', style: {aspectRatio: '1', borderRadius: '10px', background: colorObj.hex, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: isSelected ? '3px solid ' + t.text : '2px solid transparent', cursor: 'pointer'}, onClick: function() {
-              updateGroupTheme(group.id, {bgColor: colorObj.hex});
-            }}, isSelected ? '✓' : colorObj.emoji);
-            bgColorGrid.appendChild(colorBox);
-          })(rainbowColors[ci]);
-        }
-        membersBox.appendChild(bgColorGrid);
         
         page.appendChild(membersBox);
         
@@ -4133,10 +4094,9 @@ window.onerror = function(msg, url, line, col, error) {
               setState({currentGroup: group, groupView: 'detail'});
             }});
             
-            // Use custom icon if available
+            // Use custom icon if available, simple styling
             var groupIcon = (group.customTheme && group.customTheme.icon) || '👥';
-            var boxColor = (group.customTheme && group.customTheme.boxColor) || (t.accent + '22');
-            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: boxColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, groupIcon));
+            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, groupIcon));
             
             var info = el('div', {style: {flex: '1'}});
             info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, group.name));
