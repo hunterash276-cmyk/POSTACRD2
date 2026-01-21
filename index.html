@@ -2552,7 +2552,6 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '12px 16px 30px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)', pointerEvents: 'auto'}});
-      navbar.appendChild(el('span', {style: {fontSize: '22px', padding: '10px'}}, '🏠'));
       
       // Groups button
       navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '22px', padding: '10px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('groups'); }}, '👥'));
@@ -2609,12 +2608,13 @@ window.onerror = function(msg, url, line, col, error) {
       // Step 1: Photos
       if (state.step === 1) {
         var content = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '16px'}});
-        content.appendChild(el('p', {style: {color: t.muted, textAlign: 'center', margin: '0', fontSize: '14px'}}, 'Outfit (left) & Photo (right)'));
+        content.appendChild(el('p', {style: {color: t.muted, textAlign: 'center', margin: '0', fontSize: '14px'}}, 'Left: Your outfit/selfie | Right: Best moment'));
         
         var grid = el('div', {style: {display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}});
         var keys = ['outfit', 'photo'];
         var icons = ['👕', '📷'];
-        var labels = ['Outfit', 'Photo'];
+        var labels = ['Outfit/Selfie', 'Best Photo'];
+        var sublabels = ['of the day', 'of the day'];
         
         for (var i = 0; i < 2; i++) {
           (function(idx) {
@@ -2637,9 +2637,10 @@ window.onerror = function(msg, url, line, col, error) {
             if (state.np[k]) {
               label.appendChild(el('img', {src: state.np[k], style: {width: '100%', height: '100%', objectFit: 'cover'}}));
             } else {
-              var ph = el('div', {style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+              var ph = el('div', {style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '12px'}});
               ph.appendChild(el('span', {style: {fontSize: '40px'}}, icons[idx]));
-              ph.appendChild(el('span', {style: {color: t.muted, fontSize: '14px'}}, labels[idx]));
+              ph.appendChild(el('span', {style: {color: t.text, fontSize: '13px', fontWeight: '600', textAlign: 'center'}}, labels[idx]));
+              ph.appendChild(el('span', {style: {color: t.muted, fontSize: '11px', textAlign: 'center'}}, sublabels[idx]));
               label.appendChild(ph);
             }
             box.appendChild(input);
