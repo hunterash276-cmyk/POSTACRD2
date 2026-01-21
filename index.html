@@ -794,7 +794,7 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
 
-  function toggleReaction(postId, ownerId, emoji) {
+  function setReaction(postId, ownerId, emoji) {
     if (!state.user) return;
     var uid = state.user.uid;
     
@@ -807,19 +807,19 @@ window.onerror = function(msg, url, line, col, error) {
             var post = f.posts[j];
             var reactions = post.reactions || {};
             
-            // Toggle reaction
-            if (reactions[uid] === emoji) {
-              delete reactions[uid];
-            } else {
-              reactions[uid] = emoji;
+            // Only set if not already reacted (locked in)
+            if (reactions[uid]) {
+              return; // Already reacted, can't change
             }
+            
+            reactions[uid] = emoji;
             
             // Update Firestore
             db.collection('posts').doc(postId).update({reactions: reactions}).then(function() {
               post.reactions = reactions;
               render();
             }).catch(function(e) {
-              console.error('Error updating reaction:', e);
+              console.error('Error setting reaction:', e);
             });
             return;
           }
@@ -1026,19 +1026,17 @@ window.onerror = function(msg, url, line, col, error) {
       bottom.appendChild(pn);
     }
     
-    // Reactions - only for friends' posts in feed
-    if (opts.showReactions && post.id) {
-      var reactions = post.reactions || {};
-      var myReaction = state.user ? (reactions[state.user.uid] || null) : null;
-      var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
-      
-      // Reaction buttons row
+    // Reactions - for friends' posts in feed (can react) or own posts (view only)
+    var reactions = post.reactions || {};
+    var myReaction = state.user ? (reactions[state.user.uid] || null) : null;
+    var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
+    
+    // Show reaction picker only if: showing reactions, hasn't reacted yet, and it's not my post
+    if (opts.showReactions && post.id && !myReaction) {
       var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
       
       for (var i = 0; i < reactionEmojis.length; i++) {
         (function(emoji) {
-          var isSelected = myReaction === emoji;
-          
           var btn = el('span', {
             className: 'tap',
             style: {
@@ -1049,11 +1047,11 @@ window.onerror = function(msg, url, line, col, error) {
               height: '40px',
               borderRadius: '50%',
               fontSize: '18px',
-              background: isSelected ? t.accent + '22' : t.bg,
-              border: '2px solid ' + (isSelected ? t.accent : t.border)
+              background: t.bg,
+              border: '2px solid ' + t.border
             },
             onClick: function() {
-              toggleReaction(post.id, owner.id, emoji);
+              setReaction(post.id, owner.id, emoji);
             }
           }, emoji);
           reactWrap.appendChild(btn);
@@ -1061,52 +1059,86 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       bottom.appendChild(reactWrap);
+    }
+    
+    // Show my locked-in reaction if I've already reacted
+    if (opts.showReactions && myReaction) {
+      var myReactWrap = el('div', {style: {marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px'}});
+      var myChip = el('span', {style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '8px 14px',
+        borderRadius: '20px',
+        fontSize: '14px',
+        background: t.accent + '22',
+        border: '2px solid ' + t.accent,
+        color: t.text
+      }});
+      myChip.appendChild(el('span', {style: {fontSize: '18px'}}, myReaction));
+      myChip.appendChild(el('span', {style: {fontWeight: '500'}}, 'You reacted'));
+      myReactWrap.appendChild(myChip);
+      bottom.appendChild(myReactWrap);
+    }
+    
+    // Show reactions from friends (for viewing on friends' posts or own posts)
+    // Build list of friend IDs for quick lookup
+    var friendIds = {};
+    for (var fi = 0; fi < state.friends.length; fi++) {
+      friendIds[state.friends[fi].id] = state.friends[fi];
+    }
+    
+    // Determine if this is my own post
+    var isMyPost = state.user && owner && owner.id === state.user.uid;
+    
+    // Collect visible reactions
+    var visibleReactions = [];
+    for (var reactorId in reactions) {
+      if (!reactions[reactorId]) continue;
       
-      // Show confirmed reactions below (who reacted with what)
-      var hasReactions = false;
-      for (var uid in reactions) {
-        if (reactions[uid]) {
-          hasReactions = true;
-          break;
+      // Skip my own reaction (already shown above)
+      if (state.user && reactorId === state.user.uid) continue;
+      
+      // If it's my post, show all reactions
+      // If it's a friend's post, only show reactions from my friends
+      if (isMyPost || friendIds[reactorId]) {
+        var reactorName = 'Someone';
+        if (friendIds[reactorId]) {
+          reactorName = friendIds[reactorId].username;
+        } else if (isMyPost) {
+          // On my own post, try to find the name from the reactor
+          // They might not be my friend but reacted
+          reactorName = 'A friend';
         }
+        visibleReactions.push({
+          emoji: reactions[reactorId],
+          name: reactorName
+        });
+      }
+    }
+    
+    // Show visible reactions (or on own posts for showReactionsReadOnly)
+    if ((opts.showReactions || opts.showReactionsReadOnly) && visibleReactions.length > 0) {
+      var confirmedWrap = el('div', {style: {marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px'}});
+      
+      for (var ri = 0; ri < visibleReactions.length; ri++) {
+        var r = visibleReactions[ri];
+        var chip = el('span', {style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 10px',
+          borderRadius: '12px',
+          fontSize: '12px',
+          background: t.bg,
+          color: t.muted
+        }});
+        chip.appendChild(el('span', {style: {fontSize: '14px'}}, r.emoji));
+        chip.appendChild(el('span', null, r.name));
+        confirmedWrap.appendChild(chip);
       }
       
-      if (hasReactions) {
-        var confirmedWrap = el('div', {style: {marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px'}});
-        
-        for (var uid in reactions) {
-          (function(reactorId, emoji) {
-            // Find reactor name
-            var reactorName = 'Someone';
-            if (state.user && reactorId === state.user.uid) {
-              reactorName = 'You';
-            } else {
-              for (var fi = 0; fi < state.friends.length; fi++) {
-                if (state.friends[fi].id === reactorId) {
-                  reactorName = state.friends[fi].username;
-                  break;
-                }
-              }
-            }
-            
-            var chip = el('span', {style: {
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 10px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              background: t.bg,
-              color: t.muted
-            }});
-            chip.appendChild(el('span', {style: {fontSize: '14px'}}, emoji));
-            chip.appendChild(el('span', null, reactorName));
-            confirmedWrap.appendChild(chip);
-          })(uid, reactions[uid]);
-        }
-        
-        bottom.appendChild(confirmedWrap);
-      }
+      bottom.appendChild(confirmedWrap);
     }
     
     card.appendChild(imgArea);
@@ -1327,6 +1359,7 @@ window.onerror = function(msg, url, line, col, error) {
           item.appendChild(postcardEl(p, p.friend, {
             showPrivate: isMyPost,
             showReactions: !isMyPost,
+            showReactionsReadOnly: isMyPost,
             showStamp: false
           }));
           postsWrap.appendChild(item);
