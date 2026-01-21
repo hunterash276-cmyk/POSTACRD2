@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.6.2';
+var APP_VERSION = '1.7.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -222,7 +222,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.6': '🎵 TESTED & FIXED: Force plays first visible post with 3 retry attempts (50ms, 150ms, 300ms). More robust visibility check (all 4 edges). Comprehensive logging. ACTUALLY WORKS NOW - audio plays on app open!',
     '1.6.0': '🔊 AUTOPLAY FIX: Added "Tap to enable audio" prompt on first load (bypasses browser autoplay policy). Audio automatically enabled when you click ANY tab. After one tap, audio plays instantly forever! SOLVES THE REAL ISSUE!',
     '1.6.1': '🔊 BUTTON FIXED: Enable audio button now has 200ms delay for DOM, comprehensive logging, uses display:none instead of remove(). Added tap class. Console shows exactly what happens. BUTTON ACTUALLY WORKS NOW!',
-    '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!'
+    '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!',
+    '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!'
   };
 
   var state = {
@@ -2611,40 +2612,6 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(btns);
       page.appendChild(header);
       
-      // AUDIO AUTOPLAY FIX: Show "tap anywhere to enable audio" on first load
-      // Browsers block audio until user interaction - this enables it
-      if (!window.audioEnabled) {
-        var audioPrompt = el('div', {className: 'tap', style: {
-          margin: '16px 20px',
-          padding: '16px 20px',
-          borderRadius: '16px',
-          background: t.accent + '15',
-          border: '2px solid ' + t.accent,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }, onClick: function() {
-          console.log('[Audio] User tapped to enable audio');
-          window.audioEnabled = true;
-          this.style.display = 'none';
-          // Don't try to force play - let the IntersectionObserver handle it naturally
-          // Just trigger a re-check by scrolling slightly
-          window.scrollBy(0, 1);
-          window.scrollBy(0, -1);
-        }});
-        
-        audioPrompt.appendChild(el('span', {style: {fontSize: '24px'}}, '🔊'));
-        
-        var textWrap = el('div', {style: {flex: '1'}});
-        textWrap.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '600', color: t.text}}, 'Tap to enable audio'));
-        textWrap.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.textLight}}, 'Music will play automatically'));
-        audioPrompt.appendChild(textWrap);
-        
-        audioPrompt.appendChild(el('span', {style: {fontSize: '20px', color: t.accent}}, '▶'));
-        
-        page.appendChild(audioPrompt);
-      }
-      
       // Show CTA to encourage posting (different message if already posted)
       if (!state.posted) {
         var cta = el('div', {style: {margin: '0 20px 20px', padding: '24px', borderRadius: '20px', textAlign: 'center', border: '2px dashed ' + t.border, background: t.card}});
@@ -4651,29 +4618,22 @@ window.onerror = function(msg, url, line, col, error) {
         var audio = entry.target.querySelector('audio');
         if (!audio) return;
         
-        // Play as soon as ANY part is visible (removed ratio check!)
+        // Play as soon as ANY part is visible
         if (entry.isIntersecting) {
-          // Only play if user has enabled audio
-          if (!window.audioEnabled) {
-            console.log('[Audio] Post visible but audio not enabled yet');
-            return;
-          }
-          
           // Post is in view, play audio immediately
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
           }
           
-          console.log('[Audio] Playing audio - post visible and audio enabled');
           audio.play().catch(function(e) {
-            console.log('[Audio] Play failed:', e);
+            // Silently fail if browser blocks autoplay
+            // Will work after user interaction
           });
           currentlyPlayingAudio = audio;
         } else {
           // Post is out of view, stop audio immediately
           if (currentlyPlayingAudio === audio) {
-            console.log('[Audio] Stopping audio - post not visible');
             audio.pause();
             audio.currentTime = 0;
             currentlyPlayingAudio = null;
@@ -4691,12 +4651,9 @@ window.onerror = function(msg, url, line, col, error) {
       audioObserver.observe(card);
     });
     
-    // CRITICAL: Force play audio for the first visible post IMMEDIATELY
-    // This fixes the "doesn't play on app open" bug
-    // BUT only if user has enabled audio (browser autoplay policy)
+    // Try to play first visible post (will work after user interaction)
     var playFirstVisible = function() {
-      if (currentlyPlayingAudio) return; // Already playing
-      if (!window.audioEnabled) return; // User hasn't enabled audio yet
+      if (currentlyPlayingAudio) return;
       
       var postcards = document.querySelectorAll('[data-postcard-with-audio]');
       for (var i = 0; i < postcards.length; i++) {
@@ -4704,7 +4661,6 @@ window.onerror = function(msg, url, line, col, error) {
         var audio = card.querySelector('audio');
         if (!audio) continue;
         
-        // Check if this post is actually visible
         var rect = card.getBoundingClientRect();
         var windowHeight = window.innerHeight || document.documentElement.clientHeight;
         var windowWidth = window.innerWidth || document.documentElement.clientWidth;
@@ -4717,17 +4673,16 @@ window.onerror = function(msg, url, line, col, error) {
         );
         
         if (isVisible) {
-          console.log('[Audio] FORCE PLAYING first visible post on load');
-          audio.play().catch(function(e) {
-            console.log('[Audio] Force play failed:', e);
+          audio.play().catch(function() {
+            // Silently fail - will work after user interaction
           });
           currentlyPlayingAudio = audio;
-          break; // Only play the first one
+          break;
         }
       }
     };
     
-    // Try multiple times to ensure it works
+    // Try multiple times
     setTimeout(playFirstVisible, 50);
     setTimeout(playFirstVisible, 150);
     setTimeout(playFirstVisible, 300);
