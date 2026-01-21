@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.0.6';
+var APP_VERSION = '1.0.7';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -1357,6 +1357,7 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(btns);
       page.appendChild(header);
       
+      // Show CTA to encourage posting (different message if already posted)
       if (!state.posted) {
         var cta = el('div', {style: {margin: '0 20px 20px', padding: '24px', borderRadius: '20px', textAlign: 'center', border: '2px dashed ' + t.border, background: t.card}});
         cta.appendChild(el('div', {style: {fontSize: '40px', marginBottom: '8px'}}, '📮'));
