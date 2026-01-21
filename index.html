@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.1';
+var APP_VERSION = '1.5.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -214,7 +214,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!',
     '1.4.9': '🔔 FIXED: Update notifications NO LONGER count toward badge. Green update banner now works on first tap (not second). Debug logging enhanced to show "Updates NOT counted". Badge now accurate!',
     '1.5.0': '🎵 FIXED: Song title and artist text below album cover now perfectly centered! Added max-width (280px) and proper padding to ensure text is balanced on both sides of the postcard middle. Applies to feed, downloads, and preview!',
-    '1.5.1': '🔔 FIXED (AGAIN): Update banner FINALLY works on first tap! Uses dismissed flag instead of version on click. Banner onclick sets "dismissed=true", reload saves new version and clears flag. No more double tap!'
+    '1.5.1': '🔔 FIXED (AGAIN): Update banner FINALLY works on first tap! Uses dismissed flag instead of version on click. Banner onclick sets "dismissed=true", reload saves new version and clears flag. No more double tap!',
+    '1.5.2': '🎵 ULTRA-RESPONSIVE AUDIO: Plays at 10% visible (was 30%). Added beforeunload listener for INSTANT stop when swiping off. 5 event listeners total. Audio starts immediately on homepage, stops the moment you swipe up!'
   };
 
   var state = {
@@ -4526,6 +4527,15 @@ window.onerror = function(msg, url, line, col, error) {
   var audioObserver = null;
   var currentlyPlayingAudio = null;
   
+  // INSTANT STOP: beforeunload fires IMMEDIATELY when swiping away (fastest possible)
+  window.addEventListener('beforeunload', function() {
+    if (currentlyPlayingAudio) {
+      currentlyPlayingAudio.pause();
+      currentlyPlayingAudio.currentTime = 0;
+      currentlyPlayingAudio = null;
+    }
+  });
+  
   // Stop audio when app goes to background
   document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
@@ -4549,7 +4559,7 @@ window.onerror = function(msg, url, line, col, error) {
     }
   });
   
-  // Stop audio immediately when page is being unloaded (fastest)
+  // Stop audio immediately when page is being unloaded
   window.addEventListener('pagehide', function() {
     if (currentlyPlayingAudio) {
       console.log('[Audio] Stopping audio - page hide');
@@ -4577,8 +4587,8 @@ window.onerror = function(msg, url, line, col, error) {
         var audio = entry.target.querySelector('audio');
         if (!audio) return;
         
-        // Play as soon as 30% of card is visible (was 50%)
-        if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
+        // Play as soon as 10% of card is visible (ultra-fast start!)
+        if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
           // Post is in view, play audio immediately
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
@@ -4599,8 +4609,8 @@ window.onerror = function(msg, url, line, col, error) {
         }
       });
     }, {
-      threshold: [0, 0.3, 0.5, 1], // More threshold points for faster detection
-      rootMargin: '0px' // No margin delay (was -10%)
+      threshold: [0, 0.1, 0.3, 0.5, 1], // Ultra-sensitive: triggers at 10%
+      rootMargin: '0px' // No margin delay
     });
     
     // Observe all postcards with audio immediately (no delay)
