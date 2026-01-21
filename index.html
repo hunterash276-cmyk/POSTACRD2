@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.2';
+var APP_VERSION = '1.3.3';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -186,7 +186,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".',
     '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and at midnight UTC a beautiful collage is automatically created from all submitted photos (no blank spaces!). All times are UTC-based with local time conversions shown.',
     '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.',
-    '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page instead of home.'
+    '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page.',
+    '1.3.3': '🎨 Group Customization: Creators can now edit group names, set custom group icons (emoji), choose color themes for each group, and customize background colors. Each group can have its own unique look! Access customization in group settings (⚙️).'
   };
 
   var state = {
@@ -1440,6 +1441,44 @@ window.onerror = function(msg, url, line, col, error) {
       }).catch(function(err) {
         alert('Error leaving group: ' + err.message);
       });
+    });
+  }
+  
+  function updateGroupName(groupId, newName) {
+    if (!newName || !newName.trim()) {
+      alert('Please enter a group name');
+      return;
+    }
+    
+    db.collection('groups').doc(groupId).update({
+      name: newName.trim()
+    }).then(function() {
+      alert('Group name updated!');
+    }).catch(function(err) {
+      alert('Error updating name: ' + err.message);
+    });
+  }
+  
+  function updateGroupIcon(groupId, newIcon) {
+    db.collection('groups').doc(groupId).update({
+      icon: newIcon
+    }).then(function() {
+      alert('Group icon updated!');
+    }).catch(function(err) {
+      alert('Error updating icon: ' + err.message);
+    });
+  }
+  
+  function updateGroupTheme(groupId, colorTheme, bgColor) {
+    db.collection('groups').doc(groupId).update({
+      customTheme: {
+        colorTheme: colorTheme,
+        bgColor: bgColor
+      }
+    }).then(function() {
+      alert('Group theme updated!');
+    }).catch(function(err) {
+      alert('Error updating theme: ' + err.message);
     });
   }
   
@@ -3381,14 +3420,24 @@ window.onerror = function(msg, url, line, col, error) {
         var todayPhotos = group.photos && group.photos[today] ? group.photos[today] : {};
         var myOrientation = group.orientations ? group.orientations[state.user.uid] : 'portrait';
         
+        // Apply custom group styling if set
+        var groupTheme = group.customTheme || {};
+        var customCardColor = groupTheme.colorTheme || t.card;
+        var customBgColor = groupTheme.bgColor || t.bg;
+        
+        // Override page background if custom
+        if (groupTheme.bgColor) {
+          page.style.background = groupTheme.bgColor;
+        }
+        
         // Group header
-        var groupHeader = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        var groupHeader = el('div', {style: {background: customCardColor, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
         groupHeader.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: t.text}}, group.name));
         groupHeader.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
         
         // View Members button and Leave Group button
         var buttonsContainer = el('div', {style: {display: 'flex', gap: '8px', marginBottom: '0'}});
-        buttonsContainer.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '8px 16px', borderRadius: '8px', background: t.bg, color: t.accent, fontSize: '13px', fontWeight: '600', border: '1px solid ' + t.accent, textAlign: 'center'}, onClick: function() { setState({groupView: 'members'}); }}, '👥 View Members'));
+        buttonsContainer.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '8px 16px', borderRadius: '8px', background: customBgColor, color: t.accent, fontSize: '13px', fontWeight: '600', border: '1px solid ' + t.accent, textAlign: 'center'}, onClick: function() { setState({groupView: 'members'}); }}, '👥 View Members'));
         
         // Only show Leave Group button if not creator
         if (group.createdBy !== state.user.uid) {
@@ -3398,14 +3447,14 @@ window.onerror = function(msg, url, line, col, error) {
         groupHeader.appendChild(buttonsContainer);
         
         // Time info
-        var timeInfo = el('div', {style: {marginTop: '12px', padding: '10px', background: t.bg, borderRadius: '10px', fontSize: '11px', color: t.muted}});
+        var timeInfo = el('div', {style: {marginTop: '12px', padding: '10px', background: customBgColor, borderRadius: '10px', fontSize: '11px', color: t.muted}});
         timeInfo.appendChild(el('span', null, '🕐 Next reset: 12:00 AM UTC (' + utcToLocalTime(0) + ' local)'));
         groupHeader.appendChild(timeInfo);
         
         page.appendChild(groupHeader);
         
         // Today's Challenge
-        var challengeBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        var challengeBox = el('div', {style: {background: customCardColor, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
         challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, "📅 Today's Challenge"));
         
         // Theme Chooser info
@@ -3441,7 +3490,7 @@ window.onerror = function(msg, url, line, col, error) {
         page.appendChild(challengeBox);
         
         // Your Photo Section
-        var photoBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        var photoBox = el('div', {style: {background: customCardColor, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
         photoBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📸 Your Photo'));
         
         if (hasSubmitted) {
@@ -3455,13 +3504,13 @@ window.onerror = function(msg, url, line, col, error) {
           if (group.theme || isThemeChooser) {
             photoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupPhotoOrientation: myOrientation, groupView: 'camera'}); }}, '📷 Take Photo'));
           } else {
-            photoBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '20px', background: t.bg, borderRadius: '10px'}}, 'Wait for the theme to be set before taking your photo'));
+            photoBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '20px', background: customBgColor, borderRadius: '10px'}}, 'Wait for the theme to be set before taking your photo'));
           }
         }
         page.appendChild(photoBox);
         
         // Other Members' Photos
-        var othersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        var othersBox = el('div', {style: {background: customCardColor, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
         othersBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👥 Group Photos'));
         
         if (!hasSubmitted) {
@@ -3515,7 +3564,6 @@ window.onerror = function(msg, url, line, col, error) {
           (function(memberId) {
             var memberItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: t.bg, borderRadius: '10px', marginBottom: '6px'}});
             
-            // We need to show member info - for now show placeholder
             var isMe = memberId === state.user.uid;
             var isCreator = memberId === group.createdBy;
             
@@ -3630,6 +3678,123 @@ window.onerror = function(msg, url, line, col, error) {
           }
           membersBox.appendChild(addList);
         }
+        
+        // Group Customization Section
+        var customBox = el('div', {style: {marginTop: '24px', padding: '16px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}});
+        customBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '16px', fontWeight: '600', color: t.text}}, '🎨 Group Customization'));
+        
+        // Group Name
+        var nameBox = el('div', {style: {marginBottom: '16px'}});
+        nameBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Name'));
+        var nameInput = el('input', {
+          type: 'text',
+          value: group.name,
+          placeholder: 'Enter group name',
+          style: {width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.bg, fontSize: '14px', color: t.text, boxSizing: 'border-box'}
+        });
+        nameBox.appendChild(nameInput);
+        nameBox.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', marginTop: '8px', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600'}, onClick: function() {
+          updateGroupName(group.id, nameInput.value);
+        }}, 'Update Name'));
+        customBox.appendChild(nameBox);
+        
+        // Group Icon
+        var iconBox = el('div', {style: {marginBottom: '16px'}});
+        iconBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Icon (Emoji)'));
+        var iconInput = el('input', {
+          type: 'text',
+          value: group.icon || '👥',
+          placeholder: 'Enter emoji',
+          maxLength: 2,
+          style: {width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, boxSizing: 'border-box', textAlign: 'center'}
+        });
+        iconBox.appendChild(iconInput);
+        iconBox.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', marginTop: '8px', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600'}, onClick: function() {
+          updateGroupIcon(group.id, iconInput.value);
+        }}, 'Update Icon'));
+        customBox.appendChild(iconBox);
+        
+        // Color Theme
+        var themeBox = el('div', {style: {marginBottom: '16px'}});
+        themeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Box Color Theme'));
+        var colorOptions = [
+          {label: 'Default', value: t.card},
+          {label: 'Blue', value: '#e3f2fd'},
+          {label: 'Green', value: '#e8f5e9'},
+          {label: 'Purple', value: '#f3e5f5'},
+          {label: 'Orange', value: '#fff3e0'},
+          {label: 'Pink', value: '#fce4ec'}
+        ];
+        var selectedColor = (group.customTheme && group.customTheme.colorTheme) || t.card;
+        var colorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px'}});
+        for (var ci = 0; ci < colorOptions.length; ci++) {
+          (function(color) {
+            var colorBtn = el('div', {
+              className: 'tap',
+              style: {
+                padding: '12px',
+                borderRadius: '8px',
+                background: color.value,
+                border: '2px solid ' + (selectedColor === color.value ? t.accent : t.border),
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: t.text
+              },
+              onClick: function() {
+                selectedColor = color.value;
+                var bgColor = (group.customTheme && group.customTheme.bgColor) || t.bg;
+                updateGroupTheme(group.id, color.value, bgColor);
+              }
+            });
+            colorBtn.textContent = color.label;
+            colorGrid.appendChild(colorBtn);
+          })(colorOptions[ci]);
+        }
+        themeBox.appendChild(colorGrid);
+        customBox.appendChild(themeBox);
+        
+        // Background Color
+        var bgBox = el('div', {style: {marginBottom: '0'}});
+        bgBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Background Color'));
+        var bgOptions = [
+          {label: 'Default', value: t.bg},
+          {label: 'Light Blue', value: '#f1f8ff'},
+          {label: 'Light Green', value: '#f0f8f0'},
+          {label: 'Light Purple', value: '#f8f5ff'},
+          {label: 'Light Orange', value: '#fff8f0'},
+          {label: 'Light Pink', value: '#fff5f8'}
+        ];
+        var selectedBg = (group.customTheme && group.customTheme.bgColor) || t.bg;
+        var bgGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px'}});
+        for (var bi = 0; bi < bgOptions.length; bi++) {
+          (function(bgColor) {
+            var bgBtn = el('div', {
+              className: 'tap',
+              style: {
+                padding: '12px',
+                borderRadius: '8px',
+                background: bgColor.value,
+                border: '2px solid ' + (selectedBg === bgColor.value ? t.accent : t.border),
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: t.text
+              },
+              onClick: function() {
+                selectedBg = bgColor.value;
+                var cardColor = (group.customTheme && group.customTheme.colorTheme) || t.card;
+                updateGroupTheme(group.id, cardColor, bgColor.value);
+              }
+            });
+            bgBtn.textContent = bgColor.label;
+            bgGrid.appendChild(bgBtn);
+          })(bgOptions[bi]);
+        }
+        bgBox.appendChild(bgGrid);
+        customBox.appendChild(bgBox);
+        
+        membersBox.appendChild(customBox);
         
         // Delete Group button (only for creator)
         var deleteBox = el('div', {style: {marginTop: '24px', padding: '16px', background: '#ffebee', borderRadius: '12px', border: '1px solid #ef5350'}});
@@ -3803,7 +3968,7 @@ window.onerror = function(msg, url, line, col, error) {
               setState({currentGroup: group, groupView: 'detail'});
             }});
             
-            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, '👥'));
+            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'}}, group.icon || '👥'));
             
             var info = el('div', {style: {flex: '1'}});
             info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, group.name));
