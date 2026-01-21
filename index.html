@@ -708,7 +708,7 @@ window.onerror = function(msg, url, line, col, error) {
         var userField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
         userField.appendChild(el('span', null, '👤'));
         var userInput = el('input', {placeholder: 'Username', value: state.authData.username, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
-        userInput.oninput = function(e) { setAuthData({username: e.target.value}); };
+        userInput.oninput = function(e) { state.authData.username = e.target.value; };
         userField.appendChild(userInput);
         fields.appendChild(userField);
       }
@@ -716,14 +716,14 @@ window.onerror = function(msg, url, line, col, error) {
       var emailField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
       emailField.appendChild(el('span', null, '✉️'));
       var emailInput = el('input', {type: 'email', placeholder: 'Email', value: state.authData.email, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
-      emailInput.oninput = function(e) { setAuthData({email: e.target.value}); };
+      emailInput.oninput = function(e) { state.authData.email = e.target.value; };
       emailField.appendChild(emailInput);
       fields.appendChild(emailField);
       
       var passField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
       passField.appendChild(el('span', null, '🔒'));
       var passInput = el('input', {type: 'password', placeholder: 'Password (6+ chars)', value: state.authData.password, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
-      passInput.oninput = function(e) { setAuthData({password: e.target.value}); };
+      passInput.oninput = function(e) { state.authData.password = e.target.value; };
       passField.appendChild(passInput);
       fields.appendChild(passField);
       
@@ -731,7 +731,7 @@ window.onerror = function(msg, url, line, col, error) {
         var bdayField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
         bdayField.appendChild(el('span', null, '🎂'));
         var bdayInput = el('input', {type: 'date', value: state.authData.birthday, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
-        bdayInput.oninput = function(e) { setAuthData({birthday: e.target.value}); };
+        bdayInput.oninput = function(e) { state.authData.birthday = e.target.value; };
         bdayField.appendChild(bdayInput);
         fields.appendChild(bdayField);
         fields.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted, textAlign: 'center'}}, 'Friends will see your birthday'));
@@ -1114,7 +1114,7 @@ window.onerror = function(msg, url, line, col, error) {
         addBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, 'Add by username:'));
         var addRow = el('div', {style: {display: 'flex', gap: '8px'}});
         var addInput = el('input', {placeholder: 'Username', value: state.friendCode, style: {flex: '1', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '14px', color: t.text, outline: 'none'}});
-        addInput.oninput = function(e) { setState({friendCode: e.target.value}); };
+        addInput.oninput = function(e) { state.friendCode = e.target.value; };
         addRow.appendChild(addInput);
         addRow.appendChild(el('span', {className: 'tap', style: {padding: '12px 16px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600'}, onClick: addFriend}, 'Add'));
         addBox.appendChild(addRow);
