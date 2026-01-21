@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.4';
+var APP_VERSION = '1.3.5';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -188,7 +188,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.',
     '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page.',
     '1.3.3': '🎨 Group Customization: Creators can now edit group names, set custom group icons (emoji), choose color themes for each group, and customize background colors. Each group can have its own unique look! Access customization in group settings (⚙️).',
-    '1.3.4': '🔧 Bug Fixes: All group members can now view the members list (not just creators). Fixed signup/login issues - new accounts now properly navigate to the feed after creation. Improved account creation reliability.'
+    '1.3.4': '🔧 Bug Fixes: All group members can now view the members list (not just creators). Fixed signup/login issues - new accounts now properly navigate to the feed after creation. Improved account creation reliability.',
+    '1.3.5': '📸 Camera Improvements: Fixed orientation instructions to be crystal clear. The dotted guide box now shows exactly how to hold your phone (PORTRAIT/Vertical or LANDSCAPE/Horizontal) with a bright yellow border and large icons. Instructions now match throughout the app!'
   };
 
   var state = {
@@ -3847,8 +3848,21 @@ window.onerror = function(msg, url, line, col, error) {
           // Camera input
           var camWrap = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'}});
           
-          var orientGuide = el('div', {style: {width: state.groupPhotoOrientation === 'portrait' ? '200px' : '280px', height: state.groupPhotoOrientation === 'portrait' ? '280px' : '200px', border: '3px dashed #444', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'}});
-          orientGuide.appendChild(el('span', {style: {color: '#666', fontSize: '14px'}}, 'Hold phone ' + (state.groupPhotoOrientation === 'portrait' ? 'vertically' : 'horizontally')));
+          var orientGuide = el('div', {style: {width: state.groupPhotoOrientation === 'portrait' ? '200px' : '320px', height: state.groupPhotoOrientation === 'portrait' ? '320px' : '200px', border: '3px dashed #ffcc00', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', gap: '12px'}});
+          
+          // Add large emoji to show orientation
+          var emojiIcon = el('div', {style: {fontSize: '48px'}}, state.groupPhotoOrientation === 'portrait' ? '📱' : '🖼️');
+          orientGuide.appendChild(emojiIcon);
+          
+          // Clear text instruction
+          var orientText = el('div', {style: {color: '#ffcc00', fontSize: '16px', fontWeight: '600', textAlign: 'center', lineHeight: '1.4'}}, 
+            state.groupPhotoOrientation === 'portrait' 
+              ? 'Hold Phone\nVERTICALLY\n(Portrait)' 
+              : 'Hold Phone\nHORIZONTALLY\n(Landscape)'
+          );
+          orientText.style.whiteSpace = 'pre-line';
+          orientGuide.appendChild(orientText);
+          
           camWrap.appendChild(orientGuide);
           
           var fileInput = el('input', {type: 'file', accept: 'image/*', capture: 'environment', style: {display: 'none'}, id: 'groupCameraInput'});
@@ -3888,7 +3902,9 @@ window.onerror = function(msg, url, line, col, error) {
           camBtn.appendChild(el('span', null, '📷'));
           camWrap.appendChild(camBtn);
           
-          camWrap.appendChild(el('p', {style: {color: '#888', fontSize: '13px', marginTop: '16px', textAlign: 'center'}}, 'Take a ' + state.groupPhotoOrientation + ' photo'));
+          camWrap.appendChild(el('p', {style: {color: '#ffcc00', fontSize: '14px', marginTop: '16px', textAlign: 'center', fontWeight: '600'}}, 
+            'Take a ' + (state.groupPhotoOrientation === 'portrait' ? 'PORTRAIT (Vertical)' : 'LANDSCAPE (Horizontal)') + ' photo'
+          ));
           
           camPage.appendChild(camWrap);
         }
