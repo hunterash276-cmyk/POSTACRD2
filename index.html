@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.5';
+var APP_VERSION = '1.3.6';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -189,7 +189,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page.',
     '1.3.3': '🎨 Group Customization: Creators can now edit group names, set custom group icons (emoji), choose color themes for each group, and customize background colors. Each group can have its own unique look! Access customization in group settings (⚙️).',
     '1.3.4': '🔧 Bug Fixes: All group members can now view the members list (not just creators). Fixed signup/login issues - new accounts now properly navigate to the feed after creation. Improved account creation reliability.',
-    '1.3.5': '📸 Camera Improvements: Fixed orientation instructions to be crystal clear. The dotted guide box now shows exactly how to hold your phone (PORTRAIT/Vertical or LANDSCAPE/Horizontal) with a bright yellow border and large icons. Instructions now match throughout the app!'
+    '1.3.5': '📸 Camera Improvements: Fixed orientation instructions to be crystal clear. The dotted guide box now shows exactly how to hold your phone (PORTRAIT/Vertical or LANDSCAPE/Horizontal) with a bright yellow border and large icons. Instructions now match throughout the app!',
+    '1.3.6': '🌈 Rainbow Colors: Color themes now use proper rainbow colors (🔴 Red, 🟠 Orange, 🟡 Yellow, 🟢 Green, 🔵 Blue, 🟣 Purple). Fixed duplicate members bug - members now only appear once in the list!'
   };
 
   var state = {
@@ -3564,28 +3565,35 @@ window.onerror = function(msg, url, line, col, error) {
         var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
         membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, isCreator ? '⚙️ Manage Members' : '👥 Group Members'));
         
-        // Current members
-        membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + group.members.length + ')'));
+        // Current members - filter out duplicates just in case
+        var uniqueMembers = [];
+        for (var i = 0; i < group.members.length; i++) {
+          if (uniqueMembers.indexOf(group.members[i]) === -1) {
+            uniqueMembers.push(group.members[i]);
+          }
+        }
+        
+        membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + uniqueMembers.length + ')'));
         
         var membersList = el('div', {style: {marginBottom: '20px'}});
-        for (var i = 0; i < group.members.length; i++) {
+        for (var i = 0; i < uniqueMembers.length; i++) {
           (function(memberId) {
             var memberItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: t.bg, borderRadius: '10px', marginBottom: '6px'}});
             
             var isMe = memberId === state.user.uid;
-            var isCreator = memberId === group.createdBy;
+            var isMemberCreator = memberId === group.createdBy;
             
             // Find in friends or show placeholder
             var memberName = isMe ? 'You' : 'Loading...';
             var memberAvatar = null;
             if (isMe) {
-              memberName = isCreator ? 'You (Creator)' : 'You';
+              memberName = isMemberCreator ? 'You (Creator)' : 'You';
               memberAvatar = state.userData ? state.userData.avatar : null;
             } else {
               for (var fi = 0; fi < state.friends.length; fi++) {
                 if (state.friends[fi].id === memberId) {
                   memberName = state.friends[fi].username;
-                  if (isCreator) memberName += ' (Creator)';
+                  if (isMemberCreator) memberName += ' (Creator)';
                   memberAvatar = state.friends[fi].avatar;
                   break;
                 }
@@ -3605,7 +3613,7 @@ window.onerror = function(msg, url, line, col, error) {
               getMemberInfo(memberId, function(info) {
                 if (info && info.username) {
                   var displayName = info.username;
-                  if (isCreator) displayName += ' (Creator)';
+                  if (isMemberCreator) displayName += ' (Creator)';
                   nameEl.textContent = displayName;
                   if (avatarEl.tagName === 'DIV' && info.username) {
                     avatarEl.textContent = info.username[0].toUpperCase();
@@ -3614,7 +3622,7 @@ window.onerror = function(msg, url, line, col, error) {
               });
             }
             
-            // Remove button (only for group creator, not for themselves)
+            // Remove button (only show if current user is group creator, and this isn't them)
             if (!isMe && isCreator) {
               memberItem.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '6px', background: '#ffebee', color: '#c62828', fontSize: '11px', fontWeight: '600'}, onClick: function() {
                 if (confirm('Remove this member from the group?')) {
@@ -3624,7 +3632,7 @@ window.onerror = function(msg, url, line, col, error) {
             }
             
             membersList.appendChild(memberItem);
-          })(group.members[i]);
+          })(uniqueMembers[i]);
         }
         membersBox.appendChild(membersList);
         
@@ -3726,14 +3734,14 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Color Theme
         var themeBox = el('div', {style: {marginBottom: '16px'}});
-        themeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Box Color Theme'));
+        themeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Box Color Theme (Rainbow)'));
         var colorOptions = [
-          {label: 'Default', value: t.card},
-          {label: 'Blue', value: '#e3f2fd'},
-          {label: 'Green', value: '#e8f5e9'},
-          {label: 'Purple', value: '#f3e5f5'},
-          {label: 'Orange', value: '#fff3e0'},
-          {label: 'Pink', value: '#fce4ec'}
+          {label: '🔴 Red', value: '#ffebee'},
+          {label: '🟠 Orange', value: '#fff3e0'},
+          {label: '🟡 Yellow', value: '#fffde7'},
+          {label: '🟢 Green', value: '#e8f5e9'},
+          {label: '🔵 Blue', value: '#e3f2fd'},
+          {label: '🟣 Purple', value: '#f3e5f5'}
         ];
         var selectedColor = (group.customTheme && group.customTheme.colorTheme) || t.card;
         var colorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px'}});
@@ -3766,14 +3774,14 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Background Color
         var bgBox = el('div', {style: {marginBottom: '0'}});
-        bgBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Background Color'));
+        bgBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Background Color (Rainbow)'));
         var bgOptions = [
-          {label: 'Default', value: t.bg},
-          {label: 'Light Blue', value: '#f1f8ff'},
-          {label: 'Light Green', value: '#f0f8f0'},
-          {label: 'Light Purple', value: '#f8f5ff'},
-          {label: 'Light Orange', value: '#fff8f0'},
-          {label: 'Light Pink', value: '#fff5f8'}
+          {label: '🔴 Red', value: '#fff5f5'},
+          {label: '🟠 Orange', value: '#fff9f0'},
+          {label: '🟡 Yellow', value: '#fffef5'},
+          {label: '🟢 Green', value: '#f0fff0'},
+          {label: '🔵 Blue', value: '#f0f8ff'},
+          {label: '🟣 Purple', value: '#faf5ff'}
         ];
         var selectedBg = (group.customTheme && group.customTheme.bgColor) || t.bg;
         var bgGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px'}});
