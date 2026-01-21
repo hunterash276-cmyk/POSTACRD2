@@ -111,7 +111,10 @@ window.onerror = function(msg, url, line, col, error) {
     activeEdit: null,
     showMenu: false,
     saving: false,
-    uploading: false
+    uploading: false,
+    editProfile: {username: '', avatar: null, newAvatar: null},
+    editingProfile: false,
+    savingProfile: false
   };
 
   function setState(updates) {
@@ -440,6 +443,96 @@ window.onerror = function(msg, url, line, col, error) {
 
   function handleLogout() {
     auth.signOut();
+  }
+
+  function startEditProfile() {
+    setState({
+      editingProfile: true,
+      editProfile: {
+        username: state.userData ? state.userData.username : '',
+        avatar: state.userData ? state.userData.avatar : null,
+        newAvatar: null
+      }
+    });
+  }
+
+  function saveProfile() {
+    var ep = state.editProfile;
+    if (!ep.username.trim()) {
+      alert('Username cannot be empty');
+      return;
+    }
+    setState({savingProfile: true});
+    
+    var updateData = {username: ep.username.trim()};
+    
+    var doUpdate = function(avatarUrl) {
+      if (avatarUrl !== undefined) {
+        updateData.avatar = avatarUrl;
+      }
+      db.collection('users').doc(state.user.uid).update(updateData).then(function() {
+        state.userData.username = updateData.username;
+        if (updateData.avatar !== undefined) {
+          state.userData.avatar = updateData.avatar;
+        }
+        setState({savingProfile: false, editingProfile: false});
+      }).catch(function(e) {
+        console.error('Error saving profile:', e);
+        setState({savingProfile: false});
+        alert('Error saving profile');
+      });
+    };
+    
+    if (ep.newAvatar) {
+      var ref = storage.ref('avatars/' + state.user.uid + '_' + Date.now());
+      ref.putString(ep.newAvatar, 'data_url').then(function() {
+        return ref.getDownloadURL();
+      }).then(function(url) {
+        doUpdate(url);
+      }).catch(function(e) {
+        console.error('Error uploading avatar:', e);
+        setState({savingProfile: false});
+        alert('Error uploading photo');
+      });
+    } else {
+      doUpdate();
+    }
+  }
+
+  function cancelEditProfile() {
+    setState({editingProfile: false, editProfile: {username: '', avatar: null, newAvatar: null}});
+  }
+
+  function unfriend(friendId) {
+    if (!confirm('Remove this friend?')) return;
+    
+    var myId = state.user.uid;
+    
+    // Remove from my friends list
+    db.collection('users').doc(myId).get().then(function(doc) {
+      var myFriends = doc.data().friends || [];
+      var newFriends = [];
+      for (var i = 0; i < myFriends.length; i++) {
+        if (myFriends[i] !== friendId) newFriends.push(myFriends[i]);
+      }
+      return db.collection('users').doc(myId).update({friends: newFriends});
+    }).then(function() {
+      // Remove me from their friends list
+      return db.collection('users').doc(friendId).get();
+    }).then(function(doc) {
+      var theirFriends = doc.data().friends || [];
+      var newFriends = [];
+      for (var i = 0; i < theirFriends.length; i++) {
+        if (theirFriends[i] !== myId) newFriends.push(theirFriends[i]);
+      }
+      return db.collection('users').doc(friendId).update({friends: newFriends});
+    }).then(function() {
+      // Go back to profile
+      nav('profile');
+    }).catch(function(e) {
+      console.error('Error unfriending:', e);
+      alert('Error removing friend');
+    });
   }
 
   function nav(v) {
@@ -1271,13 +1364,82 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Settings
     if (state.view === 'settings') {
-      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px'}});
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
       header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('feed'); }}, '←'));
       header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, 'Settings'));
       header.appendChild(el('div', {style: {width: '48px'}}));
       page.appendChild(header);
       
+      // Profile Section
+      var profileSection = el('div', {style: {padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, marginBottom: '12px'}});
+      profileSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '14px', fontWeight: '600', color: t.text}}, '👤 Profile'));
+      
+      if (state.editingProfile) {
+        // Editing mode
+        var avatarWrap = el('div', {style: {display: 'flex', justifyContent: 'center', marginBottom: '16px'}});
+        var avatarInput = el('input', {type: 'file', accept: 'image/*', style: {display: 'none'}, id: 'editAvatarInput'});
+        avatarInput.onchange = function(e) {
+          var f = e.target.files[0];
+          if (f) {
+            var r = new FileReader();
+            r.onloadend = function() {
+              state.editProfile.newAvatar = r.result;
+              render();
+            };
+            r.readAsDataURL(f);
+          }
+        };
+        var avatarLabel = el('label', {className: 'tap', for: 'editAvatarInput', style: {position: 'relative'}});
+        var avatarSrc = state.editProfile.newAvatar || state.editProfile.avatar;
+        if (avatarSrc) {
+          avatarLabel.appendChild(el('img', {src: avatarSrc, style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover'}}));
+        } else {
+          avatarLabel.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff'}}, state.editProfile.username ? state.editProfile.username[0].toUpperCase() : '?'));
+        }
+        avatarLabel.appendChild(el('div', {style: {position: 'absolute', bottom: '-4px', right: '-4px', width: '28px', height: '28px', borderRadius: '50%', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', border: '2px solid ' + t.card}}, '📷'));
+        avatarWrap.appendChild(avatarInput);
+        avatarWrap.appendChild(avatarLabel);
+        profileSection.appendChild(avatarWrap);
+        
+        // Username field
+        var usernameField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.bg, marginBottom: '12px'}});
+        usernameField.appendChild(el('span', null, '👤'));
+        var usernameInput = el('input', {placeholder: 'Username', value: state.editProfile.username, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
+        usernameInput.oninput = function(e) { state.editProfile.username = e.target.value; };
+        usernameField.appendChild(usernameInput);
+        profileSection.appendChild(usernameField);
+        
+        // Email (read-only)
+        var emailField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.bg, marginBottom: '12px', opacity: '0.6'}});
+        emailField.appendChild(el('span', null, '✉️'));
+        emailField.appendChild(el('span', {style: {flex: '1', fontSize: '15px', color: t.muted}}, state.user ? state.user.email : ''));
+        profileSection.appendChild(emailField);
+        profileSection.appendChild(el('p', {style: {margin: '-8px 0 12px', fontSize: '11px', color: t.muted, textAlign: 'center'}}, 'Email cannot be changed'));
+        
+        // Save/Cancel buttons
+        var editBtns = el('div', {style: {display: 'flex', gap: '8px'}});
+        editBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, textAlign: 'center', fontSize: '14px', color: t.text, background: t.card}, onClick: cancelEditProfile}, 'Cancel'));
+        editBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '12px', borderRadius: '10px', textAlign: 'center', fontSize: '14px', fontWeight: '600', color: '#fff', background: t.accent, opacity: state.savingProfile ? '0.5' : '1'}, onClick: state.savingProfile ? null : saveProfile}, state.savingProfile ? 'Saving...' : 'Save'));
+        profileSection.appendChild(editBtns);
+      } else {
+        // View mode
+        var profileRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px'}});
+        if (state.userData && state.userData.avatar) {
+          profileRow.appendChild(el('img', {src: state.userData.avatar, style: {width: '50px', height: '50px', borderRadius: '16px', objectFit: 'cover'}}));
+        } else {
+          profileRow.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '16px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
+        }
+        var profileInfo = el('div', {style: {flex: '1'}});
+        profileInfo.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, state.userData ? state.userData.username : 'User'));
+        profileInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '13px', color: t.muted}}, state.user ? state.user.email : ''));
+        profileRow.appendChild(profileInfo);
+        profileRow.appendChild(el('span', {className: 'tap', style: {padding: '10px 16px', borderRadius: '10px', background: t.bg, fontSize: '13px', fontWeight: '600', color: t.accent}, onClick: startEditProfile}, 'Edit'));
+        profileSection.appendChild(profileRow);
+      }
+      page.appendChild(profileSection);
+      
+      // Dark mode toggle
       var darkToggle = el('div', {style: {display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, marginBottom: '12px'}});
       var darkInfo = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px'}});
       darkInfo.appendChild(el('span', {style: {fontSize: '24px'}}, state.dark ? '🌙' : '☀️'));
@@ -1288,7 +1450,8 @@ window.onerror = function(msg, url, line, col, error) {
       darkToggle.appendChild(toggle);
       page.appendChild(darkToggle);
       
-      page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600'}, onClick: handleLogout}, 'Log Out'));
+      // Log out button
+      page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600', marginTop: '20px'}, onClick: handleLogout}, 'Log Out'));
       app.appendChild(page);
       return;
     }
@@ -1547,6 +1710,10 @@ window.onerror = function(msg, url, line, col, error) {
       }
       cal.appendChild(days);
       info.appendChild(cal);
+      
+      // Unfriend button
+      var unfriendBtn = el('span', {className: 'tap', style: {display: 'block', width: '100%', marginTop: '20px', padding: '14px', borderRadius: '14px', border: '1px solid #ffcdd2', background: '#ffebee', textAlign: 'center', color: '#e53935', fontSize: '14px', fontWeight: '600'}, onClick: function() { unfriend(friend.id); }}, '👋 Remove Friend');
+      info.appendChild(unfriendBtn);
       
       page.appendChild(info);
       app.appendChild(page);
