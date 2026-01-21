@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.6';
+var APP_VERSION = '1.4.7';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -205,7 +205,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.',
     '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!',
     '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).',
-    '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!'
+    '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!',
+    '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.'
   };
 
   var state = {
@@ -707,12 +708,30 @@ window.onerror = function(msg, url, line, col, error) {
   
   function getUnreadCount() {
     var count = 0;
+    var debugInfo = {reactions: 0, groups: 0, updates: 0, weekly: 0, other: 0};
+    
     for (var i = 0; i < state.notifications.length; i++) {
-      // Count ALL unread notifications including updates
-      if (!state.notifications[i].read) count++;
+      var n = state.notifications[i];
+      // Count unread notifications
+      if (!n.read) {
+        count++;
+        // Debug: track what types are unread
+        if (n.type === 'reaction') debugInfo.reactions++;
+        else if (n.type === 'update') debugInfo.updates++;
+        else if (n.type === 'weeklyLookback') debugInfo.weekly++;
+        else if (n.type && n.type.startsWith('group_')) debugInfo.groups++;
+        else debugInfo.other++;
+      }
     }
+    
     // Also add pending friend requests
     count += state.friendRequests.length;
+    
+    // Log for debugging if count seems wrong
+    if (count > 0) {
+      console.log('[Badge] Unread count:', count, '(Friends:', state.friendRequests.length, 'Reactions:', debugInfo.reactions, 'Groups:', debugInfo.groups, 'Updates:', debugInfo.updates, 'Weekly:', debugInfo.weekly, 'Other:', debugInfo.other + ')');
+    }
+    
     return count;
   }
   
@@ -3180,17 +3199,18 @@ window.onerror = function(msg, url, line, col, error) {
       }
       page.appendChild(weeklySection);
       
-      // Reactions Section - Show all reactions
+      // Reactions Section - Only show UNREAD reactions (dismiss to remove)
+      var unreadReactions = reactionNotifs.filter(function(n) { return !n.read; });
       var reactSection = el('div', {style: {marginBottom: '24px'}});
-      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ Reactions'));
+      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ New Reactions'));
       
-      if (reactionNotifs.length > 0) {
-        for (var i = 0; i < reactionNotifs.length; i++) {
+      if (unreadReactions.length > 0) {
+        for (var i = 0; i < unreadReactions.length; i++) {
           (function(notif) {
             if (!notif || !notif.data) return; // Skip invalid notifications
             
-            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : (t.accent + '11'), border: '1px solid ' + t.border, marginBottom: '8px', opacity: notif.read ? '0.7' : '1'}, onClick: function() { 
-              // Mark as read and remove from notifications
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
+              // Remove from notifications (dismiss)
               removeNotification(notif.id);
             }});
             
@@ -3204,10 +3224,10 @@ window.onerror = function(msg, url, line, col, error) {
             item.appendChild(el('span', {style: {fontSize: '12px', color: t.muted, padding: '4px 8px', background: t.bg, borderRadius: '6px'}}, 'Tap to dismiss'));
             
             reactSection.appendChild(item);
-          })(reactionNotifs[i]);
+          })(unreadReactions[i]);
         }
       } else {
-        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No reactions yet'));
+        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No new reactions'));
       }
       page.appendChild(reactSection);
       
