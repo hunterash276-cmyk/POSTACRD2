@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.3';
+var APP_VERSION = '1.5.4';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -216,7 +216,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.0': '🎵 FIXED: Song title and artist text below album cover now perfectly centered! Added max-width (280px) and proper padding to ensure text is balanced on both sides of the postcard middle. Applies to feed, downloads, and preview!',
     '1.5.1': '🔔 FIXED (AGAIN): Update banner FINALLY works on first tap! Uses dismissed flag instead of version on click. Banner onclick sets "dismissed=true", reload saves new version and clears flag. No more double tap!',
     '1.5.2': '🎵 ULTRA-RESPONSIVE AUDIO: Plays at 10% visible (was 30%). Added beforeunload listener for INSTANT stop when swiping off. 5 event listeners total. Audio starts immediately on homepage, stops the moment you swipe up!',
-    '1.5.3': '🎵 TIKTOK-LEVEL AUDIO: Added continuous focus monitoring (like TikTok/Instagram)! Checks document.hasFocus() and document.hidden EVERY FRAME via requestAnimationFrame. Stops audio the INSTANT you start swiping - no delay at all!'
+    '1.5.3': '🎵 TIKTOK-LEVEL AUDIO: Added continuous focus monitoring (like TikTok/Instagram)! Checks document.hasFocus() and document.hidden EVERY FRAME via requestAnimationFrame. Stops audio the INSTANT you start swiping - no delay at all!',
+    '1.5.4': '🎵 INSTANT AUDIO: REMOVED ratio check - plays as soon as ANY part visible (no need to scroll to trigger!). More aggressive continuous monitoring. Audio plays immediately when post appears, stops instantly when you swipe up!'
   };
 
   var state = {
@@ -4529,33 +4530,32 @@ window.onerror = function(msg, url, line, col, error) {
   var currentlyPlayingAudio = null;
   var lastFocusState = true;
   var lastVisibilityState = 'visible';
+  var monitoringActive = false;
   
-  // CONTINUOUS MONITORING: Check focus/visibility every frame (like TikTok/Instagram)
+  // AGGRESSIVE CONTINUOUS MONITORING: Check focus CONSTANTLY (like TikTok/Instagram)
   function monitorAudioState() {
+    if (!monitoringActive) return;
+    
     var isHidden = document.hidden;
     var hasFocus = document.hasFocus();
     var shouldStop = isHidden || !hasFocus;
     
-    // If state changed and audio is playing, stop immediately
-    if (shouldStop && currentlyPlayingAudio && (lastFocusState || lastVisibilityState === 'visible')) {
-      console.log('[Audio] INSTANT STOP - focus/visibility lost');
+    // Stop IMMEDIATELY if focus/visibility lost
+    if (shouldStop && currentlyPlayingAudio) {
       currentlyPlayingAudio.pause();
       currentlyPlayingAudio.currentTime = 0;
       currentlyPlayingAudio = null;
     }
     
-    // Track state
-    lastFocusState = hasFocus;
-    lastVisibilityState = document.visibilityState;
-    
-    // Continue monitoring every frame
+    // Continue monitoring
     requestAnimationFrame(monitorAudioState);
   }
   
   // Start continuous monitoring
+  monitoringActive = true;
   requestAnimationFrame(monitorAudioState);
   
-  // INSTANT STOP: beforeunload fires IMMEDIATELY when swiping away (fastest possible)
+  // INSTANT STOP: beforeunload fires IMMEDIATELY when swiping away
   window.addEventListener('beforeunload', function() {
     if (currentlyPlayingAudio) {
       currentlyPlayingAudio.pause();
@@ -4567,7 +4567,6 @@ window.onerror = function(msg, url, line, col, error) {
   // Stop audio when app goes to background (backup)
   document.addEventListener('visibilitychange', function() {
     if (document.hidden && currentlyPlayingAudio) {
-      console.log('[Audio] Stopping audio - visibility change');
       currentlyPlayingAudio.pause();
       currentlyPlayingAudio.currentTime = 0;
       currentlyPlayingAudio = null;
@@ -4577,7 +4576,6 @@ window.onerror = function(msg, url, line, col, error) {
   // Also stop audio when page loses focus (backup)
   window.addEventListener('blur', function() {
     if (currentlyPlayingAudio) {
-      console.log('[Audio] Stopping audio - window blur');
       currentlyPlayingAudio.pause();
       currentlyPlayingAudio.currentTime = 0;
       currentlyPlayingAudio = null;
@@ -4587,7 +4585,6 @@ window.onerror = function(msg, url, line, col, error) {
   // Stop audio immediately when page is being unloaded (backup)
   window.addEventListener('pagehide', function() {
     if (currentlyPlayingAudio) {
-      console.log('[Audio] Stopping audio - page hide');
       currentlyPlayingAudio.pause();
       currentlyPlayingAudio.currentTime = 0;
       currentlyPlayingAudio = null;
@@ -4612,21 +4609,23 @@ window.onerror = function(msg, url, line, col, error) {
         var audio = entry.target.querySelector('audio');
         if (!audio) return;
         
-        // Play as soon as 10% of card is visible (ultra-fast start!)
-        if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
+        // Play as soon as ANY part is visible (removed ratio check!)
+        if (entry.isIntersecting) {
           // Post is in view, play audio immediately
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
           }
           
+          console.log('[Audio] Playing audio - post visible');
           audio.play().catch(function(e) {
-            console.log('Audio play failed:', e);
+            console.log('[Audio] Play failed:', e);
           });
           currentlyPlayingAudio = audio;
         } else {
           // Post is out of view, stop audio immediately
           if (currentlyPlayingAudio === audio) {
+            console.log('[Audio] Stopping audio - post not visible');
             audio.pause();
             audio.currentTime = 0;
             currentlyPlayingAudio = null;
@@ -4634,8 +4633,8 @@ window.onerror = function(msg, url, line, col, error) {
         }
       });
     }, {
-      threshold: [0, 0.1, 0.3, 0.5, 1], // Ultra-sensitive: triggers at 10%
-      rootMargin: '0px' // No margin delay
+      threshold: [0, 0.01], // Trigger as soon as ANY part visible
+      rootMargin: '0px'
     });
     
     // Observe all postcards with audio immediately (no delay)
