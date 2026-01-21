@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.2';
+var APP_VERSION = '1.4.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -201,7 +201,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.3.6': 'Added theme color picker with 6 rainbow colors (Red, Orange, Yellow, Green, Blue, Purple) for group boxes and backgrounds.',
     '1.4.0': '🎵 Song Entry: iTunes search available (may be blocked by network restrictions). Manual song entry works offline and is always available. Fixed group customization visibility and navigation bugs. Added comprehensive error handling and auto-fallback.',
     '1.4.1': '🔔 FIXED: Update notifications now show badge on mailbox icon! Song search now uses free CORS proxy (allOrigins) - no setup needed. Improved forgot password with better error messages and validation.',
-    '1.4.2': '🎵 Audio stops when you leave the app (no more background playback). Fixed duplicate post bug with stronger submit protection. Button now properly disabled while uploading.'
+    '1.4.2': '🎵 Audio stops when you leave the app (no more background playback). Fixed duplicate post bug with stronger submit protection. Button now properly disabled while uploading.',
+    '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.'
   };
 
   var state = {
@@ -3682,10 +3683,12 @@ window.onerror = function(msg, url, line, col, error) {
           }
         } else {
           // Show who is theme chooser
-          var chooserName = 'Loading...';
-          challengeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', color: t.muted}}, '👑 Theme Chooser: Loading...'));
+          var chooserInfo = el('p', {style: {margin: '0 0 8px', fontSize: '13px', color: t.muted}}, '👑 Theme Chooser: Loading...');
+          challengeBox.appendChild(chooserInfo);
+          
+          // Get theme chooser info and update display
           getMemberInfo(group.themeChooserId, function(info) {
-            // This is async so we can't update the element directly, but for now show placeholder
+            chooserInfo.textContent = '👑 Theme Chooser: ' + (info.username || 'Unknown');
           });
           
           if (group.theme) {
@@ -3848,25 +3851,8 @@ window.onerror = function(msg, url, line, col, error) {
             var isMe = memberId === state.user.uid;
             var isMeCreator = memberId === group.createdBy;
             
-            getMemberInfo(memberId, function(info) {
-              // This is async, so we can't easily update. For now, render what we have.
-            });
-            
-            // Find in friends or show placeholder
-            var memberName = isMe ? 'You' : 'Loading...';
-            var memberAvatar = null;
-            if (isMe) {
-              memberName = 'You (Creator)';
-              memberAvatar = state.userData ? state.userData.avatar : null;
-            } else {
-              for (var fi = 0; fi < state.friends.length; fi++) {
-                if (state.friends[fi].id === memberId) {
-                  memberName = state.friends[fi].username;
-                  memberAvatar = state.friends[fi].avatar;
-                  break;
-                }
-              }
-            }
+            var memberName = isMe ? (isMeCreator ? 'You (Creator)' : 'You') : 'Loading...';
+            var memberAvatar = isMe && state.userData ? state.userData.avatar : null;
             
             if (memberAvatar) {
               memberItem.appendChild(el('img', {src: memberAvatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
@@ -3874,7 +3860,23 @@ window.onerror = function(msg, url, line, col, error) {
               memberItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, memberName[0].toUpperCase()));
             }
             
-            memberItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, memberName));
+            var nameSpan = el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, memberName);
+            memberItem.appendChild(nameSpan);
+            
+            // Get member info and update display (if not current user)
+            if (!isMe) {
+              getMemberInfo(memberId, function(info) {
+                nameSpan.textContent = info.username || 'Unknown';
+                // Update avatar if available
+                if (info.avatar && !memberAvatar) {
+                  var avatarEl = memberItem.children[0];
+                  if (avatarEl.tagName === 'DIV') {
+                    var img = el('img', {src: info.avatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}});
+                    memberItem.replaceChild(img, avatarEl);
+                  }
+                }
+              });
+            }
             
             // Remove button (not for creator)
             if (!isMe) {
@@ -3899,17 +3901,15 @@ window.onerror = function(msg, url, line, col, error) {
             (function(inviteId) {
               var inviteItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: '#fff8e1', borderRadius: '10px', marginBottom: '6px'}});
               
-              var inviteName = 'Loading...';
-              for (var fi = 0; fi < state.friends.length; fi++) {
-                if (state.friends[fi].id === inviteId) {
-                  inviteName = state.friends[fi].username;
-                  break;
-                }
-              }
-              
               inviteItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: '#ffcc80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'}}, '⏳'));
-              inviteItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, inviteName));
+              var nameSpan = el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, 'Loading...');
+              inviteItem.appendChild(nameSpan);
               inviteItem.appendChild(el('span', {style: {fontSize: '11px', color: t.muted}}, 'Pending'));
+              
+              // Get member info and update display
+              getMemberInfo(inviteId, function(info) {
+                nameSpan.textContent = info.username || 'Unknown';
+              });
               
               pendingList.appendChild(inviteItem);
             })(pendingInvites[i]);
