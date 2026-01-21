@@ -203,6 +203,7 @@ window.onerror = function(msg, url, line, col, error) {
     itunesSearch: '',
     itunesResults: [],
     itunesSearching: false,
+    manualSongEntry: false,
     authMode: 'login',
     authData: {email: '', password: '', username: '', birthday: '', avatar: null},
     authError: '',
@@ -1069,11 +1070,13 @@ window.onerror = function(msg, url, line, col, error) {
   }
 
   function selectSong(song) {
+    setNp({
+      songTitle: song.trackName,
+      songArtist: song.artistName,
+      songArtwork: song.artworkUrl100 || '',
+      songPreview: song.previewUrl || ''
+    });
     setState({
-      'np.songTitle': song.trackName,
-      'np.songArtist': song.artistName,
-      'np.songArtwork': song.artworkUrl100 || '',
-      'np.songPreview': song.previewUrl || '',
       itunesSearch: '',
       itunesResults: []
     });
@@ -1419,6 +1422,73 @@ window.onerror = function(msg, url, line, col, error) {
       
       db.collection('groups').doc(groupId).update(updates).then(function() {
         alert('Member removed');
+      });
+    });
+  }
+  
+  // Update group name (creator only)
+  function updateGroupName(groupId, newName) {
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy !== state.user.uid) {
+        alert('Only the group creator can update the name');
+        return;
+      }
+      
+      db.collection('groups').doc(groupId).update({
+        name: newName
+      }).then(function() {
+        alert('Group name updated!');
+        loadGroups(state.user.uid);
+      });
+    });
+  }
+  
+  // Update group icon (creator only)
+  function updateGroupIcon(groupId, icon) {
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy !== state.user.uid) {
+        alert('Only the group creator can update the icon');
+        return;
+      }
+      
+      var customTheme = group.customTheme || {};
+      customTheme.icon = icon;
+      
+      db.collection('groups').doc(groupId).update({
+        customTheme: customTheme
+      }).then(function() {
+        alert('Group icon updated!');
+        loadGroups(state.user.uid);
+      });
+    });
+  }
+  
+  // Update group theme colors (creator only)
+  function updateGroupTheme(groupId, themeUpdates) {
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy !== state.user.uid) {
+        alert('Only the group creator can update the theme');
+        return;
+      }
+      
+      var customTheme = group.customTheme || {};
+      for (var key in themeUpdates) {
+        customTheme[key] = themeUpdates[key];
+      }
+      
+      db.collection('groups').doc(groupId).update({
+        customTheme: customTheme
+      }).then(function() {
+        loadGroups(state.user.uid);
       });
     });
   }
@@ -2663,7 +2733,7 @@ window.onerror = function(msg, url, line, col, error) {
         // Song Search Section
         var songSection = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '12px'}});
         
-        // Show selected song or search interface
+        // Show selected song or search/manual interface
         if (state.np.songTitle && state.np.songArtist) {
           var selectedSong = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
           if (state.np.songArtwork) {
@@ -2673,10 +2743,32 @@ window.onerror = function(msg, url, line, col, error) {
           songInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, '🎵 ' + state.np.songTitle));
           songInfo.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.textLight}}, state.np.songArtist));
           selectedSong.appendChild(songInfo);
-          selectedSong.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.textLight}, onClick: function() { setState({'np.songTitle': '', 'np.songArtist': '', 'np.songArtwork': '', 'np.songPreview': ''}); }}, '✕'));
+          selectedSong.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.textLight}, onClick: function() { setNp({songTitle: '', songArtist: '', songArtwork: '', songPreview: ''}); setState({manualSongEntry: false}); }}, '✕'));
           songSection.appendChild(selectedSong);
+        } else if (state.manualSongEntry) {
+          // Manual entry mode
+          var manualBox = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
+          
+          var titleInput = el('input', {placeholder: 'Song title', value: state.np.songTitle, style: {background: 'transparent', border: 'none', borderBottom: '1px solid ' + t.border, fontSize: '15px', color: t.text, outline: 'none', padding: '8px 0'}});
+          titleInput.oninput = function(e) {
+            state.np.songTitle = e.target.value;
+          };
+          
+          var artistInput = el('input', {placeholder: 'Artist name', value: state.np.songArtist, style: {background: 'transparent', border: 'none', borderBottom: '1px solid ' + t.border, fontSize: '15px', color: t.text, outline: 'none', padding: '8px 0'}});
+          artistInput.oninput = function(e) {
+            state.np.songArtist = e.target.value;
+          };
+          
+          manualBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, '✍️ Enter song manually'));
+          manualBox.appendChild(titleInput);
+          manualBox.appendChild(artistInput);
+          
+          var backBtn = el('span', {className: 'tap', style: {marginTop: '8px', fontSize: '13px', color: t.accent, textAlign: 'center'}, onClick: function() { setState({manualSongEntry: false}); }}, '← Back to search');
+          manualBox.appendChild(backBtn);
+          
+          songSection.appendChild(manualBox);
         } else {
-          // Search input
+          // Search mode
           var searchBox = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
           searchBox.appendChild(el('span', {style: {fontSize: '18px'}}, '🔍'));
           var searchInput = el('input', {placeholder: 'Search for a song...', value: state.itunesSearch, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '16px', color: t.text, outline: 'none'}});
@@ -2690,6 +2782,10 @@ window.onerror = function(msg, url, line, col, error) {
           var searchBtn = el('span', {className: 'tap', style: {padding: '8px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', background: t.accent}, onClick: searchItunes}, state.itunesSearching ? 'Searching...' : 'Search');
           searchBox.appendChild(searchBtn);
           songSection.appendChild(searchBox);
+          
+          // Manual entry link
+          var manualLink = el('span', {className: 'tap', style: {fontSize: '13px', color: t.accent, textAlign: 'center', padding: '8px'}, onClick: function() { setState({manualSongEntry: true, itunesResults: []}); }}, "Can't find it? Enter manually →");
+          songSection.appendChild(manualLink);
           
           // Search results
           if (state.itunesResults.length > 0) {
@@ -3293,11 +3389,23 @@ window.onerror = function(msg, url, line, col, error) {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 120px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
       
-      // Back button - goes to feed from list, goes to list from detail/other views
-      var backTarget = (state.groupView === 'list' || !state.groupView) ? 'feed' : 'list';
+      // Back button - proper navigation hierarchy
+      var backTarget = 'feed';
+      if (state.groupView === 'list' || !state.groupView) {
+        backTarget = 'feed';
+      } else if (state.groupView === 'members' || state.groupView === 'history' || state.groupView === 'camera') {
+        backTarget = 'detail';
+      } else if (state.groupView === 'detail' || state.groupView === 'create') {
+        backTarget = 'list';
+      } else {
+        backTarget = 'list';
+      }
+      
       header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { 
         if (backTarget === 'feed') {
           nav('feed');
+        } else if (backTarget === 'detail') {
+          setState({groupView: 'detail', groupPhoto: null});
         } else {
           setState({groupView: 'list', currentGroup: null, groupPhoto: null}); 
         }
@@ -3537,11 +3645,83 @@ window.onerror = function(msg, url, line, col, error) {
           return;
         }
         
-        var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
-        membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '⚙️ Manage Members'));
+        var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+        membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '🎨 Customize Group'));
+        
+        // Group Name
+        membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Name'));
+        var nameInput = el('input', {value: group.name, placeholder: 'Group name', maxLength: 50, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '16px'}});
+        nameInput.oninput = function(e) { state.editGroupName = e.target.value; };
+        var nameBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '16px'}, onClick: function() {
+          if (state.editGroupName && state.editGroupName.trim() && state.editGroupName !== group.name) {
+            updateGroupName(group.id, state.editGroupName.trim());
+          }
+        }}, 'Update Name');
+        membersBox.appendChild(nameInput);
+        membersBox.appendChild(nameBtn);
+        
+        // Group Icon (emoji, max 2 characters)
+        membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Icon (emoji, max 2 chars)'));
+        var iconInput = el('input', {value: (group.customTheme && group.customTheme.icon) || '👥', placeholder: '👥', maxLength: 2, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '16px', textAlign: 'center'}});
+        iconInput.oninput = function(e) { state.editGroupIcon = e.target.value; };
+        var iconBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
+          if (state.editGroupIcon && state.editGroupIcon.length <= 2) {
+            updateGroupIcon(group.id, state.editGroupIcon);
+          }
+        }}, 'Update Icon');
+        membersBox.appendChild(iconInput);
+        membersBox.appendChild(iconBtn);
+        
+        // Theme Colors
+        membersBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Theme Colors'));
+        
+        var rainbowColors = [
+          {name: 'Red', hex: '#ef4444', emoji: '🔴'},
+          {name: 'Orange', hex: '#f97316', emoji: '🟠'},
+          {name: 'Yellow', hex: '#eab308', emoji: '🟡'},
+          {name: 'Green', hex: '#22c55e', emoji: '🟢'},
+          {name: 'Blue', hex: '#3b82f6', emoji: '🔵'},
+          {name: 'Purple', hex: '#a855f7', emoji: '🟣'}
+        ];
+        
+        // Box Color
+        membersBox.appendChild(el('p', {style: {margin: '12px 0 8px', fontSize: '12px', fontWeight: '600', color: t.text}}, 'Box Color'));
+        var boxColorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginBottom: '16px'}});
+        for (var ci = 0; ci < rainbowColors.length; ci++) {
+          (function(colorObj) {
+            var currentBoxColor = (group.customTheme && group.customTheme.boxColor) || '#3b82f6';
+            var isSelected = currentBoxColor === colorObj.hex;
+            var colorBox = el('div', {className: 'tap', style: {aspectRatio: '1', borderRadius: '10px', background: colorObj.hex, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: isSelected ? '3px solid ' + t.text : '2px solid transparent', cursor: 'pointer'}, onClick: function() {
+              updateGroupTheme(group.id, {boxColor: colorObj.hex});
+            }}, isSelected ? '✓' : colorObj.emoji);
+            boxColorGrid.appendChild(colorBox);
+          })(rainbowColors[ci]);
+        }
+        membersBox.appendChild(boxColorGrid);
+        
+        // Background Color
+        membersBox.appendChild(el('p', {style: {margin: '12px 0 8px', fontSize: '12px', fontWeight: '600', color: t.text}}, 'Background Color'));
+        var bgColorGrid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginBottom: '16px'}});
+        for (var ci = 0; ci < rainbowColors.length; ci++) {
+          (function(colorObj) {
+            var currentBgColor = (group.customTheme && group.customTheme.bgColor) || '#1e293b';
+            var isSelected = currentBgColor === colorObj.hex;
+            var colorBox = el('div', {className: 'tap', style: {aspectRatio: '1', borderRadius: '10px', background: colorObj.hex, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: isSelected ? '3px solid ' + t.text : '2px solid transparent', cursor: 'pointer'}, onClick: function() {
+              updateGroupTheme(group.id, {bgColor: colorObj.hex});
+            }}, isSelected ? '✓' : colorObj.emoji);
+            bgColorGrid.appendChild(colorBox);
+          })(rainbowColors[ci]);
+        }
+        membersBox.appendChild(bgColorGrid);
+        
+        page.appendChild(membersBox);
+        
+        // Members management section
+        var manageMembersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
+        manageMembersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '👥 Manage Members'));
         
         // Current members
-        membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + group.members.length + ')'));
+        manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + group.members.length + ')'));
         
         var membersList = el('div', {style: {marginBottom: '20px'}});
         for (var i = 0; i < group.members.length; i++) {
@@ -3592,7 +3772,7 @@ window.onerror = function(msg, url, line, col, error) {
             membersList.appendChild(memberItem);
           })(group.members[i]);
         }
-        membersBox.appendChild(membersList);
+        manageMembersBox.appendChild(membersList);
         
         // Pending invites
         var pendingInvites = group.pendingInvites || [];
@@ -3630,7 +3810,7 @@ window.onerror = function(msg, url, line, col, error) {
         });
         
         if (availableFriends.length === 0) {
-          membersBox.appendChild(el('p', {style: {fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.bg, borderRadius: '10px'}}, 'All your friends are already members or invited'));
+          manageMembersBox.appendChild(el('p', {style: {fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.bg, borderRadius: '10px'}}, 'All your friends are already members or invited'));
         } else {
           var addList = el('div', {style: {maxHeight: '150px', overflowY: 'auto', background: t.bg, borderRadius: '10px', padding: '6px'}});
           for (var i = 0; i < availableFriends.length; i++) {
@@ -3650,10 +3830,10 @@ window.onerror = function(msg, url, line, col, error) {
               addList.appendChild(addItem);
             })(availableFriends[i]);
           }
-          membersBox.appendChild(addList);
+          manageMembersBox.appendChild(addList);
         }
         
-        page.appendChild(membersBox);
+        page.appendChild(manageMembersBox);
         app.appendChild(page);
         return;
       }
