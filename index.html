@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Postcard</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Dancing+Script&family=Bebas+Neue&family=Courier+Prime&display=swap" rel="stylesheet">
   <style>
@@ -16,9 +20,11 @@
     #loading{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
     #loading .spinner{font-size:48px}
     #error{display:none;padding:20px;text-align:center;color:#c62828}
+    #updateBanner{display:none;position:fixed;top:0;left:0;right:0;background:#4CAF50;color:#fff;padding:12px 20px;text-align:center;font-size:14px;z-index:9999;cursor:pointer}
   </style>
 </head>
 <body>
+<div id="updateBanner" onclick="location.reload()">New version available! Tap to update.</div>
 <div class="app">
   <div id="loading">
     <div class="spinner">📮</div>
@@ -29,6 +35,19 @@
 </div>
 
 <script>
+// App version for cache busting
+var APP_VERSION = '1.0.1';
+
+// Check for app updates periodically
+(function checkForUpdates() {
+  // Store version in localStorage
+  var storedVersion = localStorage.getItem('postcard_version');
+  if (storedVersion && storedVersion !== APP_VERSION) {
+    document.getElementById('updateBanner').style.display = 'block';
+  }
+  localStorage.setItem('postcard_version', APP_VERSION);
+})();
+
 window.onerror = function(msg, url, line, col, error) {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('error').style.display = 'block';
@@ -174,7 +193,6 @@ window.onerror = function(msg, url, line, col, error) {
     // Set up real-time listener for my posts
     postsUnsubscribe = db.collection('posts')
       .where('userId', '==', uid)
-      .orderBy('date', 'desc')
       .onSnapshot(function(snap) {
         var posts = [];
         snap.forEach(function(d) {
@@ -182,6 +200,10 @@ window.onerror = function(msg, url, line, col, error) {
           var data = d.data();
           for (var k in data) p[k] = data[k];
           posts.push(p);
+        });
+        // Sort by date descending
+        posts.sort(function(a, b) {
+          return b.date.localeCompare(a.date);
         });
         var today = new Date().toISOString().split('T')[0];
         var hasPosted = false;
@@ -191,6 +213,20 @@ window.onerror = function(msg, url, line, col, error) {
         setState({myPosts: posts, posted: hasPosted});
       }, function(error) {
         console.error('Posts listener error:', error);
+        // Fallback to one-time fetch
+        db.collection('posts').where('userId', '==', uid).get().then(function(snap) {
+          var posts = [];
+          snap.forEach(function(d) {
+            var p = {id: d.id};
+            var data = d.data();
+            for (var k in data) p[k] = data[k];
+            posts.push(p);
+          });
+          posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+          var today = new Date().toISOString().split('T')[0];
+          var hasPosted = posts.some(function(p) { return p.date === today; });
+          setState({myPosts: posts, posted: hasPosted});
+        });
       });
   }
 
@@ -204,7 +240,9 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Listen for changes to my user doc (for friends list changes)
     friendsUnsubscribe = db.collection('users').doc(uid).onSnapshot(function(userDoc) {
-      var ids = userDoc.data().friends || [];
+      var data = userDoc.data();
+      if (!data) return;
+      var ids = data.friends || [];
       
       if (ids.length === 0) {
         setState({friends: []});
@@ -222,14 +260,13 @@ window.onerror = function(msg, url, line, col, error) {
         db.collection('users').doc(fid).get().then(function(fDoc) {
           if (fDoc.exists) {
             var f = {id: fid};
-            var data = fDoc.data();
-            for (var k in data) f[k] = data[k];
+            var fdata = fDoc.data();
+            for (var k in fdata) f[k] = fdata[k];
             f.posts = [];
             
-            // Set up real-time listener for this friend's posts
+            // Set up real-time listener for this friend's posts (no orderBy to avoid index requirement)
             var unsubFriendPosts = db.collection('posts')
               .where('userId', '==', fid)
-              .orderBy('date', 'desc')
               .onSnapshot(function(pSnap) {
                 f.posts = [];
                 pSnap.forEach(function(d) {
@@ -238,8 +275,24 @@ window.onerror = function(msg, url, line, col, error) {
                   for (var k in pdata) p[k] = pdata[k];
                   f.posts.push(p);
                 });
+                // Sort by date descending
+                f.posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
                 // Update state with new posts
                 setState({friends: state.friends.slice()});
+              }, function(error) {
+                console.error('Friend posts listener error:', error);
+                // Fallback fetch
+                db.collection('posts').where('userId', '==', fid).get().then(function(pSnap) {
+                  f.posts = [];
+                  pSnap.forEach(function(d) {
+                    var p = {id: d.id};
+                    var pdata = d.data();
+                    for (var k in pdata) p[k] = pdata[k];
+                    f.posts.push(p);
+                  });
+                  f.posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+                  setState({friends: state.friends.slice()});
+                });
               });
             
             friendPostsUnsubscribes.push(unsubFriendPosts);
