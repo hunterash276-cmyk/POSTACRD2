@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.1.2';
+var APP_VERSION = '1.1.4';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -144,7 +144,22 @@ window.onerror = function(msg, url, line, col, error) {
   var savedNotifications = localStorage.getItem('postcard_notifications');
   var loadedNotifications = [];
   try {
-    if (savedNotifications) loadedNotifications = JSON.parse(savedNotifications);
+    if (savedNotifications) {
+      var parsed = JSON.parse(savedNotifications);
+      // Deduplicate update notifications (keep only one per version)
+      var seenVersions = {};
+      loadedNotifications = parsed.filter(function(n) {
+        if (n.type === 'update' && n.data && n.data.version) {
+          if (seenVersions[n.data.version]) return false;
+          seenVersions[n.data.version] = true;
+        }
+        return true;
+      });
+      // Save cleaned notifications back
+      if (loadedNotifications.length !== parsed.length) {
+        localStorage.setItem('postcard_notifications', JSON.stringify(loadedNotifications));
+      }
+    }
   } catch(e) {}
   
   // App update notes
@@ -152,7 +167,9 @@ window.onerror = function(msg, url, line, col, error) {
     '1.0.9': 'Added notifications center with friend requests, reactions, and weekly lookbacks. You can now see all your updates in one place!',
     '1.1.0': 'Reactions now close after 24 hours. React to your friends\' postcards within a day or miss your chance! Existing reactions stay forever.',
     '1.1.1': 'Bug fix: Resolved an issue that could cause the app to freeze on some devices.',
-    '1.1.2': 'Improved mailbox layout: All sections now always visible with headers. Updates no longer trigger notification badges.'
+    '1.1.2': 'Improved mailbox layout: All sections now always visible with headers. Updates no longer trigger notification badges.',
+    '1.1.3': 'Fixed duplicate update notifications in the mailbox.',
+    '1.1.4': 'Reactions now disappear from mailbox once viewed (they stay on your post). Weekly recaps moved to a separate page - tap "View All" to see them.'
   };
 
   var state = {
@@ -565,6 +582,13 @@ window.onerror = function(msg, url, line, col, error) {
     setState({notifications: newNotifs});
   }
   
+  function removeNotification(notifId) {
+    var newNotifs = state.notifications.filter(function(n) {
+      return n.id !== notifId;
+    });
+    setState({notifications: newNotifs});
+  }
+  
   function getUnreadCount() {
     var count = 0;
     for (var i = 0; i < state.notifications.length; i++) {
@@ -633,20 +657,28 @@ window.onerror = function(msg, url, line, col, error) {
   function checkForUpdateNotification() {
     var lastSeenVersion = localStorage.getItem('postcard_last_seen_version');
     if (lastSeenVersion !== APP_VERSION && UPDATE_NOTES[APP_VERSION]) {
-      // Add notification directly without calling setState
-      var notif = {
-        id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        type: 'update',
-        data: {
-          version: APP_VERSION,
-          notes: UPDATE_NOTES[APP_VERSION]
-        },
-        createdAt: new Date().toISOString(),
-        read: false
-      };
-      state.notifications = [notif].concat(state.notifications);
-      if (state.notifications.length > 50) state.notifications = state.notifications.slice(0, 50);
-      localStorage.setItem('postcard_notifications', JSON.stringify(state.notifications));
+      // Check if we already have a notification for this version
+      var alreadyHasNotif = state.notifications.some(function(n) {
+        return n.type === 'update' && n.data && n.data.version === APP_VERSION;
+      });
+      
+      if (!alreadyHasNotif) {
+        // Add notification directly without calling setState
+        var notif = {
+          id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          type: 'update',
+          data: {
+            version: APP_VERSION,
+            notes: UPDATE_NOTES[APP_VERSION]
+          },
+          createdAt: new Date().toISOString(),
+          read: false
+        };
+        state.notifications = [notif].concat(state.notifications);
+        if (state.notifications.length > 50) state.notifications = state.notifications.slice(0, 50);
+        localStorage.setItem('postcard_notifications', JSON.stringify(state.notifications));
+      }
+      
       localStorage.setItem('postcard_last_seen_version', APP_VERSION);
       return true; // Indicates a notification was added
     }
@@ -2065,47 +2097,41 @@ window.onerror = function(msg, url, line, col, error) {
       }
       page.appendChild(frSection);
       
-      // Weekly Recaps Section - ALWAYS SHOW HEADER
+      // Weekly Recaps Section - Compact with button to view all
       var weeklySection = el('div', {style: {marginBottom: '24px'}});
-      weeklySection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📅 Weekly Recaps'));
+      var weeklyHeader = el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}});
+      weeklyHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📅 Weekly Recaps'));
+      
+      var unreadWeeklyCount = weeklyNotifs.filter(function(n) { return !n.read; }).length;
       
       if (weeklyNotifs.length > 0) {
-        for (var i = 0; i < weeklyNotifs.length; i++) {
-          (function(notif) {
-            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() {
-              markNotificationRead(notif.id);
-              // Show weekly lookback posts
-              var weekPosts = state.myPosts.filter(function(p) {
-                return notif.data.posts.indexOf(p.id) !== -1;
-              });
-              setState({weeklyLookbackPosts: weekPosts, view: 'weeklyLookback'});
-            }});
-            
-            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px'}}, '📮'));
-            
-            var info = el('div', {style: {flex: '1'}});
-            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, notif.data.weekLabel));
-            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, notif.data.postCount + ' postcard' + (notif.data.postCount !== 1 ? 's' : '')));
-            item.appendChild(info);
-            
-            item.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '›'));
-            
-            weeklySection.appendChild(item);
-          })(weeklyNotifs[i]);
+        var viewAllBtn = el('span', {className: 'tap', style: {fontSize: '13px', color: t.accent, fontWeight: '600', padding: '6px 12px', background: t.accent + '15', borderRadius: '8px'}, onClick: function() { nav('weeklyRecapsList'); }}, 'View All (' + weeklyNotifs.length + ')');
+        weeklyHeader.appendChild(viewAllBtn);
+        weeklySection.appendChild(weeklyHeader);
+        
+        if (unreadWeeklyCount > 0) {
+          weeklySection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.accent, padding: '12px', background: t.accent + '11', borderRadius: '12px', border: '1px solid ' + t.accent + '33'}}, '🎉 ' + unreadWeeklyCount + ' new recap' + (unreadWeeklyCount !== 1 ? 's' : '') + ' available!'));
+        } else {
+          weeklySection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, weeklyNotifs.length + ' recap' + (weeklyNotifs.length !== 1 ? 's' : '') + ' saved'));
         }
       } else {
+        weeklySection.appendChild(weeklyHeader);
         weeklySection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'Your weekly recaps will appear here every Sunday'));
       }
       page.appendChild(weeklySection);
       
-      // Reactions Section - ALWAYS SHOW HEADER
+      // Reactions Section - Only show UNREAD reactions, dismiss on tap
+      var unreadReactions = reactionNotifs.filter(function(n) { return !n.read; });
       var reactSection = el('div', {style: {marginBottom: '24px'}});
-      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ Reactions'));
+      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ New Reactions'));
       
-      if (reactionNotifs.length > 0) {
-        for (var i = 0; i < reactionNotifs.length; i++) {
+      if (unreadReactions.length > 0) {
+        for (var i = 0; i < unreadReactions.length; i++) {
           (function(notif) {
-            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { markNotificationRead(notif.id); }});
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
+              // Mark as read and remove from notifications
+              removeNotification(notif.id);
+            }});
             
             item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, notif.data.emoji));
             
@@ -2114,11 +2140,16 @@ window.onerror = function(msg, url, line, col, error) {
             info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'to your postcard'));
             item.appendChild(info);
             
+            item.appendChild(el('span', {style: {fontSize: '12px', color: t.muted, padding: '4px 8px', background: t.bg, borderRadius: '6px'}}, 'Tap to dismiss'));
+            
             reactSection.appendChild(item);
           })(reactionNotifs[i]);
         }
+            reactSection.appendChild(item);
+          })(unreadReactions[i]);
+        }
       } else {
-        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No reactions yet'));
+        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No new reactions'));
       }
       page.appendChild(reactSection);
       
@@ -2150,11 +2181,61 @@ window.onerror = function(msg, url, line, col, error) {
       return;
     }
     
+    // Weekly Recaps List View
+    if (state.view === 'weeklyRecapsList') {
+      var weeklyNotifs = state.notifications.filter(function(n) { return n.type === 'weeklyLookback'; });
+      
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
+      var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('notifications'); }}, '←'));
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '📅 All Weekly Recaps'));
+      header.appendChild(el('div', {style: {width: '48px'}}));
+      page.appendChild(header);
+      
+      if (weeklyNotifs.length > 0) {
+        for (var i = 0; i < weeklyNotifs.length; i++) {
+          (function(notif) {
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '10px'}, onClick: function() {
+              markNotificationRead(notif.id);
+              var weekPosts = state.myPosts.filter(function(p) {
+                return notif.data.posts.indexOf(p.id) !== -1;
+              });
+              setState({weeklyLookbackPosts: weekPosts, view: 'weeklyLookback'});
+            }});
+            
+            item.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, '📮'));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, notif.data.weekLabel));
+            info.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.muted}}, notif.data.postCount + ' postcard' + (notif.data.postCount !== 1 ? 's' : '')));
+            item.appendChild(info);
+            
+            if (!notif.read) {
+              item.appendChild(el('span', {style: {fontSize: '11px', color: '#fff', padding: '4px 8px', background: t.accent, borderRadius: '6px', fontWeight: '600'}}, 'NEW'));
+            }
+            
+            item.appendChild(el('span', {style: {fontSize: '20px', color: t.muted}}, '›'));
+            
+            page.appendChild(item);
+          })(weeklyNotifs[i]);
+        }
+      } else {
+        var empty = el('div', {style: {textAlign: 'center', padding: '60px 20px'}});
+        empty.appendChild(el('div', {style: {fontSize: '48px', marginBottom: '16px'}}, '📅'));
+        empty.appendChild(el('p', {style: {margin: '0', fontSize: '16px', color: t.muted}}, 'No weekly recaps yet'));
+        empty.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '13px', color: t.muted}}, 'Check back every Sunday!'));
+        page.appendChild(empty);
+      }
+      
+      app.appendChild(page);
+      return;
+    }
+    
     // Weekly Lookback View
     if (state.view === 'weeklyLookback' && state.weeklyLookbackPosts) {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('notifications'); }}, '←'));
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('weeklyRecapsList'); }}, '←'));
       header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '📅 Weekly Lookback'));
       header.appendChild(el('div', {style: {width: '48px'}}));
       page.appendChild(header);
