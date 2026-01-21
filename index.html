@@ -1,648 +1,627 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2575.7">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #ffffff}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; color: #3586ff; -webkit-text-stroke: #3586ff}
-    p.p3 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #ffffff; min-height: 14.0px}
-    span.s1 {font-kerning: none}
-    span.s2 {font-kerning: none; color: #000000; -webkit-text-stroke: 0px #ffffff}
-    span.s3 {text-decoration: underline ; font-kerning: none; -webkit-text-stroke: 0px #3586ff}
-    span.s4 {text-decoration: underline ; font-kerning: none; color: #3586ff; -webkit-text-stroke: 0px #3586ff}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Postcard">
+  <meta name="theme-color" content="#E07A5F">
+  <title>Postcard</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Dancing+Script:wght@400;600&family=Bebas+Neue&family=Courier+Prime&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+    html,body,#root{margin:0;padding:0;width:100%;min-height:100vh;min-height:-webkit-fill-available;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overscroll-behavior:none}
+    input{-webkit-user-select:text;user-select:text}
+    .tap{cursor:pointer;transition:transform .1s,opacity .1s}.tap:active{opacity:.7;transform:scale(.97)}
+    .loading{opacity:.5;pointer-events:none}
   </style>
 </head>
 <body>
-<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
-<p class="p1"><span class="s1">&lt;html lang="en"&gt;</span></p>
-<p class="p1"><span class="s1">&lt;head&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta charset="UTF-8"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta name="apple-mobile-web-app-capable" content="yes"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta name="apple-mobile-web-app-title" content="Postcard"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;meta name="theme-color" content="#E07A5F"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;title&gt;Postcard&lt;/title&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://unpkg.com/react@18/umd/react.production.min.js"><span class="s3">https://unpkg.com/react@18/umd/react.production.min.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><span class="s3">https://unpkg.com/react-dom@18/umd/react-dom.production.min.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://unpkg.com/@babel/standalone/babel.min.js"><span class="s3">https://unpkg.com/@babel/standalone/babel.min.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"><span class="s3">https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"><span class="s3">https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"><span class="s3">https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"><span class="s3">https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;script src="<a href="https://html2canvas.hertzen.com/dist/html2canvas.min.js"><span class="s3">https://html2canvas.hertzen.com/dist/html2canvas.min.js</span></a>"&gt;&lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">  &lt;link href="<a href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&amp;family=Dancing+Script:wght@400;600&amp;family=Bebas+Neue&amp;family=Courier+Prime&amp;display=swap"><span class="s3">https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&amp;family=Dancing+Script:wght@400;600&amp;family=Bebas+Neue&amp;family=Courier+Prime&amp;display=swap</span></a>" rel="stylesheet"&gt;</span></p>
-<p class="p1"><span class="s1">  &lt;style&gt;</span></p>
-<p class="p1"><span class="s1">    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}</span></p>
-<p class="p1"><span class="s1">    html,body,#root{margin:0;padding:0;width:100%;min-height:100vh;min-height:-webkit-fill-available;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overscroll-behavior:none}</span></p>
-<p class="p1"><span class="s1">    input{-webkit-user-select:text;user-select:text}</span></p>
-<p class="p1"><span class="s1">    .tap{cursor:pointer;transition:transform .1s,opacity .1s}.tap:active{opacity:.7;transform:scale(.97)}</span></p>
-<p class="p1"><span class="s1">    .loading{opacity:.5;pointer-events:none}</span></p>
-<p class="p1"><span class="s1">  &lt;/style&gt;</span></p>
-<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
-<p class="p1"><span class="s1">&lt;body&gt;</span></p>
-<p class="p1"><span class="s1">&lt;div id="root"&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">&lt;script&gt;</span></p>
-<p class="p1"><span class="s1">  const firebaseConfig = {</span></p>
-<p class="p1"><span class="s1">    apiKey: "AIzaSyCVCSTiYb0oj-qiWrQA6PNJw3L1LcQcN2k",</span></p>
-<p class="p2"><span class="s2">    authDomain: "<a href="http://postcard-d055d.firebaseapp.com/"><span class="s3">postcard-d055d.firebaseapp.com</span></a>",</span></p>
-<p class="p1"><span class="s1">    projectId: "postcard-d055d",</span></p>
-<p class="p1"><span class="s1">    storageBucket: "postcard-d055d.firebasestorage.app",</span></p>
-<p class="p1"><span class="s1">    messagingSenderId: "241151731606",</span></p>
-<p class="p1"><span class="s1">    appId: "1:241151731606:web:1cac2069b350b1543a1fb7"</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p1"><span class="s1">  firebase.initializeApp(firebaseConfig);</span></p>
-<p class="p1"><span class="s1">  window.db = firebase.firestore();</span></p>
-<p class="p1"><span class="s1">  window.auth = firebase.auth();</span></p>
-<p class="p1"><span class="s1">  window.storage = firebase.storage();</span></p>
-<p class="p1"><span class="s1">&lt;/script&gt;</span></p>
-<p class="p1"><span class="s1">&lt;script type="text/babel"&gt;</span></p>
-<p class="p1"><span class="s1">const{useState,useEffect,useRef}=React;</span></p>
-<p class="p1"><span class="s1">const L={bg:'#FFF9F5',card:'#FFF',text:'#2D2A26',muted:'#8B8680',border:'#E8E4DF',accent:'#E07A5F'};</span></p>
-<p class="p1"><span class="s1">const D={bg:'#1A1918',card:'#252422',text:'#F5F2EE',muted:'#8B8680',border:'#3D3A36',accent:'#E07A5F'};</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">const FONTS=[</span></p>
-<p class="p1"><span class="s1">  {name:'Classic',value:'-apple-system,sans-serif'},</span></p>
-<p class="p1"><span class="s1">  {name:'Elegant',value:'"Playfair Display",serif'},</span></p>
-<p class="p1"><span class="s1">  {name:'Script',value:'"Dancing Script",cursive'},</span></p>
-<p class="p1"><span class="s1">  {name:'Bold',value:'"Bebas Neue",sans-serif'},</span></p>
-<p class="p1"><span class="s1">  {name:'Mono',value:'"Courier Prime",monospace'}</span></p>
-<p class="p1"><span class="s1">];</span></p>
-<p class="p1"><span class="s1">const COLORS=['#FFFFFF','#2D2A26','#E07A5F','#81B29A','#F2CC8F','#3D405B'];</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">function App(){</span></p>
-<p class="p1"><span class="s1">  const[dark,setDark]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[user,setUser]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[userData,setUserData]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[view,setView]=useState('loading');</span></p>
-<p class="p1"><span class="s1">  const[authMode,setAuthMode]=useState('login');</span></p>
-<p class="p1"><span class="s1">  const[authData,setAuthData]=useState({email:'',password:'',username:'',birthday:'',avatar:null});</span></p>
-<p class="p1"><span class="s1">  const[authError,setAuthError]=useState('');</span></p>
-<p class="p1"><span class="s1">  const[authLoading,setAuthLoading]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[friends,setFriends]=useState([]);</span></p>
-<p class="p1"><span class="s1">  const[myPosts,setMyPosts]=useState([]);</span></p>
-<p class="p1"><span class="s1">  const[posted,setPosted]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[sel,setSel]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[step,setStep]=useState(1);</span></p>
-<p class="p1"><span class="s1">  const[np,setNp]=useState({</span></p>
-<p class="p1"><span class="s1">    photo:null,outfit:null,songTitle:'',songArtist:'',loc:'',quote:'',privateNote:'',</span></p>
-<p class="p1"><span class="s1">    outfitX:0,outfitY:0,photoX:0,photoY:0,</span></p>
-<p class="p1"><span class="s1">    songFont:0,songColor:0</span></p>
-<p class="p1"><span class="s1">  });</span></p>
-<p class="p1"><span class="s1">  const[uploading,setUploading]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[calDate,setCalDate]=useState(new Date());</span></p>
-<p class="p1"><span class="s1">  const[dayPost,setDayPost]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[scrolled,setScrolled]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[friendProfile,setFriendProfile]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[friendCalDate,setFriendCalDate]=useState(new Date());</span></p>
-<p class="p1"><span class="s1">  const[friendDayPost,setFriendDayPost]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[showAddFriend,setShowAddFriend]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[friendCode,setFriendCode]=useState('');</span></p>
-<p class="p1"><span class="s1">  const[linkCopied,setLinkCopied]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[editingProfile,setEditingProfile]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[editUsername,setEditUsername]=useState('');</span></p>
-<p class="p1"><span class="s1">  const[editAvatar,setEditAvatar]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[savingProfile,setSavingProfile]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[activeEdit,setActiveEdit]=useState(null);</span></p>
-<p class="p1"><span class="s1">  const[showMenu,setShowMenu]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const[saving,setSaving]=useState(false);</span></p>
-<p class="p1"><span class="s1">  const scrollRef=useRef(null);</span></p>
-<p class="p1"><span class="s1">  const postcardRef=useRef(null);</span></p>
-<p class="p1"><span class="s1">  const t=dark?D:L;</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  useEffect(()=&gt;{</span></p>
-<p class="p1"><span class="s1">    const unsub=window.auth.onAuthStateChanged(async(u)=&gt;{</span></p>
-<p class="p1"><span class="s1">      if(u){setUser(u);await loadUserData(u.uid);setView('feed');}</span></p>
-<p class="p1"><span class="s1">      else{setUser(null);setUserData(null);setView('auth');}</span></p>
-<p class="p1"><span class="s1">    });</span></p>
-<p class="p1"><span class="s1">    return()=&gt;unsub();</span></p>
-<p class="p1"><span class="s1">  },[]);</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const loadUserData=async(uid)=&gt;{</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const doc=await window.db.collection('users').doc(uid).get();</span></p>
-<p class="p1"><span class="s1">      if(doc.exists){setUserData({id:uid,...doc.data()});await loadPosts(uid);await loadFriends(uid);}</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const loadPosts=async(uid)=&gt;{</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const snap=await window.db.collection('posts').where('userId','==',uid).orderBy('date','desc').get();</span></p>
-<p class="p1"><span class="s1">      const posts=snap.docs.map(d=&gt;({id:<a href="http://d.id/"><span class="s4">d.id</span></a>,...d.data()}));</span></p>
-<p class="p1"><span class="s1">      setMyPosts(posts);</span></p>
-<p class="p1"><span class="s1">      setPosted(posts.some(p=&gt;p.date===new Date().toISOString().split('T')[0]));</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const loadFriends=async(uid)=&gt;{</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const userDoc=await window.db.collection('users').doc(uid).get();</span></p>
-<p class="p1"><span class="s1">      const friendIds=userDoc.data()?.friends||[];</span></p>
-<p class="p1"><span class="s1">      const friendsData=[];</span></p>
-<p class="p1"><span class="s1">      for(const fid of friendIds){</span></p>
-<p class="p1"><span class="s1">        const fDoc=await window.db.collection('users').doc(fid).get();</span></p>
-<p class="p1"><span class="s1">        if(fDoc.exists){</span></p>
-<p class="p1"><span class="s1">          const fData={id:fid,...fDoc.data()};</span></p>
-<p class="p1"><span class="s1">          const pSnap=await window.db.collection('posts').where('userId','==',fid).orderBy('date','desc').get();</span></p>
-<p class="p1"><span class="s1">          fData.posts=pSnap.docs.map(d=&gt;({id:<a href="http://d.id/"><span class="s4">d.id</span></a>,...d.data()}));</span></p>
-<p class="p1"><span class="s1">          friendsData.push(fData);</span></p>
-<p class="p1"><span class="s1">        }</span></p>
-<p class="p1"><span class="s1">      }</span></p>
-<p class="p1"><span class="s1">      setFriends(friendsData);</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  useEffect(()=&gt;{const el=scrollRef.current;if(!el)return;const h=()=&gt;setScrolled(el.scrollTop&gt;50);el.addEventListener('scroll',h);return()=&gt;el.removeEventListener('scroll',h);},[view]);</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const nav=(v)=&gt;{setView(v);setSel(null);setDayPost(null);setFriendProfile(null);setFriendDayPost(null);setShowAddFriend(false);setEditingProfile(false);setAuthError('');setShowMenu(false);setActiveEdit(null);};</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const handleSignup=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!authData.email||!authData.password||!authData.username||!authData.birthday){setAuthError('Please fill in all fields');return;}</span></p>
-<p class="p1"><span class="s1">    setAuthLoading(true);setAuthError('');</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const cred=await window.auth.createUserWithEmailAndPassword(authData.email,authData.password);</span></p>
-<p class="p1"><span class="s1">      let avatarUrl=null;</span></p>
-<p class="p1"><span class="s1">      if(authData.avatar){</span></p>
-<p class="p1"><span class="s1">        const ref=window.storage.ref(`avatars/${cred.user.uid}`);</span></p>
-<p class="p1"><span class="s1">        await ref.putString(authData.avatar,'data_url');</span></p>
-<p class="p1"><span class="s1">        avatarUrl=await ref.getDownloadURL();</span></p>
-<p class="p1"><span class="s1">      }</span></p>
-<p class="p1"><span class="s1">      const userDocData={username:authData.username,email:authData.email,birthday:authData.birthday,avatar:avatarUrl,friends:[],createdAt:new Date().toISOString()};</span></p>
-<p class="p1"><span class="s1">      await window.db.collection('users').doc(cred.user.uid).set(userDocData);</span></p>
-<p class="p1"><span class="s1">      setUserData({id:cred.user.uid,...userDocData});</span></p>
-<p class="p1"><span class="s1">    }catch(e){setAuthError(e.message);}</span></p>
-<p class="p1"><span class="s1">    setAuthLoading(false);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const handleLogin=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!authData.email||!authData.password)return;</span></p>
-<p class="p1"><span class="s1">    setAuthLoading(true);setAuthError('');</span></p>
-<p class="p1"><span class="s1">    try{await window.auth.signInWithEmailAndPassword(authData.email,authData.password);}</span></p>
-<p class="p1"><span class="s1">    catch(e){setAuthError(e.code==='auth/invalid-credential'?'Invalid email or password':e.message);}</span></p>
-<p class="p1"><span class="s1">    setAuthLoading(false);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const handleLogout=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    await window.auth.signOut();</span></p>
-<p class="p1"><span class="s1">    setMyPosts([]);setFriends([]);setPosted(false);</span></p>
-<p class="p1"><span class="s1">    setAuthData({email:'',password:'',username:'',birthday:'',avatar:null});</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const uploadImage=async(dataUrl,path)=&gt;{</span></p>
-<p class="p1"><span class="s1">    const ref=window.storage.ref(path);</span></p>
-<p class="p1"><span class="s1">    await ref.putString(dataUrl,'data_url');</span></p>
-<p class="p1"><span class="s1">    return await ref.getDownloadURL();</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const saveProfile=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!editUsername.trim()&amp;&amp;!editAvatar)return;</span></p>
-<p class="p1"><span class="s1">    setSavingProfile(true);</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const updates={};</span></p>
-<p class="p1"><span class="s1">      if(editUsername.trim())updates.username=editUsername;</span></p>
-<p class="p1"><span class="s1">      if(editAvatar)updates.avatar=await uploadImage(editAvatar,`avatars/${user.uid}`);</span></p>
-<p class="p1"><span class="s1">      await window.db.collection('users').doc(user.uid).update(updates);</span></p>
-<p class="p1"><span class="s1">      setUserData(d=&gt;({...d,...updates}));</span></p>
-<p class="p1"><span class="s1">      setEditingProfile(false);</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">    setSavingProfile(false);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const startEditProfile=()=&gt;{setEditUsername(userData?.username||'');setEditAvatar(null);setEditingProfile(true);};</span></p>
-<p class="p1"><span class="s1">  const uploadAuth=(e)=&gt;{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=&gt;setAuthData(p=&gt;({...p,avatar:r.result}));r.readAsDataURL(f);}};</span></p>
-<p class="p1"><span class="s1">  const uploadEditAvatar=(e)=&gt;{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=&gt;setEditAvatar(r.result);r.readAsDataURL(f);}};</span></p>
-<p class="p1"><span class="s1">  const upload=(e,k)=&gt;{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=&gt;setNp(p=&gt;({...p,[k]:r.result}));r.readAsDataURL(f);}};</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const submit=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!np.photo||!np.outfit||!np.songTitle||!np.songArtist||!np.loc)return;</span></p>
-<p class="p1"><span class="s1">    setUploading(true);</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const ts=Date.now();</span></p>
-<p class="p1"><span class="s1">      const photoUrl=await uploadImage(np.photo,`posts/${user.uid}/${ts}_photo`);</span></p>
-<p class="p1"><span class="s1">      const outfitUrl=await uploadImage(np.outfit,`posts/${user.uid}/${ts}_outfit`);</span></p>
-<p class="p1"><span class="s1">      const post={</span></p>
-<p class="p1"><span class="s1">        userId:user.uid,date:new Date().toISOString().split('T')[0],location:np.loc,</span></p>
-<p class="p1"><span class="s1">        photo:photoUrl,outfitPhoto:outfitUrl,</span></p>
-<p class="p1"><span class="s1">        photoX:np.photoX,photoY:np.photoY,outfitX:np.outfitX,outfitY:np.outfitY,</span></p>
-<p class="p1"><span class="s1">        song:{title:np.songTitle,artist:np.songArtist},</span></p>
-<p class="p1"><span class="s1">        songFont:np.songFont,songColor:np.songColor,</span></p>
-<p class="p1"><span class="s1">        quote:np.quote,privateNote:np.privateNote,</span></p>
-<p class="p1"><span class="s1">        createdAt:new Date().toISOString()</span></p>
-<p class="p1"><span class="s1">      };</span></p>
-<p class="p1"><span class="s1">      const docRef=await window.db.collection('posts').add(post);</span></p>
-<p class="p1"><span class="s1">      setMyPosts(x=&gt;[{id:<a href="http://docref.id/"><span class="s4">docRef.id</span></a>,...post},...x]);</span></p>
-<p class="p1"><span class="s1">      setPosted(true);</span></p>
-<p class="p1"><span class="s1">      nav('feed');</span></p>
-<p class="p1"><span class="s1">      setStep(1);</span></p>
-<p class="p1"><span class="s1">      setNp({photo:null,outfit:null,songTitle:'',songArtist:'',loc:'',quote:'',privateNote:'',outfitX:0,outfitY:0,photoX:0,photoY:0,songFont:0,songColor:0});</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">    setUploading(false);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const addFriendByCode=async()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!friendCode.trim())return;</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      const snap=await window.db.collection('users').where('username','==',friendCode.trim()).get();</span></p>
-<p class="p1"><span class="s1">      if(!snap.empty){</span></p>
-<p class="p1"><span class="s1">        const friendDoc=snap.docs[0];</span></p>
-<p class="p1"><span class="s1">        const friendId=<a href="http://frienddoc.id/"><span class="s4">friendDoc.id</span></a>;</span></p>
-<p class="p1"><span class="s1">        if(friendId===user.uid){setFriendCode('');return;}</span></p>
-<p class="p1"><span class="s1">        const userDoc=await window.db.collection('users').doc(user.uid).get();</span></p>
-<p class="p1"><span class="s1">        const currentFriends=userDoc.data()?.friends||[];</span></p>
-<p class="p1"><span class="s1">        if(!currentFriends.includes(friendId)){</span></p>
-<p class="p1"><span class="s1">          await window.db.collection('users').doc(user.uid).update({friends:[...currentFriends,friendId]});</span></p>
-<p class="p1"><span class="s1">          const friendData=await window.db.collection('users').doc(friendId).get();</span></p>
-<p class="p1"><span class="s1">          const friendFriends=friendData.data()?.friends||[];</span></p>
-<p class="p1"><span class="s1">          if(!friendFriends.includes(user.uid)){</span></p>
-<p class="p1"><span class="s1">            await window.db.collection('users').doc(friendId).update({friends:[...friendFriends,user.uid]});</span></p>
-<p class="p1"><span class="s1">          }</span></p>
-<p class="p1"><span class="s1">          await loadFriends(user.uid);</span></p>
-<p class="p1"><span class="s1">        }</span></p>
-<p class="p1"><span class="s1">      }else{alert('User not found');}</span></p>
-<p class="p1"><span class="s1">      setFriendCode('');</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);}</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const copyUsername=()=&gt;{navigator.clipboard?.writeText(userData?.username||'');setLinkCopied(true);setTimeout(()=&gt;setLinkCopied(false),2000);};</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Save to camera roll - works on all devices</span></p>
-<p class="p1"><span class="s1">  const saveToCamera=async(post,owner)=&gt;{</span></p>
-<p class="p1"><span class="s1">    setSaving(true);setShowMenu(false);</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      // Create a temporary container for rendering</span></p>
-<p class="p1"><span class="s1">      const container=document.createElement('div');</span></p>
-<p class="p1"><span class="s1">      container.style.cssText='position:fixed;left:-9999px;top:0;width:600px;background:#fff;font-family:-apple-system,sans-serif;';</span></p>
-<p class="p1"><span class="s1">      document.body.appendChild(container);</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      const font=FONTS[post.songFont||0]?.value||FONTS[0].value;</span></p>
-<p class="p1"><span class="s1">      const color=COLORS[post.songColor||0]||COLORS[0];</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      container.innerHTML=`</span></p>
-<p class="p1"><span class="s1">        &lt;div style="background:#fff;"&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style="position:relative;display:flex;height:360px;"&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="flex:1;overflow:hidden;position:relative;"&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;img src="${post.outfitPhoto||post.outfit}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:${50+post.outfitX}% ${50+post.outfitY}%;"/&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div style="position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;"&gt;OOTD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="width:4px;background:#fff;"&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="flex:1;overflow:hidden;position:relative;"&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;img src="${post.photo}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:${50+post.photoX}% ${50+post.photoY}%;"/&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div style="position:absolute;bottom:12px;right:12px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;"&gt;PHOTO&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;text-shadow:0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5);padding:12px 20px;"&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style="margin:0;font-size:20px;font-weight:600;color:${color};font-family:${font};"&gt;🎵 ${post.song?.title||''}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style="margin:4px 0 0;font-size:15px;color:${color};font-family:${font};opacity:0.95;"&gt;${post.song?.artist||''}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#E07A5F;color:#fff;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700;"&gt;📮 POSTCARD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style="padding:20px;border-top:2px solid #E8E4DF;"&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style="display:flex;align-items:center;gap:12px;"&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div style="width:44px;height:44px;border-radius:14px;background:#E07A5F;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;overflow:hidden;"&gt;</span></p>
-<p class="p1"><span class="s1">                ${owner?.avatar?`&lt;img src="${owner.avatar}" style="width:100%;height:100%;object-fit:cover;"/&gt;`:(owner?.username?.[0]?.toUpperCase()||'?')}</span></p>
-<p class="p1"><span class="s1">              &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;p style="margin:0;font-size:17px;font-weight:600;color:#2D2A26;"&gt;${owner?.username||'You'}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;p style="margin:2px 0 0;font-size:13px;color:#8B8680;"&gt;📍 ${post.location||''} · ${post.date||new Date().toLocaleDateString()}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            ${post.quote?`&lt;p style="margin:14px 0 0;font-size:17px;font-style:italic;color:#2D2A26;"&gt;"${post.quote}"&lt;/p&gt;`:''}</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">      `;</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      // Wait for images to load</span></p>
-<p class="p1"><span class="s1">      const images=container.querySelectorAll('img');</span></p>
-<p class="p1"><span class="s1">      await Promise.all([...images].map(img=&gt;new Promise(r=&gt;{if(img.complete)r();else{img.onload=r;img.onerror=r;}})));</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      const canvas=await html2canvas(container,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff'});</span></p>
-<p class="p1"><span class="s1">      document.body.removeChild(container);</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      // Convert to blob and trigger download</span></p>
-<p class="p1"><span class="s1">      canvas.toBlob((blob)=&gt;{</span></p>
-<p class="p1"><span class="s1">        const url=URL.createObjectURL(blob);</span></p>
-<p class="p1"><span class="s1">        const a=document.createElement('a');</span></p>
-<p class="p1"><span class="s1">        a.href=url;</span></p>
-<p class="p1"><span class="s1">        a.download=`postcard-${post.date||new Date().toISOString().split('T')[0]}.png`;</span></p>
-<p class="p1"><span class="s1">        a.click();</span></p>
-<p class="p1"><span class="s1">        URL.revokeObjectURL(url);</span></p>
-<p class="p1"><span class="s1">        setSaving(false);</span></p>
-<p class="p1"><span class="s1">      },'image/png',1.0);</span></p>
-<p class="p1"><span class="s1">    }catch(e){</span></p>
-<p class="p1"><span class="s1">      console.error('Save error:',e);</span></p>
-<p class="p1"><span class="s1">      alert('Could not save. Please try again.');</span></p>
-<p class="p1"><span class="s1">      setSaving(false);</span></p>
-<p class="p1"><span class="s1">    }</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Delete post</span></p>
-<p class="p1"><span class="s1">  const deletePost=async(postId)=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!confirm('Delete this postcard? This cannot be undone.'))return;</span></p>
-<p class="p1"><span class="s1">    setShowMenu(false);</span></p>
-<p class="p1"><span class="s1">    try{</span></p>
-<p class="p1"><span class="s1">      await window.db.collection('posts').doc(postId).delete();</span></p>
-<p class="p1"><span class="s1">      setMyPosts(p=&gt;p.filter(x=&gt;<a href="http://x.id/"><span class="s4">x.id</span></a>!==postId));</span></p>
-<p class="p1"><span class="s1">      const today=new Date().toISOString().split('T')[0];</span></p>
-<p class="p1"><span class="s1">      const remaining=myPosts.filter(x=&gt;<a href="http://x.id/"><span class="s4">x.id</span></a>!==postId);</span></p>
-<p class="p1"><span class="s1">      setPosted(remaining.some(p=&gt;p.date===today));</span></p>
-<p class="p1"><span class="s1">      nav('feed');</span></p>
-<p class="p1"><span class="s1">    }catch(e){console.error(e);alert('Could not delete. Try again.');}</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  const allTodayPosts=()=&gt;{</span></p>
-<p class="p1"><span class="s1">    const today=new Date().toISOString().split('T')[0];</span></p>
-<p class="p1"><span class="s1">    const fp=friends.flatMap(f=&gt;f.posts?.filter(p=&gt;p.date===today).map(p=&gt;({...p,friend:f}))||[]);</span></p>
-<p class="p1"><span class="s1">    const mp=myPosts.filter(p=&gt;p.date===today).map(p=&gt;({...p,friend:{...userData,id:user?.uid}}));</span></p>
-<p class="p1"><span class="s1">    return[...mp,...fp];</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p1"><span class="s1">  </span></p>
-<p class="p1"><span class="s1">  const getBirthdays=(date)=&gt;{</span></p>
-<p class="p1"><span class="s1">    const month=date.getMonth()+1;const day=date.getDate();</span></p>
-<p class="p1"><span class="s1">    const all=[...friends];if(userData&amp;&amp;userData.birthday)all.push(userData);</span></p>
-<p class="p1"><span class="s1">    return all.filter(f=&gt;{if(!f.birthday)return false;const parts=f.birthday.split('-');return parseInt(parts[1],10)===month&amp;&amp;parseInt(parts[2],10)===day;});</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p1"><span class="s1">  </span></p>
-<p class="p1"><span class="s1">  const getMyPostForDate=(day)=&gt;{</span></p>
-<p class="p1"><span class="s1">    const ds=`${calDate.getFullYear()}-${String(calDate.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;</span></p>
-<p class="p1"><span class="s1">    return myPosts.find(p=&gt;p.date===ds);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p1"><span class="s1">  const getFriendPostForDate=(friend,day,cd)=&gt;{</span></p>
-<p class="p1"><span class="s1">    const ds=`${cd.getFullYear()}-${String(cd.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;</span></p>
-<p class="p1"><span class="s1">    return friend.posts?.find(p=&gt;p.date===ds);</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p1"><span class="s1">  const days=d=&gt;({n:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),s:new Date(d.getFullYear(),d.getMonth(),1).getDay()});</span></p>
-<p class="p1"><span class="s1">  const fmtM=d=&gt;d.toLocaleDateString('en-US',{month:'long',year:'numeric'});</span></p>
-<p class="p1"><span class="s1">  const{n:daysN,s:startD}=days(calDate);</span></p>
-<p class="p1"><span class="s1">  const now=new Date();</span></p>
-<p class="p1"><span class="s1">  const isCur=calDate.getMonth()===now.getMonth()&amp;&amp;calDate.getFullYear()===now.getFullYear();</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Postcard component</span></p>
-<p class="p1"><span class="s1">  const PostcardView=({post,owner,showPrivate=false,isOwner=false,showMenuOption=false})=&gt;{</span></p>
-<p class="p1"><span class="s1">    const font=FONTS[post.songFont||0]?.value||FONTS[0].value;</span></p>
-<p class="p1"><span class="s1">    const color=COLORS[post.songColor||0]||COLORS[0];</span></p>
-<p class="p1"><span class="s1">    </span></p>
-<p class="p1"><span class="s1">    return(</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{position:'relative'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{background:t.card,borderRadius:16,border:`1px solid ${t.border}`,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{position:'relative',display:'flex',height:200}}&gt;</span></p>
-<p class="p1"><span class="s1">            {/* Left - OOTD */}</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{flex:1,overflow:'hidden',position:'relative'}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;img src={post.outfitPhoto||post.outfit} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+(post.outfitX||0)}% ${50+(post.outfitY||0)}%`}}/&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div style={{position:'absolute',bottom:8,left:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}&gt;OOTD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{width:3,background:t.card}}/&gt;</span></p>
-<p class="p1"><span class="s1">            {/* Right - Photo */}</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{flex:1,overflow:'hidden',position:'relative'}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;img src={post.photo} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+(post.photoX||0)}% ${50+(post.photoY||0)}%`}}/&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;div style={{position:'absolute',bottom:8,right:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}&gt;PHOTO&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            {/* Song - centered */}</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',textAlign:'center',textShadow:'0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5)',padding:'10px 16px'}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style={{margin:0,fontSize:15,fontWeight:600,color,fontFamily:font}}&gt;🎵 {post.song?.title}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style={{margin:'3px 0 0',fontSize:12,color,fontFamily:font,opacity:0.95}}&gt;{post.song?.artist}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',background:t.accent,color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:10,fontWeight:700}}&gt;📮 POSTCARD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{padding:14,borderTop:`1px solid ${t.border}`}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{display:'flex',alignItems:'center',gap:10}}&gt;</span></p>
-<p class="p1"><span class="s1">              {owner?.avatar?&lt;img src={owner.avatar} style={{width:32,height:32,borderRadius:10,objectFit:'cover'}}/&gt;:&lt;div style={{width:32,height:32,borderRadius:10,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:600,color:'#fff'}}&gt;{owner?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">              &lt;div style={{flex:1}}&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;p style={{margin:0,fontSize:13,fontWeight:600,color:t.text}}&gt;{owner?.id===user?.uid?'You':owner?.username||'User'}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;p style={{margin:0,fontSize:11,color:t.muted}}&gt;📍 {post.location} · {post.date}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">            {post.quote&amp;&amp;&lt;p style={{margin:'10px 0 0',fontSize:14,fontStyle:'italic',color:t.text}}&gt;"{post.quote}"&lt;/p&gt;}</span></p>
-<p class="p1"><span class="s1">            {showPrivate&amp;&amp;post.privateNote&amp;&amp;&lt;div style={{marginTop:8,padding:8,background:dark?'#3d3520':'#fff8e1',borderRadius:6,border:`1px dashed ${dark?'#665c30':'#ffc107'}`}}&gt;&lt;p style={{margin:0,fontSize:10,color:dark?'#ffc107':'#f57c00'}}&gt;🔒 {post.privateNote}&lt;/p&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        </span></p>
-<p class="p1"><span class="s1">        {/* 3-dot menu for owner */}</span></p>
-<p class="p1"><span class="s1">        {showMenuOption&amp;&amp;isOwner&amp;&amp;(</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',justifyContent:'center',marginTop:12}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{position:'relative'}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;span className="tap" onClick={()=&gt;setShowMenu(!showMenu)} style={{display:'flex',gap:4,padding:'8px 16px',background:t.card,borderRadius:20,border:`1px solid ${t.border}`,alignItems:'center'}}&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">              {showMenu&amp;&amp;(</span></p>
-<p class="p1"><span class="s1">                &lt;&gt;</span></p>
-<p class="p1"><span class="s1">                  &lt;div onClick={()=&gt;setShowMenu(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99}}/&gt;</span></p>
-<p class="p1"><span class="s1">                  &lt;div style={{position:'absolute',bottom:'100%',left:'50%',transform:'translateX(-50%)',marginBottom:8,background:t.card,borderRadius:14,border:`1px solid ${t.border}`,boxShadow:'0 4px 20px rgba(0,0,0,0.15)',overflow:'hidden',zIndex:100,minWidth:200}}&gt;</span></p>
-<p class="p1"><span class="s1">                    &lt;span className="tap" onClick={()=&gt;saveToCamera(post,owner)} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',color:t.text,fontSize:14,fontWeight:500,borderBottom:`1px solid ${t.border}`}}&gt;</span></p>
-<p class="p1"><span class="s1">                      &lt;span style={{fontSize:18}}&gt;💾&lt;/span&gt;Save to Photos</span></p>
-<p class="p1"><span class="s1">                    &lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">                    &lt;span className="tap" onClick={()=&gt;deletePost(<a href="http://post.id/"><span class="s4">post.id</span></a>)} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',color:'#e53935',fontSize:14,fontWeight:500}}&gt;</span></p>
-<p class="p1"><span class="s1">                      &lt;span style={{fontSize:18}}&gt;🗑️&lt;/span&gt;Delete Post</span></p>
-<p class="p1"><span class="s1">                    &lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">                  &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">                &lt;/&gt;</span></p>
-<p class="p1"><span class="s1">              )}</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        )}</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    );</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Editor preview</span></p>
-<p class="p1"><span class="s1">  const EditorPreview=()=&gt;{</span></p>
-<p class="p1"><span class="s1">    const font=FONTS[np.songFont]?.value;</span></p>
-<p class="p1"><span class="s1">    const color=COLORS[np.songColor];</span></p>
-<p class="p1"><span class="s1">    return(</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{background:t.card,borderRadius:16,border:`1px solid ${t.border}`,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{position:'relative',display:'flex',height:200}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div onClick={()=&gt;setActiveEdit('outfit')} style={{flex:1,overflow:'hidden',position:'relative',outline:activeEdit==='outfit'?`3px solid ${t.accent}`:'none',outlineOffset:'-3px',cursor:'pointer'}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;img src={np.outfit} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+np.outfitX}% ${50+np.outfitY}%`}}/&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{position:'absolute',bottom:8,left:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}&gt;OOTD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{width:3,background:t.card}}/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div onClick={()=&gt;setActiveEdit('photo')} style={{flex:1,overflow:'hidden',position:'relative',outline:activeEdit==='photo'?`3px solid ${t.accent}`:'none',outlineOffset:'-3px',cursor:'pointer'}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;img src={np.photo} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+np.photoX}% ${50+np.photoY}%`}}/&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{position:'absolute',bottom:8,right:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}&gt;PHOTO&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div onClick={()=&gt;setActiveEdit('song')} style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',textAlign:'center',textShadow:'0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5)',padding:'10px 16px',borderRadius:8,background:activeEdit==='song'?'rgba(255,255,255,0.2)':'transparent',border:activeEdit==='song'?`2px dashed ${t.accent}`:'2px dashed transparent',cursor:'pointer'}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;p style={{margin:0,fontSize:15,fontWeight:600,color,fontFamily:font}}&gt;🎵 {np.songTitle||'Song'}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;p style={{margin:'3px 0 0',fontSize:12,color,fontFamily:font,opacity:0.95}}&gt;{np.songArtist||'Artist'}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',background:t.accent,color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:10,fontWeight:700}}&gt;📮 POSTCARD&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{padding:14,borderTop:`1px solid ${t.border}`}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',alignItems:'center',gap:10}}&gt;</span></p>
-<p class="p1"><span class="s1">            {userData?.avatar?&lt;img src={userData.avatar} style={{width:32,height:32,borderRadius:10,objectFit:'cover'}}/&gt;:&lt;div style={{width:32,height:32,borderRadius:10,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:600,color:'#fff'}}&gt;{userData?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">            &lt;div style={{flex:1}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style={{margin:0,fontSize:13,fontWeight:600,color:t.text}}&gt;You&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;p style={{margin:0,fontSize:11,color:t.muted}}&gt;📍 {np.loc||'Location'} · Today&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          {np.quote&amp;&amp;&lt;p style={{margin:'10px 0 0',fontSize:14,fontStyle:'italic',color:t.text}}&gt;"{np.quote}"&lt;/p&gt;}</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    );</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Edit controls</span></p>
-<p class="p1"><span class="s1">  const EditControls=()=&gt;{</span></p>
-<p class="p1"><span class="s1">    if(!activeEdit)return(</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{padding:20,background:t.card,borderRadius:16,border:`2px dashed ${t.border}`,textAlign:'center'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;p style={{margin:0,color:t.muted,fontSize:14}}&gt;👆 Tap an image or song text to edit&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    );</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">    if(activeEdit==='song'){</span></p>
-<p class="p1"><span class="s1">      return(</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{background:t.card,borderRadius:16,padding:20,border:`2px solid ${t.accent}`}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;p style={{margin:0,fontSize:16,fontWeight:600,color:t.text}}&gt;🎵 Song Style&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onClick={()=&gt;setActiveEdit(null)} style={{fontSize:20,color:t.muted,padding:4}}&gt;✕&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;p style={{margin:'0 0 10px',fontSize:13,fontWeight:500,color:t.text}}&gt;Font&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}&gt;</span></p>
-<p class="p1"><span class="s1">            {FONTS.map((f,i)=&gt;(</span></p>
-<p class="p1"><span class="s1">              &lt;span key={i} className="tap" onClick={()=&gt;setNp(p=&gt;({...p,songFont:i}))} style={{padding:'10px 14px',borderRadius:10,fontSize:13,background:np.songFont===i?t.accent:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,color:np.songFont===i?'#fff':t.text,fontFamily:f.value,fontWeight:500}}&gt;{f.name}&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">            ))}</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;p style={{margin:'0 0 10px',fontSize:13,fontWeight:500,color:t.text}}&gt;Color&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',gap:10}}&gt;</span></p>
-<p class="p1"><span class="s1">            {COLORS.map((c,i)=&gt;(</span></p>
-<p class="p1"><span class="s1">              &lt;span key={i} className="tap" onClick={()=&gt;setNp(p=&gt;({...p,songColor:i}))} style={{width:40,height:40,borderRadius:10,background:c,border:np.songColor===i?`3px solid ${t.accent}`:`2px solid ${t.border}`,boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}/&gt;</span></p>
-<p class="p1"><span class="s1">            ))}</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">      );</span></p>
-<p class="p1"><span class="s1">    }</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">    const isOutfit=activeEdit==='outfit';</span></p>
-<p class="p1"><span class="s1">    const prefix=isOutfit?'outfit':'photo';</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">    return(</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{background:t.card,borderRadius:16,padding:20,border:`2px solid ${t.accent}`}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;p style={{margin:0,fontSize:16,fontWeight:600,color:t.text}}&gt;{isOutfit?'👕 Outfit':'📷 Photo'} Position&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setActiveEdit(null)} style={{fontSize:20,color:t.muted,padding:4}}&gt;✕&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,maxWidth:200,margin:'0 auto'}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setNp(p=&gt;({...p,[`${prefix}Y`]:p[`${prefix}Y`]-10}))} style={{padding:18,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,borderRadius:12,textAlign:'center',fontSize:22}}&gt;↑&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setNp(p=&gt;({...p,[`${prefix}X`]:p[`${prefix}X`]-10}))} style={{padding:18,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,borderRadius:12,textAlign:'center',fontSize:22}}&gt;←&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setNp(p=&gt;({...p,[`${prefix}X`]:0,[`${prefix}Y`]:0}))} style={{padding:18,background:t.accent,borderRadius:12,textAlign:'center',fontSize:11,fontWeight:600,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}&gt;Reset&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setNp(p=&gt;({...p,[`${prefix}X`]:p[`${prefix}X`]+10}))} style={{padding:18,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,borderRadius:12,textAlign:'center',fontSize:22}}&gt;→&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onClick={()=&gt;setNp(p=&gt;({...p,[`${prefix}Y`]:p[`${prefix}Y`]+10}))} style={{padding:18,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,borderRadius:12,textAlign:'center',fontSize:22}}&gt;↓&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div/&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    );</span></p>
-<p class="p1"><span class="s1">  };</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  // Saving overlay</span></p>
-<p class="p1"><span class="s1">  const SavingOverlay=()=&gt;saving?(</span></p>
-<p class="p1"><span class="s1">    &lt;div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{background:t.card,padding:28,borderRadius:20,textAlign:'center'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{fontSize:32,marginBottom:12}}&gt;💾&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;p style={{margin:0,fontSize:16,fontWeight:500,color:t.text}}&gt;Saving to photos...&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">  ):null;</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  if(view==='loading')return(&lt;div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>}}&gt;&lt;div style={{textAlign:'center'}}&gt;&lt;div style={{fontSize:48,marginBottom:12}}&gt;📮&lt;/div&gt;&lt;p style={{color:t.muted,margin:0}}&gt;Loading...&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;);</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  if(view==='auth')return(</span></p>
-<p class="p1"><span class="s1">    &lt;div style={{width:'100%',maxWidth:430,minHeight:'100vh',margin:'0 auto',fontFamily:'-apple-system,sans-serif',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:20,display:'flex',flexDirection:'column'}}&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;SavingOverlay/&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{textAlign:'center',marginBottom:40}}&gt;&lt;div style={{fontSize:60,marginBottom:8}}&gt;📮&lt;/div&gt;&lt;h1 style={{margin:0,fontSize:32,fontWeight:700,color:t.text}}&gt;postcard&lt;/h1&gt;&lt;p style={{margin:'8px 0 0',color:t.muted}}&gt;Share your day with friends&lt;/p&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{display:'flex',marginBottom:24,background:t.card,borderRadius:12,padding:4,border:`1px solid ${t.border}`}}&gt;&lt;span className="tap" onPointerDown={()=&gt;{setAuthMode('login');setAuthError('');}} style={{flex:1,padding:12,borderRadius:8,textAlign:'center',fontSize:14,fontWeight:600,background:authMode==='login'?t.accent:'transparent',color:authMode==='login'?'#fff':t.muted}}&gt;Log In&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;{setAuthMode('signup');setAuthError('');}} style={{flex:1,padding:12,borderRadius:8,textAlign:'center',fontSize:14,fontWeight:600,background:authMode==='signup'?t.accent:'transparent',color:authMode==='signup'?'#fff':t.muted}}&gt;Sign Up&lt;/span&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        {authMode==='signup'&amp;&amp;&lt;div style={{display:'flex',justifyContent:'center',marginBottom:20}}&gt;&lt;input type="file" accept="image/*" onChange={uploadAuth} style={{display:'none'}} id="avatar"/&gt;&lt;label htmlFor="avatar" className="tap"&gt;{authData.avatar?&lt;img src={authData.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',border:`3px solid ${t.accent}`}}/&gt;:&lt;div style={{width:80,height:80,borderRadius:24,background:t.card,border:`2px dashed ${t.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}}&gt;&lt;span style={{fontSize:24}}&gt;📷&lt;/span&gt;&lt;span style={{fontSize:10,color:t.muted}}&gt;Add photo&lt;/span&gt;&lt;/div&gt;}&lt;/label&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        {authError&amp;&amp;&lt;div style={{padding:12,marginBottom:12,borderRadius:10,background:'#ffebee',color:'#c62828',fontSize:13,textAlign:'center'}}&gt;{authError}&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{display:'flex',flexDirection:'column',gap:12}}&gt;</span></p>
-<p class="p1"><span class="s1">          {authMode==='signup'&amp;&amp;&lt;div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;span&gt;👤&lt;/span&gt;&lt;input placeholder="Username" value={authData.username} onChange={e=&gt;setAuthData(p=&gt;({...p,username:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;span&gt;✉️&lt;/span&gt;&lt;input type="email" placeholder="Email" value={authData.email} onChange={e=&gt;setAuthData(p=&gt;({...p,email:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;span&gt;🔒&lt;/span&gt;&lt;input type="password" placeholder="Password (6+ characters)" value={authData.password} onChange={e=&gt;setAuthData(p=&gt;({...p,password:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          {authMode==='signup'&amp;&amp;&lt;&gt;&lt;div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;span&gt;🎂&lt;/span&gt;&lt;input type="date" value={authData.birthday} onChange={e=&gt;setAuthData(p=&gt;({...p,birthday:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/&gt;&lt;/div&gt;&lt;p style={{margin:0,fontSize:11,color:t.muted,textAlign:'center'}}&gt;Friends will see your birthday on their calendar&lt;/p&gt;&lt;/&gt;}</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;span className={`tap ${authLoading?'loading':''}`} onPointerDown={authMode==='login'?handleLogin:handleSignup} style={{marginTop:24,color:'#fff',padding:16,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}&gt;{authLoading?'Please wait...':authMode==='login'?'Log In':'Create Account'}&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">    &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">  );</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">  return(</span></p>
-<p class="p1"><span class="s1">    &lt;div style={{width:'100%',maxWidth:430,minHeight:'100vh',margin:'0 auto',fontFamily:'-apple-system,sans-serif',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>}}&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;style&gt;{`@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes float{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}`}&lt;/style&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;SavingOverlay/&gt;</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='feed'&amp;&amp;&lt;div ref={scrollRef} style={{minHeight:'100vh',paddingBottom:100,overflowY:'auto'}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px'}}&gt;&lt;div style={{display:'flex',alignItems:'center',gap:8}}&gt;&lt;span style={{fontSize:26,fontWeight:700,color:t.text}}&gt;postcard&lt;/span&gt;&lt;span style={{fontSize:18,animation:'float 3s infinite'}}&gt;✈️&lt;/span&gt;&lt;/div&gt;&lt;div style={{display:'flex',gap:8}}&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('settings')} style={{fontSize:20,padding:8,color:t.muted}}&gt;⚙️&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('profile')} style={{padding:8}}&gt;{userData?.avatar?&lt;img src={userData.avatar} style={{width:36,height:36,borderRadius:12,objectFit:'cover'}}/&gt;:&lt;div style={{width:36,height:36,borderRadius:12,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:600,color:'#fff'}}&gt;{userData?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/header&gt;</span></p>
-<p class="p1"><span class="s1">        {!posted&amp;&amp;&lt;div style={{margin:'0 20px 20px',padding:24,borderRadius:20,textAlign:'center',border:`2px dashed ${t.border}`,background:t.card}}&gt;&lt;div style={{fontSize:40,marginBottom:8}}&gt;📮&lt;/div&gt;&lt;p style={{color:t.text,margin:'0 0 14px',fontSize:15}}&gt;Share your day to see friends' postcards&lt;/p&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('post')} style={{display:'inline-block',color:'#fff',padding:'14px 28px',borderRadius:14,fontSize:15,fontWeight:600,background:t.accent}}&gt;Send postcard ✉️&lt;/span&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        {allTodayPosts().length===0&amp;&amp;posted&amp;&amp;&lt;div style={{padding:'40px 20px',textAlign:'center'}}&gt;&lt;p style={{color:t.muted,fontSize:15}}&gt;No postcards from friends today yet.&lt;/p&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        &lt;div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:16}}&gt;{allTodayPosts().map((p,i)=&gt;(&lt;div key={<a href="http://p.id/"><span class="s4">p.id</span></a>} className="tap" onPointerDown={()=&gt;(setSel(p),setView('detail'))} style={{animation:`up .4s ${i*.1}s both`}}&gt;&lt;PostcardView post={p} owner={p.friend} showPrivate={p.userId===user?.uid}/&gt;&lt;/div&gt;))}&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,padding:scrolled?'8px 20px 20px':'16px 20px 34px',display:'flex',justifyContent:'space-around',alignItems:'center',background:`linear-gradient(transparent,${<a href="http://t.bg/"><span class="s4">t.bg</span></a>})`,transition:'padding .3s'}}&gt;&lt;span style={{fontSize:scrolled?18:24,padding:scrolled?8:12}}&gt;🏠&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('post')} style={{width:scrolled?40:56,height:scrolled?40:56,borderRadius:scrolled?12:16,display:'flex',alignItems:'center',justifyContent:'center',fontSize:scrolled?20:28,color:'#fff',background:t.accent,transition:'all .3s'}}&gt;+&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('profile')} style={{fontSize:scrolled?18:24,padding:scrolled?8:12,opacity:.5}}&gt;👤&lt;/span&gt;&lt;/nav&gt;</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;}</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='settings'&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:'0 20px'}}&gt;&lt;header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}&gt;←&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;Settings&lt;/span&gt;&lt;div style={{width:48}}/&gt;&lt;/header&gt;&lt;div style={{display:'flex',flexDirection:'column',gap:12}}&gt;&lt;div style={{padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;p style={{margin:'0 0 12px',fontWeight:600,color:t.text}}&gt;Edit Profile&lt;/p&gt;{!editingProfile?&lt;div style={{display:'flex',alignItems:'center',gap:12}}&gt;{userData?.avatar?&lt;img src={userData.avatar} style={{width:50,height:50,borderRadius:16,objectFit:'cover'}}/&gt;:&lt;div style={{width:50,height:50,borderRadius:16,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:600,color:'#fff'}}&gt;{userData?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}&lt;div style={{flex:1}}&gt;&lt;p style={{margin:0,fontWeight:600,color:t.text}}&gt;{userData?.username}&lt;/p&gt;&lt;p style={{margin:'2px 0 0',fontSize:13,color:t.muted}}&gt;{userData?.email}&lt;/p&gt;&lt;/div&gt;&lt;span className="tap" onPointerDown={startEditProfile} style={{padding:'8px 16px',borderRadius:8,background:t.accent,color:'#fff',fontSize:13,fontWeight:600}}&gt;Edit&lt;/span&gt;&lt;/div&gt;:&lt;div style={{display:'flex',flexDirection:'column',gap:12}}&gt;&lt;div style={{display:'flex',justifyContent:'center'}}&gt;&lt;input type="file" accept="image/*" onChange={uploadEditAvatar} style={{display:'none'}} id="editAvatar"/&gt;&lt;label htmlFor="editAvatar" className="tap"&gt;{(editAvatar||userData?.avatar)?&lt;img src={editAvatar||userData?.avatar} style={{width:70,height:70,borderRadius:20,objectFit:'cover',border:`3px solid ${t.accent}`}}/&gt;:&lt;div style={{width:70,height:70,borderRadius:20,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:600,color:'#fff'}}&gt;{userData?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}&lt;/label&gt;&lt;/div&gt;&lt;p style={{margin:0,fontSize:11,color:t.muted,textAlign:'center'}}&gt;Tap to change photo&lt;/p&gt;&lt;div style={{display:'flex',alignItems:'center',gap:10,padding:12,borderRadius:10,border:`1px solid ${t.border}`,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>}}&gt;&lt;span&gt;👤&lt;/span&gt;&lt;input placeholder="Username" value={editUsername} onChange={e=&gt;setEditUsername(e.target.value)} style={{flex:1,background:'transparent',border:'none',fontSize:14,color:t.text,outline:'none'}}/&gt;&lt;/div&gt;&lt;div style={{display:'flex',gap:8}}&gt;&lt;span className="tap" onPointerDown={()=&gt;setEditingProfile(false)} style={{flex:1,padding:12,borderRadius:8,border:`1px solid ${t.border}`,textAlign:'center',fontSize:14,color:t.text}}&gt;Cancel&lt;/span&gt;&lt;span className={`tap ${savingProfile?'loading':''}`} onPointerDown={saveProfile} style={{flex:1,padding:12,borderRadius:8,background:t.accent,textAlign:'center',fontSize:14,color:'#fff',fontWeight:600}}&gt;{savingProfile?'Saving...':'Save'}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;}&lt;/div&gt;&lt;div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;div style={{display:'flex',alignItems:'center',gap:12}}&gt;&lt;span style={{fontSize:24}}&gt;{dark?'🌙':'☀️'}&lt;/span&gt;&lt;div&gt;&lt;p style={{margin:0,fontWeight:600,color:t.text}}&gt;{dark?'Dark':'Light'} mode&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;span className="tap" onPointerDown={()=&gt;setDark(!dark)} style={{width:50,height:30,borderRadius:15,padding:3,background:dark?t.accent:t.border,display:'block'}}&gt;&lt;div style={{width:24,height:24,borderRadius:12,background:'#fff',transform:dark?'translateX(20px)':'translateX(0)',transition:'transform .3s'}}/&gt;&lt;/span&gt;&lt;/div&gt;&lt;span className="tap" onPointerDown={handleLogout} style={{padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card,textAlign:'center',color:'#e53935',fontWeight:600}}&gt;Log Out&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='profile'&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:'0 20px 40px'}}&gt;&lt;header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}&gt;←&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;Profile&lt;/span&gt;&lt;div style={{width:48}}/&gt;&lt;/header&gt;&lt;div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:10}}&gt;{userData?.avatar?&lt;img src={userData.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',marginBottom:12}}/&gt;:&lt;div style={{width:80,height:80,borderRadius:24,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:700,color:'#fff',marginBottom:12}}&gt;{userData?.username?.[0]?.toUpperCase()||'?'}&lt;/div&gt;}&lt;h2 style={{margin:'0 0 4px',fontSize:22,fontWeight:600,color:t.text}}&gt;{userData?.username||'User'}&lt;/h2&gt;{userData?.birthday&amp;&amp;&lt;p style={{margin:'0 0 16px',fontSize:12,color:t.muted}}&gt;🎂 {new Date(userData.birthday+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'})}&lt;/p&gt;}&lt;div style={{display:'flex',gap:24,padding:20,borderRadius:16,border:`1px solid ${t.border}`,width:'100%',background:t.card,marginBottom:20}}&gt;&lt;div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}&gt;&lt;span style={{fontSize:24,fontWeight:700,color:t.text}}&gt;{myPosts.length}&lt;/span&gt;&lt;span style={{fontSize:13,color:t.muted}}&gt;Postcards&lt;/span&gt;&lt;/div&gt;&lt;div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}&gt;&lt;span style={{fontSize:24,fontWeight:700,color:t.text}}&gt;{friends.length}&lt;/span&gt;&lt;span style={{fontSize:13,color:t.muted}}&gt;Friends&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style={{width:'100%',marginBottom:20}}&gt;&lt;span className="tap" onPointerDown={()=&gt;setShowAddFriend(!showAddFriend)} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:14,background:t.accent,color:'#fff',fontWeight:600,fontSize:14}}&gt;{showAddFriend?'✕ Close':'👥 Add Friends'}&lt;/span&gt;{showAddFriend&amp;&amp;&lt;div style={{marginTop:12,padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}&gt;&lt;p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:t.text}}&gt;Add by username:&lt;/p&gt;&lt;div style={{display:'flex',gap:8}}&gt;&lt;input placeholder="Username" value={friendCode} onChange={e=&gt;setFriendCode(e.target.value)} style={{flex:1,padding:12,borderRadius:10,border:`1px solid ${t.border}`,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,fontSize:14,color:t.text,outline:'none'}}/&gt;&lt;span className="tap" onPointerDown={addFriendByCode} style={{padding:'12px 16px',borderRadius:10,background:t.accent,color:'#fff',fontSize:14,fontWeight:600}}&gt;Add&lt;/span&gt;&lt;/div&gt;&lt;div style={{borderTop:`1px solid ${t.border}`,marginTop:16,paddingTop:16}}&gt;&lt;p style={{margin:'0 0 8px',fontSize:13,color:t.muted}}&gt;Your username:&lt;/p&gt;&lt;span className="tap" onPointerDown={copyUsername} style={{display:'block',padding:14,borderRadius:10,background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,textAlign:'center',fontSize:14,color:t.accent,fontWeight:600}}&gt;{linkCopied?'✓ Copied!':userData?.username}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;}&lt;/div&gt;{friends.length&gt;0&amp;&amp;&lt;div style={{width:'100%',marginBottom:20}}&gt;&lt;p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}&gt;Friends&lt;/p&gt;&lt;div style={{display:'flex',flexDirection:'column',gap:8}}&gt;{friends.map(f=&gt;&lt;div key={<a href="http://f.id/"><span class="s4">f.id</span></a>} className="tap" onPointerDown={()=&gt;{setFriendProfile(f);setFriendCalDate(new Date());setView('friendProfile');}} style={{display:'flex',alignItems:'center',gap:10,padding:12,borderRadius:12,border:`1px solid ${t.border}`,background:t.card}}&gt;{f.avatar?&lt;img src={f.avatar} style={{width:40,height:40,borderRadius:12,objectFit:'cover'}}/&gt;:&lt;div style={{width:40,height:40,borderRadius:12,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:600,color:'#fff'}}&gt;{f.username?.[0]?.toUpperCase()}&lt;/div&gt;}&lt;div style={{flex:1}}&gt;&lt;p style={{margin:0,fontSize:14,fontWeight:600,color:t.text}}&gt;{f.username}&lt;/p&gt;&lt;/div&gt;&lt;span style={{fontSize:18,color:t.muted}}&gt;→&lt;/span&gt;&lt;/div&gt;)}&lt;/div&gt;&lt;/div&gt;}&lt;div style={{width:'100%',borderRadius:16,border:`1px solid ${t.border}`,padding:16,background:t.card}}&gt;&lt;p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}&gt;Your Postcards&lt;/p&gt;&lt;div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}&gt;&lt;span className="tap" onPointerDown={()=&gt;setCalDate(new Date(calDate.getFullYear(),calDate.getMonth()-1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}&gt;‹&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;{fmtM(calDate)}&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;setCalDate(new Date(calDate.getFullYear(),calDate.getMonth()+1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}&gt;›&lt;/span&gt;&lt;/div&gt;&lt;div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:8}}&gt;{['S','M','T','W','T','F','S'].map((d,i)=&gt;&lt;div key={i} style={{textAlign:'center',fontSize:12,fontWeight:600,padding:8,color:t.muted}}&gt;{d}&lt;/div&gt;)}&lt;/div&gt;&lt;div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}&gt;{Array(startD).fill(null).map((_,i)=&gt;&lt;div key={`e${i}`}/&gt;)}{Array(daysN).fill(null).map((_,i)=&gt;{const day=i+1;const pfd=getMyPostForDate(day);const isT=isCur&amp;&amp;day===now.getDate();const bdays=getBirthdays(new Date(calDate.getFullYear(),calDate.getMonth(),day));return&lt;div key={day} className={pfd?"tap":""} onPointerDown={()=&gt;pfd&amp;&amp;(setDayPost(pfd),setView('dayDetail'))} style={{aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,background:pfd?t.accent:bdays.length?'#fff3e0':'transparent',color:pfd?'#fff':t.text,border:isT?`2px solid ${t.accent}`:'none',fontWeight:isT?700:400,flexDirection:'column',position:'relative'}}&gt;{pfd?&lt;&gt;&lt;span style={{fontSize:10}}&gt;{day}&lt;/span&gt;&lt;span style={{fontSize:8}}&gt;📮&lt;/span&gt;&lt;/&gt;:&lt;span style={{fontSize:12}}&gt;{day}&lt;/span&gt;}{bdays.length&gt;0&amp;&amp;!pfd&amp;&amp;&lt;span style={{position:'absolute',bottom:2,fontSize:8}}&gt;🎂&lt;/span&gt;}&lt;/div&gt;})}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='friendProfile'&amp;&amp;friendProfile&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:'0 20px 40px'}}&gt;&lt;header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('profile')} style={{fontSize:28,padding:'8px 12px',color:t.text}}&gt;←&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;{friendProfile.username}&lt;/span&gt;&lt;div style={{width:48}}/&gt;&lt;/header&gt;&lt;div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:10}}&gt;{friendProfile.avatar?&lt;img src={friendProfile.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',marginBottom:12}}/&gt;:&lt;div style={{width:80,height:80,borderRadius:24,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:700,color:'#fff',marginBottom:12}}&gt;{friendProfile.username?.[0]?.toUpperCase()}&lt;/div&gt;}&lt;h2 style={{margin:'0 0 4px',fontSize:22,fontWeight:600,color:t.text}}&gt;{friendProfile.username}&lt;/h2&gt;{friendProfile.birthday&amp;&amp;&lt;p style={{margin:'0 0 16px',fontSize:12,color:t.muted}}&gt;🎂 {new Date(friendProfile.birthday+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'})}&lt;/p&gt;}&lt;div style={{display:'flex',gap:24,padding:20,borderRadius:16,border:`1px solid ${t.border}`,width:'100%',background:t.card,marginBottom:20}}&gt;&lt;div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}&gt;&lt;span style={{fontSize:24,fontWeight:700,color:t.text}}&gt;{friendProfile.posts?.length||0}&lt;/span&gt;&lt;span style={{fontSize:13,color:t.muted}}&gt;Postcards&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style={{width:'100%',borderRadius:16,border:`1px solid ${t.border}`,padding:16,background:t.card}}&gt;&lt;p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}&gt;{friendProfile.username}'s Postcards&lt;/p&gt;&lt;div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}&gt;&lt;span className="tap" onPointerDown={()=&gt;setFriendCalDate(new Date(friendCalDate.getFullYear(),friendCalDate.getMonth()-1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}&gt;‹&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;{fmtM(friendCalDate)}&lt;/span&gt;&lt;span className="tap" onPointerDown={()=&gt;setFriendCalDate(new Date(friendCalDate.getFullYear(),friendCalDate.getMonth()+1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}&gt;›&lt;/span&gt;&lt;/div&gt;&lt;div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:8}}&gt;{['S','M','T','W','T','F','S'].map((d,i)=&gt;&lt;div key={i} style={{textAlign:'center',fontSize:12,fontWeight:600,padding:8,color:t.muted}}&gt;{d}&lt;/div&gt;)}&lt;/div&gt;&lt;div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}&gt;{Array(days(friendCalDate).s).fill(null).map((_,i)=&gt;&lt;div key={`e${i}`}/&gt;)}{Array(days(friendCalDate).n).fill(null).map((_,i)=&gt;{const day=i+1;const pfd=getFriendPostForDate(friendProfile,day,friendCalDate);const isT=friendCalDate.getMonth()===now.getMonth()&amp;&amp;friendCalDate.getFullYear()===now.getFullYear()&amp;&amp;day===now.getDate();return&lt;div key={day} className={pfd?"tap":""} onPointerDown={()=&gt;pfd&amp;&amp;(setFriendDayPost({...pfd,friend:friendProfile}),setView('friendDayDetail'))} style={{aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,background:pfd?t.accent:'transparent',color:pfd?'#fff':t.text,border:isT?`2px solid ${t.accent}`:'none',fontWeight:isT?700:400,flexDirection:'column'}}&gt;{pfd?&lt;&gt;&lt;span style={{fontSize:10}}&gt;{day}&lt;/span&gt;&lt;span style={{fontSize:8}}&gt;📮&lt;/span&gt;&lt;/&gt;:&lt;span style={{fontSize:12}}&gt;{day}&lt;/span&gt;}&lt;/div&gt;})}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='post'&amp;&amp;&lt;div style={{minHeight:'100vh',padding:'0 20px 40px',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>}}&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}&gt;&lt;span className="tap" onPointerDown={()=&gt;step&gt;1?setStep(step-1):nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}&gt;←&lt;/span&gt;&lt;span style={{fontWeight:600,color:t.text}}&gt;{step===1?'📸 Photos':step===2?'🎵 Details':step===3?'✏️ Edit':'✓ Preview'}&lt;/span&gt;&lt;span style={{color:t.muted,padding:'8px 12px'}}&gt;{step}/4&lt;/span&gt;&lt;/header&gt;</span></p>
-<p class="p1"><span class="s1">        </span></p>
-<p class="p1"><span class="s1">        {step===1&amp;&amp;&lt;div style={{display:'flex',flexDirection:'column',gap:16}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;p style={{color:t.muted,textAlign:'center',margin:0,fontSize:14}}&gt;Outfit (left) &amp; Photo (right)&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}&gt;</span></p>
-<p class="p1"><span class="s1">            {['outfit','photo'].map((k,i)=&gt;&lt;div key={k} style={{aspectRatio:'3/4',borderRadius:16,overflow:'hidden',border:`2px dashed ${t.border}`,background:t.card}}&gt;&lt;input type="file" accept="image/*" onChange={e=&gt;upload(e,k)} style={{display:'none'}} id={k}/&gt;&lt;label htmlFor={k} style={{width:'100%',height:'100%',display:'flex',cursor:'pointer'}}&gt;{np[k]?&lt;img src={np[k]} style={{width:'100%',height:'100%',objectFit:'cover'}}/&gt;:&lt;div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}&gt;&lt;span style={{fontSize:40}}&gt;{i===0?'👕':'📷'}&lt;/span&gt;&lt;span style={{color:t.muted,fontSize:14}}&gt;{i===0?'Outfit':'Photo'}&lt;/span&gt;&lt;/div&gt;}&lt;/label&gt;&lt;/div&gt;)}</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;span className="tap" onPointerDown={()=&gt;np.photo&amp;&amp;np.outfit&amp;&amp;setStep(2)} style={{color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent,opacity:np.photo&amp;&amp;np.outfit?1:.4}}&gt;Next →&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        </span></p>
-<p class="p1"><span class="s1">        {step===2&amp;&amp;&lt;div style={{display:'flex',flexDirection:'column',gap:14}}&gt;</span></p>
-<p class="p1"><span class="s1">          {[{icon:'🎵',key:'songTitle',placeholder:'Song title'},{icon:'🎤',key:'songArtist',placeholder:'Artist'},{icon:'📍',key:'loc',placeholder:'Location'},{icon:'💬',key:'quote',placeholder:'Quote (optional)'},{icon:'🔒',key:'privateNote',placeholder:'Private note',bg:'#fff8e1'}].map(f=&gt;(</span></p>
-<p class="p1"><span class="s1">            &lt;div key={f.key} style={{display:'flex',alignItems:'center',gap:12,padding:16,borderRadius:14,border:`1px solid ${t.border}`,background:<a href="http://f.bg/"><span class="s4">f.bg</span></a>||t.card}}&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;span style={{fontSize:18}}&gt;{f.icon}&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">              &lt;input placeholder={f.placeholder} value={np[f.key]} onChange={e=&gt;setNp(p=&gt;({...p,[f.key]:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:16,color:t.text,outline:'none'}}/&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">          ))}</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',gap:12,marginTop:8}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onPointerDown={()=&gt;setStep(1)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}&gt;←&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onPointerDown={()=&gt;np.songTitle&amp;&amp;np.songArtist&amp;&amp;np.loc&amp;&amp;setStep(3)} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent,opacity:np.songTitle&amp;&amp;np.songArtist&amp;&amp;np.loc?1:.4}}&gt;Next →&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        </span></p>
-<p class="p1"><span class="s1">        {step===3&amp;&amp;&lt;div style={{display:'flex',flexDirection:'column',gap:20}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;EditorPreview/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;EditControls/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',gap:12}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onPointerDown={()=&gt;setStep(2)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}&gt;←&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onPointerDown={()=&gt;{setActiveEdit(null);setStep(4);}} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}&gt;Preview →&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">        </span></p>
-<p class="p1"><span class="s1">        {step===4&amp;&amp;&lt;div style={{display:'flex',flexDirection:'column',gap:20}}&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;p style={{color:t.text,textAlign:'center',margin:0,fontSize:16,fontWeight:500}}&gt;Ready to send? 🎉&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;PostcardView post={{...np,song:{title:np.songTitle,artist:np.songArtist},location:np.loc,outfitPhoto:np.outfit,date:'Today'}} owner={userData} showPrivate={true}/&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;div style={{display:'flex',gap:12}}&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className="tap" onPointerDown={()=&gt;setStep(3)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}&gt;← Edit&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">            &lt;span className={`tap ${uploading?'loading':''}`} onPointerDown={submit} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}&gt;{uploading?'Sending...':'Send ✈️'}&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1">          &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">        &lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">      &lt;/div&gt;}</span></p>
-<p class="p3"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">      {view==='detail'&amp;&amp;sel&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:16}}&gt;&lt;span className="tap" onPointerDown={()=&gt;nav('feed')} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}&gt;✕&lt;/span&gt;&lt;div style={{paddingTop:40}}&gt;&lt;PostcardView post={sel} owner={sel.friend} showPrivate={sel.userId===user?.uid} isOwner={sel.userId===user?.uid} showMenuOption={true}/&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      {view==='dayDetail'&amp;&amp;dayPost&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:16}}&gt;&lt;span className="tap" onPointerDown={()=&gt;{setView('profile');setDayPost(null);setShowMenu(false);}} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}&gt;✕&lt;/span&gt;&lt;div style={{paddingTop:40}}&gt;&lt;PostcardView post={dayPost} owner={{...userData,id:user?.uid}} showPrivate={true} isOwner={true} showMenuOption={true}/&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">      </span></p>
-<p class="p1"><span class="s1">      {view==='friendDayDetail'&amp;&amp;friendDayPost&amp;&amp;&lt;div style={{minHeight:'100vh',background:<a href="http://t.bg/"><span class="s4">t.bg</span></a>,padding:16}}&gt;&lt;span className="tap" onPointerDown={()=&gt;{setView('friendProfile');setFriendDayPost(null);}} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}&gt;✕&lt;/span&gt;&lt;div style={{paddingTop:40}}&gt;&lt;PostcardView post={friendDayPost} owner={friendDayPost.friend} showPrivate={false}/&gt;&lt;/div&gt;&lt;/div&gt;}</span></p>
-<p class="p1"><span class="s1">    &lt;/div&gt;</span></p>
-<p class="p1"><span class="s1">  );</span></p>
-<p class="p1"><span class="s1">}</span></p>
-<p class="p1"><span class="s1">ReactDOM.createRoot(document.getElementById('root')).render(&lt;App/&gt;);</span></p>
-<p class="p1"><span class="s1">&lt;/script&gt;</span></p>
-<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
-<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+<div id="root"></div>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVCSTiYb0oj-qiWrQA6PNJw3L1LcQcN2k",
+    authDomain: "postcard-d055d.firebaseapp.com",
+    projectId: "postcard-d055d",
+    storageBucket: "postcard-d055d.firebasestorage.app",
+    messagingSenderId: "241151731606",
+    appId: "1:241151731606:web:1cac2069b350b1543a1fb7"
+  };
+  firebase.initializeApp(firebaseConfig);
+  window.db = firebase.firestore();
+  window.auth = firebase.auth();
+  window.storage = firebase.storage();
+</script>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+const L={bg:'#FFF9F5',card:'#FFF',text:'#2D2A26',muted:'#8B8680',border:'#E8E4DF',accent:'#E07A5F'};
+const D={bg:'#1A1918',card:'#252422',text:'#F5F2EE',muted:'#8B8680',border:'#3D3A36',accent:'#E07A5F'};
+
+const FONTS=[
+  {name:'Classic',value:'-apple-system,sans-serif'},
+  {name:'Elegant',value:'"Playfair Display",serif'},
+  {name:'Script',value:'"Dancing Script",cursive'},
+  {name:'Bold',value:'"Bebas Neue",sans-serif'},
+  {name:'Mono',value:'"Courier Prime",monospace'}
+];
+const COLORS=['#FFFFFF','#2D2A26','#E07A5F','#81B29A','#F2CC8F','#3D405B'];
+
+function App(){
+  const[dark,setDark]=useState(false);
+  const[user,setUser]=useState(null);
+  const[userData,setUserData]=useState(null);
+  const[view,setView]=useState('loading');
+  const[authMode,setAuthMode]=useState('login');
+  const[authData,setAuthData]=useState({email:'',password:'',username:'',birthday:'',avatar:null});
+  const[authError,setAuthError]=useState('');
+  const[authLoading,setAuthLoading]=useState(false);
+  const[friends,setFriends]=useState([]);
+  const[myPosts,setMyPosts]=useState([]);
+  const[posted,setPosted]=useState(false);
+  const[sel,setSel]=useState(null);
+  const[step,setStep]=useState(1);
+  const[np,setNp]=useState({
+    photo:null,outfit:null,songTitle:'',songArtist:'',loc:'',quote:'',privateNote:'',
+    outfitX:0,outfitY:0,photoX:0,photoY:0,
+    songFont:0,songColor:0
+  });
+  const[uploading,setUploading]=useState(false);
+  const[calDate,setCalDate]=useState(new Date());
+  const[dayPost,setDayPost]=useState(null);
+  const[scrolled,setScrolled]=useState(false);
+  const[friendProfile,setFriendProfile]=useState(null);
+  const[friendCalDate,setFriendCalDate]=useState(new Date());
+  const[friendDayPost,setFriendDayPost]=useState(null);
+  const[showAddFriend,setShowAddFriend]=useState(false);
+  const[friendCode,setFriendCode]=useState('');
+  const[linkCopied,setLinkCopied]=useState(false);
+  const[editingProfile,setEditingProfile]=useState(false);
+  const[editUsername,setEditUsername]=useState('');
+  const[editAvatar,setEditAvatar]=useState(null);
+  const[savingProfile,setSavingProfile]=useState(false);
+  const[activeEdit,setActiveEdit]=useState(null);
+  const[showMenu,setShowMenu]=useState(false);
+  const[saving,setSaving]=useState(false);
+  const scrollRef=useRef(null);
+  const postcardRef=useRef(null);
+  const t=dark?D:L;
+
+  useEffect(()=>{
+    const unsub=window.auth.onAuthStateChanged(async(u)=>{
+      if(u){setUser(u);await loadUserData(u.uid);setView('feed');}
+      else{setUser(null);setUserData(null);setView('auth');}
+    });
+    return()=>unsub();
+  },[]);
+
+  const loadUserData=async(uid)=>{
+    try{
+      const doc=await window.db.collection('users').doc(uid).get();
+      if(doc.exists){setUserData({id:uid,...doc.data()});await loadPosts(uid);await loadFriends(uid);}
+    }catch(e){console.error(e);}
+  };
+
+  const loadPosts=async(uid)=>{
+    try{
+      const snap=await window.db.collection('posts').where('userId','==',uid).orderBy('date','desc').get();
+      const posts=snap.docs.map(d=>({id:d.id,...d.data()}));
+      setMyPosts(posts);
+      setPosted(posts.some(p=>p.date===new Date().toISOString().split('T')[0]));
+    }catch(e){console.error(e);}
+  };
+
+  const loadFriends=async(uid)=>{
+    try{
+      const userDoc=await window.db.collection('users').doc(uid).get();
+      const friendIds=userDoc.data()?.friends||[];
+      const friendsData=[];
+      for(const fid of friendIds){
+        const fDoc=await window.db.collection('users').doc(fid).get();
+        if(fDoc.exists){
+          const fData={id:fid,...fDoc.data()};
+          const pSnap=await window.db.collection('posts').where('userId','==',fid).orderBy('date','desc').get();
+          fData.posts=pSnap.docs.map(d=>({id:d.id,...d.data()}));
+          friendsData.push(fData);
+        }
+      }
+      setFriends(friendsData);
+    }catch(e){console.error(e);}
+  };
+
+  useEffect(()=>{const el=scrollRef.current;if(!el)return;const h=()=>setScrolled(el.scrollTop>50);el.addEventListener('scroll',h);return()=>el.removeEventListener('scroll',h);},[view]);
+
+  const nav=(v)=>{setView(v);setSel(null);setDayPost(null);setFriendProfile(null);setFriendDayPost(null);setShowAddFriend(false);setEditingProfile(false);setAuthError('');setShowMenu(false);setActiveEdit(null);};
+
+  const handleSignup=async()=>{
+    if(!authData.email||!authData.password||!authData.username||!authData.birthday){setAuthError('Please fill in all fields');return;}
+    setAuthLoading(true);setAuthError('');
+    try{
+      const cred=await window.auth.createUserWithEmailAndPassword(authData.email,authData.password);
+      let avatarUrl=null;
+      if(authData.avatar){
+        const ref=window.storage.ref(`avatars/${cred.user.uid}`);
+        await ref.putString(authData.avatar,'data_url');
+        avatarUrl=await ref.getDownloadURL();
+      }
+      const userDocData={username:authData.username,email:authData.email,birthday:authData.birthday,avatar:avatarUrl,friends:[],createdAt:new Date().toISOString()};
+      await window.db.collection('users').doc(cred.user.uid).set(userDocData);
+      setUserData({id:cred.user.uid,...userDocData});
+    }catch(e){setAuthError(e.message);}
+    setAuthLoading(false);
+  };
+
+  const handleLogin=async()=>{
+    if(!authData.email||!authData.password)return;
+    setAuthLoading(true);setAuthError('');
+    try{await window.auth.signInWithEmailAndPassword(authData.email,authData.password);}
+    catch(e){setAuthError(e.code==='auth/invalid-credential'?'Invalid email or password':e.message);}
+    setAuthLoading(false);
+  };
+
+  const handleLogout=async()=>{
+    await window.auth.signOut();
+    setMyPosts([]);setFriends([]);setPosted(false);
+    setAuthData({email:'',password:'',username:'',birthday:'',avatar:null});
+  };
+
+  const uploadImage=async(dataUrl,path)=>{
+    const ref=window.storage.ref(path);
+    await ref.putString(dataUrl,'data_url');
+    return await ref.getDownloadURL();
+  };
+
+  const saveProfile=async()=>{
+    if(!editUsername.trim()&&!editAvatar)return;
+    setSavingProfile(true);
+    try{
+      const updates={};
+      if(editUsername.trim())updates.username=editUsername;
+      if(editAvatar)updates.avatar=await uploadImage(editAvatar,`avatars/${user.uid}`);
+      await window.db.collection('users').doc(user.uid).update(updates);
+      setUserData(d=>({...d,...updates}));
+      setEditingProfile(false);
+    }catch(e){console.error(e);}
+    setSavingProfile(false);
+  };
+
+  const startEditProfile=()=>{setEditUsername(userData?.username||'');setEditAvatar(null);setEditingProfile(true);};
+  const uploadAuth=(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=>setAuthData(p=>({...p,avatar:r.result}));r.readAsDataURL(f);}};
+  const uploadEditAvatar=(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=>setEditAvatar(r.result);r.readAsDataURL(f);}};
+  const upload=(e,k)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onloadend=()=>setNp(p=>({...p,[k]:r.result}));r.readAsDataURL(f);}};
+
+  const submit=async()=>{
+    if(!np.photo||!np.outfit||!np.songTitle||!np.songArtist||!np.loc)return;
+    setUploading(true);
+    try{
+      const ts=Date.now();
+      const photoUrl=await uploadImage(np.photo,`posts/${user.uid}/${ts}_photo`);
+      const outfitUrl=await uploadImage(np.outfit,`posts/${user.uid}/${ts}_outfit`);
+      const post={
+        userId:user.uid,date:new Date().toISOString().split('T')[0],location:np.loc,
+        photo:photoUrl,outfitPhoto:outfitUrl,
+        photoX:np.photoX,photoY:np.photoY,outfitX:np.outfitX,outfitY:np.outfitY,
+        song:{title:np.songTitle,artist:np.songArtist},
+        songFont:np.songFont,songColor:np.songColor,
+        quote:np.quote,privateNote:np.privateNote,
+        createdAt:new Date().toISOString()
+      };
+      const docRef=await window.db.collection('posts').add(post);
+      setMyPosts(x=>[{id:docRef.id,...post},...x]);
+      setPosted(true);
+      nav('feed');
+      setStep(1);
+      setNp({photo:null,outfit:null,songTitle:'',songArtist:'',loc:'',quote:'',privateNote:'',outfitX:0,outfitY:0,photoX:0,photoY:0,songFont:0,songColor:0});
+    }catch(e){console.error(e);}
+    setUploading(false);
+  };
+
+  const addFriendByCode=async()=>{
+    if(!friendCode.trim())return;
+    try{
+      const snap=await window.db.collection('users').where('username','==',friendCode.trim()).get();
+      if(!snap.empty){
+        const friendDoc=snap.docs[0];
+        const friendId=friendDoc.id;
+        if(friendId===user.uid){setFriendCode('');return;}
+        const userDoc=await window.db.collection('users').doc(user.uid).get();
+        const currentFriends=userDoc.data()?.friends||[];
+        if(!currentFriends.includes(friendId)){
+          await window.db.collection('users').doc(user.uid).update({friends:[...currentFriends,friendId]});
+          const friendData=await window.db.collection('users').doc(friendId).get();
+          const friendFriends=friendData.data()?.friends||[];
+          if(!friendFriends.includes(user.uid)){
+            await window.db.collection('users').doc(friendId).update({friends:[...friendFriends,user.uid]});
+          }
+          await loadFriends(user.uid);
+        }
+      }else{alert('User not found');}
+      setFriendCode('');
+    }catch(e){console.error(e);}
+  };
+
+  const copyUsername=()=>{navigator.clipboard?.writeText(userData?.username||'');setLinkCopied(true);setTimeout(()=>setLinkCopied(false),2000);};
+
+  // Save to camera roll - works on all devices
+  const saveToCamera=async(post,owner)=>{
+    setSaving(true);setShowMenu(false);
+    try{
+      // Create a temporary container for rendering
+      const container=document.createElement('div');
+      container.style.cssText='position:fixed;left:-9999px;top:0;width:600px;background:#fff;font-family:-apple-system,sans-serif;';
+      document.body.appendChild(container);
+      
+      const font=FONTS[post.songFont||0]?.value||FONTS[0].value;
+      const color=COLORS[post.songColor||0]||COLORS[0];
+      
+      container.innerHTML=`
+        <div style="background:#fff;">
+          <div style="position:relative;display:flex;height:360px;">
+            <div style="flex:1;overflow:hidden;position:relative;">
+              <img src="${post.outfitPhoto||post.outfit}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:${50+post.outfitX}% ${50+post.outfitY}%;"/>
+              <div style="position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">OOTD</div>
+            </div>
+            <div style="width:4px;background:#fff;"></div>
+            <div style="flex:1;overflow:hidden;position:relative;">
+              <img src="${post.photo}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:${50+post.photoX}% ${50+post.photoY}%;"/>
+              <div style="position:absolute;bottom:12px;right:12px;background:rgba(0,0,0,0.7);color:#fff;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">PHOTO</div>
+            </div>
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;text-shadow:0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5);padding:12px 20px;">
+              <p style="margin:0;font-size:20px;font-weight:600;color:${color};font-family:${font};">🎵 ${post.song?.title||''}</p>
+              <p style="margin:4px 0 0;font-size:15px;color:${color};font-family:${font};opacity:0.95;">${post.song?.artist||''}</p>
+            </div>
+            <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#E07A5F;color:#fff;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700;">📮 POSTCARD</div>
+          </div>
+          <div style="padding:20px;border-top:2px solid #E8E4DF;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:44px;height:44px;border-radius:14px;background:#E07A5F;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;overflow:hidden;">
+                ${owner?.avatar?`<img src="${owner.avatar}" style="width:100%;height:100%;object-fit:cover;"/>`:(owner?.username?.[0]?.toUpperCase()||'?')}
+              </div>
+              <div>
+                <p style="margin:0;font-size:17px;font-weight:600;color:#2D2A26;">${owner?.username||'You'}</p>
+                <p style="margin:2px 0 0;font-size:13px;color:#8B8680;">📍 ${post.location||''} · ${post.date||new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+            ${post.quote?`<p style="margin:14px 0 0;font-size:17px;font-style:italic;color:#2D2A26;">"${post.quote}"</p>`:''}
+          </div>
+        </div>
+      `;
+      
+      // Wait for images to load
+      const images=container.querySelectorAll('img');
+      await Promise.all([...images].map(img=>new Promise(r=>{if(img.complete)r();else{img.onload=r;img.onerror=r;}})));
+      
+      const canvas=await html2canvas(container,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff'});
+      document.body.removeChild(container);
+      
+      // Convert to blob and trigger download
+      canvas.toBlob((blob)=>{
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=`postcard-${post.date||new Date().toISOString().split('T')[0]}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setSaving(false);
+      },'image/png',1.0);
+    }catch(e){
+      console.error('Save error:',e);
+      alert('Could not save. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  // Delete post
+  const deletePost=async(postId)=>{
+    if(!confirm('Delete this postcard? This cannot be undone.'))return;
+    setShowMenu(false);
+    try{
+      await window.db.collection('posts').doc(postId).delete();
+      setMyPosts(p=>p.filter(x=>x.id!==postId));
+      const today=new Date().toISOString().split('T')[0];
+      const remaining=myPosts.filter(x=>x.id!==postId);
+      setPosted(remaining.some(p=>p.date===today));
+      nav('feed');
+    }catch(e){console.error(e);alert('Could not delete. Try again.');}
+  };
+
+  const allTodayPosts=()=>{
+    const today=new Date().toISOString().split('T')[0];
+    const fp=friends.flatMap(f=>f.posts?.filter(p=>p.date===today).map(p=>({...p,friend:f}))||[]);
+    const mp=myPosts.filter(p=>p.date===today).map(p=>({...p,friend:{...userData,id:user?.uid}}));
+    return[...mp,...fp];
+  };
+  
+  const getBirthdays=(date)=>{
+    const month=date.getMonth()+1;const day=date.getDate();
+    const all=[...friends];if(userData&&userData.birthday)all.push(userData);
+    return all.filter(f=>{if(!f.birthday)return false;const parts=f.birthday.split('-');return parseInt(parts[1],10)===month&&parseInt(parts[2],10)===day;});
+  };
+  
+  const getMyPostForDate=(day)=>{
+    const ds=`${calDate.getFullYear()}-${String(calDate.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return myPosts.find(p=>p.date===ds);
+  };
+  const getFriendPostForDate=(friend,day,cd)=>{
+    const ds=`${cd.getFullYear()}-${String(cd.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return friend.posts?.find(p=>p.date===ds);
+  };
+  const days=d=>({n:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),s:new Date(d.getFullYear(),d.getMonth(),1).getDay()});
+  const fmtM=d=>d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const{n:daysN,s:startD}=days(calDate);
+  const now=new Date();
+  const isCur=calDate.getMonth()===now.getMonth()&&calDate.getFullYear()===now.getFullYear();
+
+  // Postcard component
+  const PostcardView=({post,owner,showPrivate=false,isOwner=false,showMenuOption=false})=>{
+    const font=FONTS[post.songFont||0]?.value||FONTS[0].value;
+    const color=COLORS[post.songColor||0]||COLORS[0];
+    
+    return(
+      <div style={{position:'relative'}}>
+        <div style={{background:t.card,borderRadius:16,border:`1px solid ${t.border}`,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+          <div style={{position:'relative',display:'flex',height:200}}>
+            {/* Left - OOTD */}
+            <div style={{flex:1,overflow:'hidden',position:'relative'}}>
+              <img src={post.outfitPhoto||post.outfit} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+(post.outfitX||0)}% ${50+(post.outfitY||0)}%`}}/>
+              <div style={{position:'absolute',bottom:8,left:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}>OOTD</div>
+            </div>
+            <div style={{width:3,background:t.card}}/>
+            {/* Right - Photo */}
+            <div style={{flex:1,overflow:'hidden',position:'relative'}}>
+              <img src={post.photo} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+(post.photoX||0)}% ${50+(post.photoY||0)}%`}}/>
+              <div style={{position:'absolute',bottom:8,right:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}>PHOTO</div>
+            </div>
+            {/* Song - centered */}
+            <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',textAlign:'center',textShadow:'0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5)',padding:'10px 16px'}}>
+              <p style={{margin:0,fontSize:15,fontWeight:600,color,fontFamily:font}}>🎵 {post.song?.title}</p>
+              <p style={{margin:'3px 0 0',fontSize:12,color,fontFamily:font,opacity:0.95}}>{post.song?.artist}</p>
+            </div>
+            <div style={{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',background:t.accent,color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:10,fontWeight:700}}>📮 POSTCARD</div>
+          </div>
+          <div style={{padding:14,borderTop:`1px solid ${t.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              {owner?.avatar?<img src={owner.avatar} style={{width:32,height:32,borderRadius:10,objectFit:'cover'}}/>:<div style={{width:32,height:32,borderRadius:10,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:600,color:'#fff'}}>{owner?.username?.[0]?.toUpperCase()||'?'}</div>}
+              <div style={{flex:1}}>
+                <p style={{margin:0,fontSize:13,fontWeight:600,color:t.text}}>{owner?.id===user?.uid?'You':owner?.username||'User'}</p>
+                <p style={{margin:0,fontSize:11,color:t.muted}}>📍 {post.location} · {post.date}</p>
+              </div>
+            </div>
+            {post.quote&&<p style={{margin:'10px 0 0',fontSize:14,fontStyle:'italic',color:t.text}}>"{post.quote}"</p>}
+            {showPrivate&&post.privateNote&&<div style={{marginTop:8,padding:8,background:dark?'#3d3520':'#fff8e1',borderRadius:6,border:`1px dashed ${dark?'#665c30':'#ffc107'}`}}><p style={{margin:0,fontSize:10,color:dark?'#ffc107':'#f57c00'}}>🔒 {post.privateNote}</p></div>}
+          </div>
+        </div>
+        
+        {/* 3-dot menu for owner */}
+        {showMenuOption&&isOwner&&(
+          <div style={{display:'flex',justifyContent:'center',marginTop:12}}>
+            <div style={{position:'relative'}}>
+              <span className="tap" onClick={()=>setShowMenu(!showMenu)} style={{display:'flex',gap:4,padding:'8px 16px',background:t.card,borderRadius:20,border:`1px solid ${t.border}`,alignItems:'center'}}>
+                <span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/>
+                <span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/>
+                <span style={{width:5,height:5,borderRadius:'50%',background:t.muted}}/>
+              </span>
+              {showMenu&&(
+                <>
+                  <div onClick={()=>setShowMenu(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:99}}/>
+                  <div style={{position:'absolute',bottom:'100%',left:'50%',transform:'translateX(-50%)',marginBottom:8,background:t.card,borderRadius:14,border:`1px solid ${t.border}`,boxShadow:'0 4px 20px rgba(0,0,0,0.15)',overflow:'hidden',zIndex:100,minWidth:200}}>
+                    <span className="tap" onClick={()=>saveToCamera(post,owner)} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',color:t.text,fontSize:14,fontWeight:500,borderBottom:`1px solid ${t.border}`}}>
+                      <span style={{fontSize:18}}>💾</span>Save to Photos
+                    </span>
+                    <span className="tap" onClick={()=>deletePost(post.id)} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',color:'#e53935',fontSize:14,fontWeight:500}}>
+                      <span style={{fontSize:18}}>🗑️</span>Delete Post
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Editor preview
+  const EditorPreview=()=>{
+    const font=FONTS[np.songFont]?.value;
+    const color=COLORS[np.songColor];
+    return(
+      <div style={{background:t.card,borderRadius:16,border:`1px solid ${t.border}`,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+        <div style={{position:'relative',display:'flex',height:200}}>
+          <div onClick={()=>setActiveEdit('outfit')} style={{flex:1,overflow:'hidden',position:'relative',outline:activeEdit==='outfit'?`3px solid ${t.accent}`:'none',outlineOffset:'-3px',cursor:'pointer'}}>
+            <img src={np.outfit} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+np.outfitX}% ${50+np.outfitY}%`}}/>
+            <div style={{position:'absolute',bottom:8,left:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}>OOTD</div>
+          </div>
+          <div style={{width:3,background:t.card}}/>
+          <div onClick={()=>setActiveEdit('photo')} style={{flex:1,overflow:'hidden',position:'relative',outline:activeEdit==='photo'?`3px solid ${t.accent}`:'none',outlineOffset:'-3px',cursor:'pointer'}}>
+            <img src={np.photo} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:`${50+np.photoX}% ${50+np.photoY}%`}}/>
+            <div style={{position:'absolute',bottom:8,right:8,background:'rgba(0,0,0,0.7)',color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600}}>PHOTO</div>
+          </div>
+          <div onClick={()=>setActiveEdit('song')} style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',textAlign:'center',textShadow:'0 2px 8px rgba(0,0,0,0.95),0 0 20px rgba(0,0,0,0.5)',padding:'10px 16px',borderRadius:8,background:activeEdit==='song'?'rgba(255,255,255,0.2)':'transparent',border:activeEdit==='song'?`2px dashed ${t.accent}`:'2px dashed transparent',cursor:'pointer'}}>
+            <p style={{margin:0,fontSize:15,fontWeight:600,color,fontFamily:font}}>🎵 {np.songTitle||'Song'}</p>
+            <p style={{margin:'3px 0 0',fontSize:12,color,fontFamily:font,opacity:0.95}}>{np.songArtist||'Artist'}</p>
+          </div>
+          <div style={{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',background:t.accent,color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:10,fontWeight:700}}>📮 POSTCARD</div>
+        </div>
+        <div style={{padding:14,borderTop:`1px solid ${t.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {userData?.avatar?<img src={userData.avatar} style={{width:32,height:32,borderRadius:10,objectFit:'cover'}}/>:<div style={{width:32,height:32,borderRadius:10,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:600,color:'#fff'}}>{userData?.username?.[0]?.toUpperCase()||'?'}</div>}
+            <div style={{flex:1}}>
+              <p style={{margin:0,fontSize:13,fontWeight:600,color:t.text}}>You</p>
+              <p style={{margin:0,fontSize:11,color:t.muted}}>📍 {np.loc||'Location'} · Today</p>
+            </div>
+          </div>
+          {np.quote&&<p style={{margin:'10px 0 0',fontSize:14,fontStyle:'italic',color:t.text}}>"{np.quote}"</p>}
+        </div>
+      </div>
+    );
+  };
+
+  // Edit controls
+  const EditControls=()=>{
+    if(!activeEdit)return(
+      <div style={{padding:20,background:t.card,borderRadius:16,border:`2px dashed ${t.border}`,textAlign:'center'}}>
+        <p style={{margin:0,color:t.muted,fontSize:14}}>👆 Tap an image or song text to edit</p>
+      </div>
+    );
+
+    if(activeEdit==='song'){
+      return(
+        <div style={{background:t.card,borderRadius:16,padding:20,border:`2px solid ${t.accent}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text}}>🎵 Song Style</p>
+            <span className="tap" onClick={()=>setActiveEdit(null)} style={{fontSize:20,color:t.muted,padding:4}}>✕</span>
+          </div>
+          <p style={{margin:'0 0 10px',fontSize:13,fontWeight:500,color:t.text}}>Font</p>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+            {FONTS.map((f,i)=>(
+              <span key={i} className="tap" onClick={()=>setNp(p=>({...p,songFont:i}))} style={{padding:'10px 14px',borderRadius:10,fontSize:13,background:np.songFont===i?t.accent:t.bg,color:np.songFont===i?'#fff':t.text,fontFamily:f.value,fontWeight:500}}>{f.name}</span>
+            ))}
+          </div>
+          <p style={{margin:'0 0 10px',fontSize:13,fontWeight:500,color:t.text}}>Color</p>
+          <div style={{display:'flex',gap:10}}>
+            {COLORS.map((c,i)=>(
+              <span key={i} className="tap" onClick={()=>setNp(p=>({...p,songColor:i}))} style={{width:40,height:40,borderRadius:10,background:c,border:np.songColor===i?`3px solid ${t.accent}`:`2px solid ${t.border}`,boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}/>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    const isOutfit=activeEdit==='outfit';
+    const prefix=isOutfit?'outfit':'photo';
+
+    return(
+      <div style={{background:t.card,borderRadius:16,padding:20,border:`2px solid ${t.accent}`}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <p style={{margin:0,fontSize:16,fontWeight:600,color:t.text}}>{isOutfit?'👕 Outfit':'📷 Photo'} Position</p>
+          <span className="tap" onClick={()=>setActiveEdit(null)} style={{fontSize:20,color:t.muted,padding:4}}>✕</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,maxWidth:200,margin:'0 auto'}}>
+          <div/>
+          <span className="tap" onClick={()=>setNp(p=>({...p,[`${prefix}Y`]:p[`${prefix}Y`]-10}))} style={{padding:18,background:t.bg,borderRadius:12,textAlign:'center',fontSize:22}}>↑</span>
+          <div/>
+          <span className="tap" onClick={()=>setNp(p=>({...p,[`${prefix}X`]:p[`${prefix}X`]-10}))} style={{padding:18,background:t.bg,borderRadius:12,textAlign:'center',fontSize:22}}>←</span>
+          <span className="tap" onClick={()=>setNp(p=>({...p,[`${prefix}X`]:0,[`${prefix}Y`]:0}))} style={{padding:18,background:t.accent,borderRadius:12,textAlign:'center',fontSize:11,fontWeight:600,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}>Reset</span>
+          <span className="tap" onClick={()=>setNp(p=>({...p,[`${prefix}X`]:p[`${prefix}X`]+10}))} style={{padding:18,background:t.bg,borderRadius:12,textAlign:'center',fontSize:22}}>→</span>
+          <div/>
+          <span className="tap" onClick={()=>setNp(p=>({...p,[`${prefix}Y`]:p[`${prefix}Y`]+10}))} style={{padding:18,background:t.bg,borderRadius:12,textAlign:'center',fontSize:22}}>↓</span>
+          <div/>
+        </div>
+      </div>
+    );
+  };
+
+  // Saving overlay
+  const SavingOverlay=()=>saving?(
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+      <div style={{background:t.card,padding:28,borderRadius:20,textAlign:'center'}}>
+        <div style={{fontSize:32,marginBottom:12}}>💾</div>
+        <p style={{margin:0,fontSize:16,fontWeight:500,color:t.text}}>Saving to photos...</p>
+      </div>
+    </div>
+  ):null;
+
+  if(view==='loading')return(<div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:t.bg}}><div style={{textAlign:'center'}}><div style={{fontSize:48,marginBottom:12}}>📮</div><p style={{color:t.muted,margin:0}}>Loading...</p></div></div>);
+
+  if(view==='auth')return(
+    <div style={{width:'100%',maxWidth:430,minHeight:'100vh',margin:'0 auto',fontFamily:'-apple-system,sans-serif',background:t.bg,padding:20,display:'flex',flexDirection:'column'}}>
+      <SavingOverlay/>
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+        <div style={{textAlign:'center',marginBottom:40}}><div style={{fontSize:60,marginBottom:8}}>📮</div><h1 style={{margin:0,fontSize:32,fontWeight:700,color:t.text}}>postcard</h1><p style={{margin:'8px 0 0',color:t.muted}}>Share your day with friends</p></div>
+        <div style={{display:'flex',marginBottom:24,background:t.card,borderRadius:12,padding:4,border:`1px solid ${t.border}`}}><span className="tap" onPointerDown={()=>{setAuthMode('login');setAuthError('');}} style={{flex:1,padding:12,borderRadius:8,textAlign:'center',fontSize:14,fontWeight:600,background:authMode==='login'?t.accent:'transparent',color:authMode==='login'?'#fff':t.muted}}>Log In</span><span className="tap" onPointerDown={()=>{setAuthMode('signup');setAuthError('');}} style={{flex:1,padding:12,borderRadius:8,textAlign:'center',fontSize:14,fontWeight:600,background:authMode==='signup'?t.accent:'transparent',color:authMode==='signup'?'#fff':t.muted}}>Sign Up</span></div>
+        {authMode==='signup'&&<div style={{display:'flex',justifyContent:'center',marginBottom:20}}><input type="file" accept="image/*" onChange={uploadAuth} style={{display:'none'}} id="avatar"/><label htmlFor="avatar" className="tap">{authData.avatar?<img src={authData.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',border:`3px solid ${t.accent}`}}/>:<div style={{width:80,height:80,borderRadius:24,background:t.card,border:`2px dashed ${t.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}}><span style={{fontSize:24}}>📷</span><span style={{fontSize:10,color:t.muted}}>Add photo</span></div>}</label></div>}
+        {authError&&<div style={{padding:12,marginBottom:12,borderRadius:10,background:'#ffebee',color:'#c62828',fontSize:13,textAlign:'center'}}>{authError}</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {authMode==='signup'&&<div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}><span>👤</span><input placeholder="Username" value={authData.username} onChange={e=>setAuthData(p=>({...p,username:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/></div>}
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}><span>✉️</span><input type="email" placeholder="Email" value={authData.email} onChange={e=>setAuthData(p=>({...p,email:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/></div>
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}><span>🔒</span><input type="password" placeholder="Password (6+ characters)" value={authData.password} onChange={e=>setAuthData(p=>({...p,password:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/></div>
+          {authMode==='signup'&&<><div style={{display:'flex',alignItems:'center',gap:10,padding:14,borderRadius:14,border:`1px solid ${t.border}`,background:t.card}}><span>🎂</span><input type="date" value={authData.birthday} onChange={e=>setAuthData(p=>({...p,birthday:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:15,color:t.text,outline:'none'}}/></div><p style={{margin:0,fontSize:11,color:t.muted,textAlign:'center'}}>Friends will see your birthday on their calendar</p></>}
+        </div>
+        <span className={`tap ${authLoading?'loading':''}`} onPointerDown={authMode==='login'?handleLogin:handleSignup} style={{marginTop:24,color:'#fff',padding:16,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}>{authLoading?'Please wait...':authMode==='login'?'Log In':'Create Account'}</span>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{width:'100%',maxWidth:430,minHeight:'100vh',margin:'0 auto',fontFamily:'-apple-system,sans-serif',background:t.bg}}>
+      <style>{`@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes float{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}`}</style>
+      <SavingOverlay/>
+
+      {view==='feed'&&<div ref={scrollRef} style={{minHeight:'100vh',paddingBottom:100,overflowY:'auto'}}>
+        <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:26,fontWeight:700,color:t.text}}>postcard</span><span style={{fontSize:18,animation:'float 3s infinite'}}>✈️</span></div><div style={{display:'flex',gap:8}}><span className="tap" onPointerDown={()=>nav('settings')} style={{fontSize:20,padding:8,color:t.muted}}>⚙️</span><span className="tap" onPointerDown={()=>nav('profile')} style={{padding:8}}>{userData?.avatar?<img src={userData.avatar} style={{width:36,height:36,borderRadius:12,objectFit:'cover'}}/>:<div style={{width:36,height:36,borderRadius:12,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:600,color:'#fff'}}>{userData?.username?.[0]?.toUpperCase()||'?'}</div>}</span></div></header>
+        {!posted&&<div style={{margin:'0 20px 20px',padding:24,borderRadius:20,textAlign:'center',border:`2px dashed ${t.border}`,background:t.card}}><div style={{fontSize:40,marginBottom:8}}>📮</div><p style={{color:t.text,margin:'0 0 14px',fontSize:15}}>Share your day to see friends' postcards</p><span className="tap" onPointerDown={()=>nav('post')} style={{display:'inline-block',color:'#fff',padding:'14px 28px',borderRadius:14,fontSize:15,fontWeight:600,background:t.accent}}>Send postcard ✉️</span></div>}
+        {allTodayPosts().length===0&&posted&&<div style={{padding:'40px 20px',textAlign:'center'}}><p style={{color:t.muted,fontSize:15}}>No postcards from friends today yet.</p></div>}
+        <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:16}}>{allTodayPosts().map((p,i)=>(<div key={p.id} className="tap" onPointerDown={()=>(setSel(p),setView('detail'))} style={{animation:`up .4s ${i*.1}s both`}}><PostcardView post={p} owner={p.friend} showPrivate={p.userId===user?.uid}/></div>))}</div>
+        <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,padding:scrolled?'8px 20px 20px':'16px 20px 34px',display:'flex',justifyContent:'space-around',alignItems:'center',background:`linear-gradient(transparent,${t.bg})`,transition:'padding .3s'}}><span style={{fontSize:scrolled?18:24,padding:scrolled?8:12}}>🏠</span><span className="tap" onPointerDown={()=>nav('post')} style={{width:scrolled?40:56,height:scrolled?40:56,borderRadius:scrolled?12:16,display:'flex',alignItems:'center',justifyContent:'center',fontSize:scrolled?20:28,color:'#fff',background:t.accent,transition:'all .3s'}}>+</span><span className="tap" onPointerDown={()=>nav('profile')} style={{fontSize:scrolled?18:24,padding:scrolled?8:12,opacity:.5}}>👤</span></nav>
+      </div>}
+
+      {view==='settings'&&<div style={{minHeight:'100vh',background:t.bg,padding:'0 20px'}}><header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}><span className="tap" onPointerDown={()=>nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}>←</span><span style={{fontWeight:600,color:t.text}}>Settings</span><div style={{width:48}}/></header><div style={{display:'flex',flexDirection:'column',gap:12}}><div style={{padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}><p style={{margin:'0 0 12px',fontWeight:600,color:t.text}}>Edit Profile</p>{!editingProfile?<div style={{display:'flex',alignItems:'center',gap:12}}>{userData?.avatar?<img src={userData.avatar} style={{width:50,height:50,borderRadius:16,objectFit:'cover'}}/>:<div style={{width:50,height:50,borderRadius:16,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:600,color:'#fff'}}>{userData?.username?.[0]?.toUpperCase()||'?'}</div>}<div style={{flex:1}}><p style={{margin:0,fontWeight:600,color:t.text}}>{userData?.username}</p><p style={{margin:'2px 0 0',fontSize:13,color:t.muted}}>{userData?.email}</p></div><span className="tap" onPointerDown={startEditProfile} style={{padding:'8px 16px',borderRadius:8,background:t.accent,color:'#fff',fontSize:13,fontWeight:600}}>Edit</span></div>:<div style={{display:'flex',flexDirection:'column',gap:12}}><div style={{display:'flex',justifyContent:'center'}}><input type="file" accept="image/*" onChange={uploadEditAvatar} style={{display:'none'}} id="editAvatar"/><label htmlFor="editAvatar" className="tap">{(editAvatar||userData?.avatar)?<img src={editAvatar||userData?.avatar} style={{width:70,height:70,borderRadius:20,objectFit:'cover',border:`3px solid ${t.accent}`}}/>:<div style={{width:70,height:70,borderRadius:20,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:600,color:'#fff'}}>{userData?.username?.[0]?.toUpperCase()||'?'}</div>}</label></div><p style={{margin:0,fontSize:11,color:t.muted,textAlign:'center'}}>Tap to change photo</p><div style={{display:'flex',alignItems:'center',gap:10,padding:12,borderRadius:10,border:`1px solid ${t.border}`,background:t.bg}}><span>👤</span><input placeholder="Username" value={editUsername} onChange={e=>setEditUsername(e.target.value)} style={{flex:1,background:'transparent',border:'none',fontSize:14,color:t.text,outline:'none'}}/></div><div style={{display:'flex',gap:8}}><span className="tap" onPointerDown={()=>setEditingProfile(false)} style={{flex:1,padding:12,borderRadius:8,border:`1px solid ${t.border}`,textAlign:'center',fontSize:14,color:t.text}}>Cancel</span><span className={`tap ${savingProfile?'loading':''}`} onPointerDown={saveProfile} style={{flex:1,padding:12,borderRadius:8,background:t.accent,textAlign:'center',fontSize:14,color:'#fff',fontWeight:600}}>{savingProfile?'Saving...':'Save'}</span></div></div>}</div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}><div style={{display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:24}}>{dark?'🌙':'☀️'}</span><div><p style={{margin:0,fontWeight:600,color:t.text}}>{dark?'Dark':'Light'} mode</p></div></div><span className="tap" onPointerDown={()=>setDark(!dark)} style={{width:50,height:30,borderRadius:15,padding:3,background:dark?t.accent:t.border,display:'block'}}><div style={{width:24,height:24,borderRadius:12,background:'#fff',transform:dark?'translateX(20px)':'translateX(0)',transition:'transform .3s'}}/></span></div><span className="tap" onPointerDown={handleLogout} style={{padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card,textAlign:'center',color:'#e53935',fontWeight:600}}>Log Out</span></div></div>}
+
+      {view==='profile'&&<div style={{minHeight:'100vh',background:t.bg,padding:'0 20px 40px'}}><header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}><span className="tap" onPointerDown={()=>nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}>←</span><span style={{fontWeight:600,color:t.text}}>Profile</span><div style={{width:48}}/></header><div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:10}}>{userData?.avatar?<img src={userData.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',marginBottom:12}}/>:<div style={{width:80,height:80,borderRadius:24,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:700,color:'#fff',marginBottom:12}}>{userData?.username?.[0]?.toUpperCase()||'?'}</div>}<h2 style={{margin:'0 0 4px',fontSize:22,fontWeight:600,color:t.text}}>{userData?.username||'User'}</h2>{userData?.birthday&&<p style={{margin:'0 0 16px',fontSize:12,color:t.muted}}>🎂 {new Date(userData.birthday+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'})}</p>}<div style={{display:'flex',gap:24,padding:20,borderRadius:16,border:`1px solid ${t.border}`,width:'100%',background:t.card,marginBottom:20}}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}><span style={{fontSize:24,fontWeight:700,color:t.text}}>{myPosts.length}</span><span style={{fontSize:13,color:t.muted}}>Postcards</span></div><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}><span style={{fontSize:24,fontWeight:700,color:t.text}}>{friends.length}</span><span style={{fontSize:13,color:t.muted}}>Friends</span></div></div><div style={{width:'100%',marginBottom:20}}><span className="tap" onPointerDown={()=>setShowAddFriend(!showAddFriend)} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:14,background:t.accent,color:'#fff',fontWeight:600,fontSize:14}}>{showAddFriend?'✕ Close':'👥 Add Friends'}</span>{showAddFriend&&<div style={{marginTop:12,padding:16,borderRadius:16,border:`1px solid ${t.border}`,background:t.card}}><p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:t.text}}>Add by username:</p><div style={{display:'flex',gap:8}}><input placeholder="Username" value={friendCode} onChange={e=>setFriendCode(e.target.value)} style={{flex:1,padding:12,borderRadius:10,border:`1px solid ${t.border}`,background:t.bg,fontSize:14,color:t.text,outline:'none'}}/><span className="tap" onPointerDown={addFriendByCode} style={{padding:'12px 16px',borderRadius:10,background:t.accent,color:'#fff',fontSize:14,fontWeight:600}}>Add</span></div><div style={{borderTop:`1px solid ${t.border}`,marginTop:16,paddingTop:16}}><p style={{margin:'0 0 8px',fontSize:13,color:t.muted}}>Your username:</p><span className="tap" onPointerDown={copyUsername} style={{display:'block',padding:14,borderRadius:10,background:t.bg,textAlign:'center',fontSize:14,color:t.accent,fontWeight:600}}>{linkCopied?'✓ Copied!':userData?.username}</span></div></div>}</div>{friends.length>0&&<div style={{width:'100%',marginBottom:20}}><p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}>Friends</p><div style={{display:'flex',flexDirection:'column',gap:8}}>{friends.map(f=><div key={f.id} className="tap" onPointerDown={()=>{setFriendProfile(f);setFriendCalDate(new Date());setView('friendProfile');}} style={{display:'flex',alignItems:'center',gap:10,padding:12,borderRadius:12,border:`1px solid ${t.border}`,background:t.card}}>{f.avatar?<img src={f.avatar} style={{width:40,height:40,borderRadius:12,objectFit:'cover'}}/>:<div style={{width:40,height:40,borderRadius:12,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:600,color:'#fff'}}>{f.username?.[0]?.toUpperCase()}</div>}<div style={{flex:1}}><p style={{margin:0,fontSize:14,fontWeight:600,color:t.text}}>{f.username}</p></div><span style={{fontSize:18,color:t.muted}}>→</span></div>)}</div></div>}<div style={{width:'100%',borderRadius:16,border:`1px solid ${t.border}`,padding:16,background:t.card}}><p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}>Your Postcards</p><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><span className="tap" onPointerDown={()=>setCalDate(new Date(calDate.getFullYear(),calDate.getMonth()-1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}>‹</span><span style={{fontWeight:600,color:t.text}}>{fmtM(calDate)}</span><span className="tap" onPointerDown={()=>setCalDate(new Date(calDate.getFullYear(),calDate.getMonth()+1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}>›</span></div><div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:8}}>{['S','M','T','W','T','F','S'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:12,fontWeight:600,padding:8,color:t.muted}}>{d}</div>)}</div><div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>{Array(startD).fill(null).map((_,i)=><div key={`e${i}`}/>)}{Array(daysN).fill(null).map((_,i)=>{const day=i+1;const pfd=getMyPostForDate(day);const isT=isCur&&day===now.getDate();const bdays=getBirthdays(new Date(calDate.getFullYear(),calDate.getMonth(),day));return<div key={day} className={pfd?"tap":""} onPointerDown={()=>pfd&&(setDayPost(pfd),setView('dayDetail'))} style={{aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,background:pfd?t.accent:bdays.length?'#fff3e0':'transparent',color:pfd?'#fff':t.text,border:isT?`2px solid ${t.accent}`:'none',fontWeight:isT?700:400,flexDirection:'column',position:'relative'}}>{pfd?<><span style={{fontSize:10}}>{day}</span><span style={{fontSize:8}}>📮</span></>:<span style={{fontSize:12}}>{day}</span>}{bdays.length>0&&!pfd&&<span style={{position:'absolute',bottom:2,fontSize:8}}>🎂</span>}</div>})}</div></div></div></div>}
+
+      {view==='friendProfile'&&friendProfile&&<div style={{minHeight:'100vh',background:t.bg,padding:'0 20px 40px'}}><header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}><span className="tap" onPointerDown={()=>nav('profile')} style={{fontSize:28,padding:'8px 12px',color:t.text}}>←</span><span style={{fontWeight:600,color:t.text}}>{friendProfile.username}</span><div style={{width:48}}/></header><div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:10}}>{friendProfile.avatar?<img src={friendProfile.avatar} style={{width:80,height:80,borderRadius:24,objectFit:'cover',marginBottom:12}}/>:<div style={{width:80,height:80,borderRadius:24,background:t.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:700,color:'#fff',marginBottom:12}}>{friendProfile.username?.[0]?.toUpperCase()}</div>}<h2 style={{margin:'0 0 4px',fontSize:22,fontWeight:600,color:t.text}}>{friendProfile.username}</h2>{friendProfile.birthday&&<p style={{margin:'0 0 16px',fontSize:12,color:t.muted}}>🎂 {new Date(friendProfile.birthday+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'})}</p>}<div style={{display:'flex',gap:24,padding:20,borderRadius:16,border:`1px solid ${t.border}`,width:'100%',background:t.card,marginBottom:20}}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}><span style={{fontSize:24,fontWeight:700,color:t.text}}>{friendProfile.posts?.length||0}</span><span style={{fontSize:13,color:t.muted}}>Postcards</span></div></div><div style={{width:'100%',borderRadius:16,border:`1px solid ${t.border}`,padding:16,background:t.card}}><p style={{margin:'0 0 12px',fontSize:14,fontWeight:600,color:t.text}}>{friendProfile.username}'s Postcards</p><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><span className="tap" onPointerDown={()=>setFriendCalDate(new Date(friendCalDate.getFullYear(),friendCalDate.getMonth()-1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}>‹</span><span style={{fontWeight:600,color:t.text}}>{fmtM(friendCalDate)}</span><span className="tap" onPointerDown={()=>setFriendCalDate(new Date(friendCalDate.getFullYear(),friendCalDate.getMonth()+1,1))} style={{fontSize:24,padding:'4px 12px',color:t.text}}>›</span></div><div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:8}}>{['S','M','T','W','T','F','S'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:12,fontWeight:600,padding:8,color:t.muted}}>{d}</div>)}</div><div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>{Array(days(friendCalDate).s).fill(null).map((_,i)=><div key={`e${i}`}/>)}{Array(days(friendCalDate).n).fill(null).map((_,i)=>{const day=i+1;const pfd=getFriendPostForDate(friendProfile,day,friendCalDate);const isT=friendCalDate.getMonth()===now.getMonth()&&friendCalDate.getFullYear()===now.getFullYear()&&day===now.getDate();return<div key={day} className={pfd?"tap":""} onPointerDown={()=>pfd&&(setFriendDayPost({...pfd,friend:friendProfile}),setView('friendDayDetail'))} style={{aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,background:pfd?t.accent:'transparent',color:pfd?'#fff':t.text,border:isT?`2px solid ${t.accent}`:'none',fontWeight:isT?700:400,flexDirection:'column'}}>{pfd?<><span style={{fontSize:10}}>{day}</span><span style={{fontSize:8}}>📮</span></>:<span style={{fontSize:12}}>{day}</span>}</div>})}</div></div></div></div>}
+
+      {view==='post'&&<div style={{minHeight:'100vh',padding:'0 20px 40px',background:t.bg}}>
+        <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}><span className="tap" onPointerDown={()=>step>1?setStep(step-1):nav('feed')} style={{fontSize:28,padding:'8px 12px',color:t.text}}>←</span><span style={{fontWeight:600,color:t.text}}>{step===1?'📸 Photos':step===2?'🎵 Details':step===3?'✏️ Edit':'✓ Preview'}</span><span style={{color:t.muted,padding:'8px 12px'}}>{step}/4</span></header>
+        
+        {step===1&&<div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <p style={{color:t.muted,textAlign:'center',margin:0,fontSize:14}}>Outfit (left) & Photo (right)</p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            {['outfit','photo'].map((k,i)=><div key={k} style={{aspectRatio:'3/4',borderRadius:16,overflow:'hidden',border:`2px dashed ${t.border}`,background:t.card}}><input type="file" accept="image/*" onChange={e=>upload(e,k)} style={{display:'none'}} id={k}/><label htmlFor={k} style={{width:'100%',height:'100%',display:'flex',cursor:'pointer'}}>{np[k]?<img src={np[k]} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}><span style={{fontSize:40}}>{i===0?'👕':'📷'}</span><span style={{color:t.muted,fontSize:14}}>{i===0?'Outfit':'Photo'}</span></div>}</label></div>)}
+          </div>
+          <span className="tap" onPointerDown={()=>np.photo&&np.outfit&&setStep(2)} style={{color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent,opacity:np.photo&&np.outfit?1:.4}}>Next →</span>
+        </div>}
+        
+        {step===2&&<div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {[{icon:'🎵',key:'songTitle',placeholder:'Song title'},{icon:'🎤',key:'songArtist',placeholder:'Artist'},{icon:'📍',key:'loc',placeholder:'Location'},{icon:'💬',key:'quote',placeholder:'Quote (optional)'},{icon:'🔒',key:'privateNote',placeholder:'Private note',bg:'#fff8e1'}].map(f=>(
+            <div key={f.key} style={{display:'flex',alignItems:'center',gap:12,padding:16,borderRadius:14,border:`1px solid ${t.border}`,background:f.bg||t.card}}>
+              <span style={{fontSize:18}}>{f.icon}</span>
+              <input placeholder={f.placeholder} value={np[f.key]} onChange={e=>setNp(p=>({...p,[f.key]:e.target.value}))} style={{flex:1,background:'transparent',border:'none',fontSize:16,color:t.text,outline:'none'}}/>
+            </div>
+          ))}
+          <div style={{display:'flex',gap:12,marginTop:8}}>
+            <span className="tap" onPointerDown={()=>setStep(1)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}>←</span>
+            <span className="tap" onPointerDown={()=>np.songTitle&&np.songArtist&&np.loc&&setStep(3)} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent,opacity:np.songTitle&&np.songArtist&&np.loc?1:.4}}>Next →</span>
+          </div>
+        </div>}
+        
+        {step===3&&<div style={{display:'flex',flexDirection:'column',gap:20}}>
+          <EditorPreview/>
+          <EditControls/>
+          <div style={{display:'flex',gap:12}}>
+            <span className="tap" onPointerDown={()=>setStep(2)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}>←</span>
+            <span className="tap" onPointerDown={()=>{setActiveEdit(null);setStep(4);}} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}>Preview →</span>
+          </div>
+        </div>}
+        
+        {step===4&&<div style={{display:'flex',flexDirection:'column',gap:20}}>
+          <p style={{color:t.text,textAlign:'center',margin:0,fontSize:16,fontWeight:500}}>Ready to send? 🎉</p>
+          <PostcardView post={{...np,song:{title:np.songTitle,artist:np.songArtist},location:np.loc,outfitPhoto:np.outfit,date:'Today'}} owner={userData} showPrivate={true}/>
+          <div style={{display:'flex',gap:12}}>
+            <span className="tap" onPointerDown={()=>setStep(3)} style={{padding:'16px 24px',border:`1px solid ${t.border}`,borderRadius:14,fontSize:15,color:t.text,background:t.card}}>← Edit</span>
+            <span className={`tap ${uploading?'loading':''}`} onPointerDown={submit} style={{flex:1,color:'#fff',padding:18,borderRadius:14,fontSize:16,fontWeight:600,textAlign:'center',background:t.accent}}>{uploading?'Sending...':'Send ✈️'}</span>
+          </div>
+        </div>}
+      </div>}
+
+      {view==='detail'&&sel&&<div style={{minHeight:'100vh',background:t.bg,padding:16}}><span className="tap" onPointerDown={()=>nav('feed')} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}>✕</span><div style={{paddingTop:40}}><PostcardView post={sel} owner={sel.friend} showPrivate={sel.userId===user?.uid} isOwner={sel.userId===user?.uid} showMenuOption={true}/></div></div>}
+      
+      {view==='dayDetail'&&dayPost&&<div style={{minHeight:'100vh',background:t.bg,padding:16}}><span className="tap" onPointerDown={()=>{setView('profile');setDayPost(null);setShowMenu(false);}} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}>✕</span><div style={{paddingTop:40}}><PostcardView post={dayPost} owner={{...userData,id:user?.uid}} showPrivate={true} isOwner={true} showMenuOption={true}/></div></div>}
+      
+      {view==='friendDayDetail'&&friendDayPost&&<div style={{minHeight:'100vh',background:t.bg,padding:16}}><span className="tap" onPointerDown={()=>{setView('friendProfile');setFriendDayPost(null);}} style={{position:'absolute',top:16,right:16,width:36,height:36,borderRadius:12,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',background:t.card,color:t.text,zIndex:10}}>✕</span><div style={{paddingTop:40}}><PostcardView post={friendDayPost} owner={friendDayPost.friend} showPrivate={false}/></div></div>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
