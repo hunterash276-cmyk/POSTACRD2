@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.0.3';
+var APP_VERSION = '1.0.4';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -805,20 +805,26 @@ window.onerror = function(msg, url, line, col, error) {
         for (var j = 0; j < f.posts.length; j++) {
           if (f.posts[j].id === postId) {
             var post = f.posts[j];
-            var reactions = post.reactions || {};
             
-            // Only set if not already reacted (locked in)
-            if (reactions[uid]) {
-              return; // Already reacted, can't change
+            // Initialize reactions object if needed
+            if (!post.reactions) {
+              post.reactions = {};
             }
             
-            reactions[uid] = emoji;
+            // Only set if not already reacted (locked in)
+            if (post.reactions[uid]) {
+              render(); // Just re-render to hide buttons
+              return;
+            }
             
-            // Update Firestore
-            db.collection('posts').doc(postId).update({reactions: reactions}).then(function() {
-              post.reactions = reactions;
-              render();
-            }).catch(function(e) {
+            // Set locally first
+            post.reactions[uid] = emoji;
+            
+            // Re-render immediately to show locked state
+            render();
+            
+            // Then update Firestore
+            db.collection('posts').doc(postId).update({reactions: post.reactions}).catch(function(e) {
               console.error('Error setting reaction:', e);
             });
             return;
@@ -1351,21 +1357,35 @@ window.onerror = function(msg, url, line, col, error) {
         page.appendChild(cta);
       }
       
-      var posts = getAllTodayPosts();
+      var posts = [];
+      var today = new Date().toISOString().split('T')[0];
       
-      // Only show friends' posts if you've posted today
-      if (!state.posted) {
-        // Filter to only show your own posts (if any)
-        posts = [];
-        for (var i = 0; i < state.myPosts.length; i++) {
-          var today = new Date().toISOString().split('T')[0];
-          if (state.myPosts[i].date === today) {
-            var p = {};
-            for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
-            p.friend = {};
+      // Always add my own posts from today
+      for (var i = 0; i < state.myPosts.length; i++) {
+        if (state.myPosts[i].date === today) {
+          var p = {};
+          for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
+          p.friend = {};
+          if (state.userData) {
             for (var k in state.userData) p.friend[k] = state.userData[k];
-            p.friend.id = state.user ? state.user.uid : null;
-            posts.push(p);
+          }
+          p.friend.id = state.user ? state.user.uid : null;
+          posts.push(p);
+        }
+      }
+      
+      // Only add friends' posts if I've posted today
+      if (state.posted) {
+        for (var i = 0; i < state.friends.length; i++) {
+          var f = state.friends[i];
+          var friendPosts = f.posts || [];
+          for (var j = 0; j < friendPosts.length; j++) {
+            if (friendPosts[j].date === today) {
+              var p = {};
+              for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
+              p.friend = f;
+              posts.push(p);
+            }
           }
         }
       }
