@@ -906,21 +906,37 @@ window.onerror = function(msg, url, line, col, error) {
   }
 
   function handleForgotPassword() {
-    var email = state.authData.email;
+    var email = state.authData.email.trim();
     if (!email) {
       setState({authError: 'Please enter your email address first'});
       return;
     }
+    
+    // Validate email format
+    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setState({authError: 'Please enter a valid email address'});
+      return;
+    }
+    
     setState({authLoading: true, authError: ''});
+    console.log('[Password Reset] Sending reset email to:', email);
+    
     auth.sendPasswordResetEmail(email).then(function() {
       setState({authLoading: false, authError: ''});
-      alert('Password reset email sent! Check your inbox.');
+      console.log('[Password Reset] Email sent successfully');
+      alert('✅ Password reset email sent!\n\nCheck your inbox (and spam folder) for a link to reset your password.');
     }).catch(function(e) {
+      console.error('[Password Reset] Error:', e.code, e.message);
       var msg = 'Could not send reset email';
       if (e.code === 'auth/user-not-found') {
-        msg = 'No account found with this email';
+        msg = 'No account found with this email address';
       } else if (e.code === 'auth/invalid-email') {
         msg = 'Please enter a valid email address';
+      } else if (e.code === 'auth/too-many-requests') {
+        msg = 'Too many attempts. Please try again later';
+      } else {
+        msg = 'Error: ' + e.message;
       }
       setState({authError: msg, authLoading: false});
     });
