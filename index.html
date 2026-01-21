@@ -882,7 +882,7 @@ window.onerror = function(msg, url, line, col, error) {
           {icon: '🎤', key: 'songArtist', ph: 'Artist'},
           {icon: '📍', key: 'loc', ph: 'Location'},
           {icon: '💬', key: 'quote', ph: 'Quote (optional)'},
-          {icon: '🔒', key: 'privateNote', ph: 'Private note', bg: '#fff8e1'}
+          {icon: '🔒', key: 'privateNote', ph: 'Private note (only visible to you)', bg: '#fff8e1'}
         ];
         
         for (var i = 0; i < fieldsData.length; i++) {
@@ -891,9 +891,7 @@ window.onerror = function(msg, url, line, col, error) {
             field.appendChild(el('span', {style: {fontSize: '18px'}}, f.icon));
             var input = el('input', {placeholder: f.ph, value: state.np[f.key], style: {flex: '1', background: 'transparent', border: 'none', fontSize: '16px', color: t.text, outline: 'none'}});
             input.oninput = function(e) {
-              var upd = {};
-              upd[f.key] = e.target.value;
-              setNp(upd);
+              state.np[f.key] = e.target.value;
             };
             field.appendChild(input);
             content.appendChild(field);
@@ -903,7 +901,7 @@ window.onerror = function(msg, url, line, col, error) {
         var btns = el('div', {style: {display: 'flex', gap: '12px', marginTop: '8px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 1}); }}, '←'));
         var canNext = state.np.songTitle && state.np.songArtist && state.np.loc;
-        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: canNext ? '1' : '0.4'}, onClick: function() { if (canNext) setState({step: 3}); }}, 'Next →'));
+        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: canNext ? '1' : '0.4'}, onClick: function() { if (state.np.songTitle && state.np.songArtist && state.np.loc) setState({step: 3}); }}, 'Next →'));
         content.appendChild(btns);
         
         page.appendChild(content);
