@@ -29,7 +29,7 @@
   </style>
 </head>
 <body>
-<div id="updateBanner" onclick="location.reload(true)">New version available! Tap to update.</div>
+<div id="updateBanner" onclick="localStorage.setItem('postcard_version', APP_VERSION); this.style.display='none'; location.reload(true);">New version available! Tap to update.</div>
 <div class="app">
   <div id="loading">
     <div class="spinner">📮</div>
@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.8';
+var APP_VERSION = '1.4.9';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -55,11 +55,11 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
 (function checkForUpdates() {
   var storedVersion = localStorage.getItem('postcard_version');
   
-  console.log('Current version:', APP_VERSION, 'Stored version:', storedVersion);
+  console.log('[Update] Current version:', APP_VERSION, 'Stored version:', storedVersion);
   
   // If version changed, show update banner
   if (storedVersion && storedVersion !== APP_VERSION) {
-    console.log('Update available!');
+    console.log('[Update] Update available! Showing banner');
     document.getElementById('updateBanner').style.display = 'block';
     // Clear any caches we can
     if ('caches' in window) {
@@ -69,10 +69,12 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
         }
       });
     }
+    // DON'T save version yet - only save when banner is tapped
+  } else {
+    // Only store current version if no update banner shown
+    console.log('[Update] No update needed, saving version:', APP_VERSION);
+    localStorage.setItem('postcard_version', APP_VERSION);
   }
-  
-  // Always store current version
-  localStorage.setItem('postcard_version', APP_VERSION);
   
   // For iOS: check for updates when app becomes visible
   document.addEventListener('visibilitychange', function() {
@@ -85,11 +87,11 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
         .then(function(html) {
           var match = html.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
           if (match && match[1] !== APP_VERSION) {
-            console.log('New version detected:', match[1]);
+            console.log('[Update] New version detected:', match[1]);
             document.getElementById('updateBanner').style.display = 'block';
           }
         })
-        .catch(function(e) { console.log('Update check failed:', e); });
+        .catch(function(e) { console.log('[Update] Check failed:', e); });
     }
   });
 })();
@@ -207,7 +209,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).',
     '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!',
     '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.',
-    '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!'
+    '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!',
+    '1.4.9': '🔔 FIXED: Update notifications NO LONGER count toward badge. Green update banner now works on first tap (not second). Debug logging enhanced to show "Updates NOT counted". Badge now accurate!'
   };
 
   var state = {
@@ -713,24 +716,26 @@ window.onerror = function(msg, url, line, col, error) {
     
     for (var i = 0; i < state.notifications.length; i++) {
       var n = state.notifications[i];
-      // Count unread notifications
-      if (!n.read) {
+      // Count unread notifications EXCEPT updates
+      if (!n.read && n.type !== 'update') {
         count++;
         // Debug: track what types are unread
         if (n.type === 'reaction') debugInfo.reactions++;
-        else if (n.type === 'update') debugInfo.updates++;
         else if (n.type === 'weeklyLookback') debugInfo.weekly++;
         else if (n.type && n.type.startsWith('group_')) debugInfo.groups++;
         else debugInfo.other++;
+      } else if (!n.read && n.type === 'update') {
+        // Track updates but don't count them
+        debugInfo.updates++;
       }
     }
     
     // Also add pending friend requests
     count += state.friendRequests.length;
     
-    // Log for debugging if count seems wrong
-    if (count > 0) {
-      console.log('[Badge] Unread count:', count, '(Friends:', state.friendRequests.length, 'Reactions:', debugInfo.reactions, 'Groups:', debugInfo.groups, 'Updates:', debugInfo.updates, 'Weekly:', debugInfo.weekly, 'Other:', debugInfo.other + ')');
+    // Log for debugging if count > 0 OR if there are mysterious notifications
+    if (count > 0 || debugInfo.updates > 0 || debugInfo.other > 0) {
+      console.log('[Badge] Count:', count, '(Friends:', state.friendRequests.length, 'Reactions:', debugInfo.reactions, 'Groups:', debugInfo.groups, 'Weekly:', debugInfo.weekly, 'Updates NOT counted:', debugInfo.updates, 'Other:', debugInfo.other + ')');
     }
     
     return count;
