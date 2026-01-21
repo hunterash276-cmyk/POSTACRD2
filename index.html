@@ -158,53 +158,94 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
 
+  var postsUnsubscribe = null;
+  var friendsUnsubscribe = null;
+  var friendPostsUnsubscribes = [];
+
   function loadPosts(uid) {
-    db.collection('posts').where('userId', '==', uid).orderBy('date', 'desc').get().then(function(snap) {
-      var posts = [];
-      snap.forEach(function(d) {
-        var p = {id: d.id};
-        var data = d.data();
-        for (var k in data) p[k] = data[k];
-        posts.push(p);
+    // Unsubscribe from previous listener
+    if (postsUnsubscribe) {
+      postsUnsubscribe();
+    }
+    
+    // Set up real-time listener for my posts
+    postsUnsubscribe = db.collection('posts')
+      .where('userId', '==', uid)
+      .orderBy('date', 'desc')
+      .onSnapshot(function(snap) {
+        var posts = [];
+        snap.forEach(function(d) {
+          var p = {id: d.id};
+          var data = d.data();
+          for (var k in data) p[k] = data[k];
+          posts.push(p);
+        });
+        var today = new Date().toISOString().split('T')[0];
+        var hasPosted = false;
+        for (var i = 0; i < posts.length; i++) {
+          if (posts[i].date === today) hasPosted = true;
+        }
+        setState({myPosts: posts, posted: hasPosted});
+      }, function(error) {
+        console.error('Posts listener error:', error);
       });
-      var today = new Date().toISOString().split('T')[0];
-      var hasPosted = false;
-      for (var i = 0; i < posts.length; i++) {
-        if (posts[i].date === today) hasPosted = true;
-      }
-      setState({myPosts: posts, posted: hasPosted});
-    });
   }
 
   function loadFriends(uid) {
-    db.collection('users').doc(uid).get().then(function(userDoc) {
+    // Unsubscribe from previous listeners
+    if (friendsUnsubscribe) {
+      friendsUnsubscribe();
+    }
+    friendPostsUnsubscribes.forEach(function(unsub) { unsub(); });
+    friendPostsUnsubscribes = [];
+    
+    // Listen for changes to my user doc (for friends list changes)
+    friendsUnsubscribe = db.collection('users').doc(uid).onSnapshot(function(userDoc) {
       var ids = userDoc.data().friends || [];
-      var friendsData = [];
-      var completed = 0;
+      
       if (ids.length === 0) {
         setState({friends: []});
         return;
       }
+      
+      // Clear old post listeners
+      friendPostsUnsubscribes.forEach(function(unsub) { unsub(); });
+      friendPostsUnsubscribes = [];
+      
+      var friendsData = [];
+      var completed = 0;
+      
       ids.forEach(function(fid) {
         db.collection('users').doc(fid).get().then(function(fDoc) {
           if (fDoc.exists) {
             var f = {id: fid};
             var data = fDoc.data();
             for (var k in data) f[k] = data[k];
-            db.collection('posts').where('userId', '==', fid).orderBy('date', 'desc').get().then(function(pSnap) {
-              f.posts = [];
-              pSnap.forEach(function(d) {
-                var p = {id: d.id};
-                var pdata = d.data();
-                for (var k in pdata) p[k] = pdata[k];
-                f.posts.push(p);
+            f.posts = [];
+            
+            // Set up real-time listener for this friend's posts
+            var unsubFriendPosts = db.collection('posts')
+              .where('userId', '==', fid)
+              .orderBy('date', 'desc')
+              .onSnapshot(function(pSnap) {
+                f.posts = [];
+                pSnap.forEach(function(d) {
+                  var p = {id: d.id};
+                  var pdata = d.data();
+                  for (var k in pdata) p[k] = pdata[k];
+                  f.posts.push(p);
+                });
+                // Update state with new posts
+                setState({friends: state.friends.slice()});
               });
-              friendsData.push(f);
-              completed++;
-              if (completed === ids.length) {
-                setState({friends: friendsData});
-              }
-            });
+            
+            friendPostsUnsubscribes.push(unsubFriendPosts);
+            friendsData.push(f);
+            completed++;
+            
+            if (completed === ids.length) {
+              setState({friends: friendsData});
+            }
           } else {
             completed++;
             if (completed === ids.length) {
@@ -213,34 +254,49 @@ window.onerror = function(msg, url, line, col, error) {
           }
         });
       });
+    }, function(error) {
+      console.error('Friends listener error:', error);
     });
   }
 
+  var friendRequestsUnsubscribe = null;
+  
   function loadFriendRequests(uid) {
-    db.collection('friendRequests').where('toId', '==', uid).where('status', '==', 'pending').get().then(function(snap) {
-      var requests = [];
-      var completed = 0;
-      if (snap.empty) {
-        setState({friendRequests: []});
-        return;
-      }
-      snap.forEach(function(d) {
-        var req = {id: d.id};
-        var data = d.data();
-        for (var k in data) req[k] = data[k];
-        db.collection('users').doc(req.fromId).get().then(function(userDoc) {
-          if (userDoc.exists) {
-            req.fromUser = userDoc.data();
-            req.fromUser.id = req.fromId;
-          }
-          requests.push(req);
-          completed++;
-          if (completed === snap.size) {
-            setState({friendRequests: requests});
-          }
+    // Unsubscribe from previous listener if exists
+    if (friendRequestsUnsubscribe) {
+      friendRequestsUnsubscribe();
+    }
+    
+    // Set up real-time listener
+    friendRequestsUnsubscribe = db.collection('friendRequests')
+      .where('toId', '==', uid)
+      .where('status', '==', 'pending')
+      .onSnapshot(function(snap) {
+        var requests = [];
+        var completed = 0;
+        if (snap.empty) {
+          setState({friendRequests: []});
+          return;
+        }
+        snap.forEach(function(d) {
+          var req = {id: d.id};
+          var data = d.data();
+          for (var k in data) req[k] = data[k];
+          db.collection('users').doc(req.fromId).get().then(function(userDoc) {
+            if (userDoc.exists) {
+              req.fromUser = userDoc.data();
+              req.fromUser.id = req.fromId;
+            }
+            requests.push(req);
+            completed++;
+            if (completed === snap.size) {
+              setState({friendRequests: requests});
+            }
+          });
         });
+      }, function(error) {
+        console.error('Friend requests listener error:', error);
       });
-    });
   }
 
   function sendFriendRequest(toId) {
@@ -280,25 +336,32 @@ window.onerror = function(msg, url, line, col, error) {
   function acceptFriendRequest(request) {
     var fromId = request.fromId;
     var toId = state.user.uid;
-    // Add each other as friends
-    db.collection('users').doc(toId).get().then(function(doc) {
+    
+    // Update request status first
+    db.collection('friendRequests').doc(request.id).update({status: 'accepted'}).then(function() {
+      // Add friend to my list
+      return db.collection('users').doc(toId).get();
+    }).then(function(doc) {
       var myFriends = doc.data().friends || [];
       if (myFriends.indexOf(fromId) === -1) {
         myFriends.push(fromId);
-        db.collection('users').doc(toId).update({friends: myFriends});
+        return db.collection('users').doc(toId).update({friends: myFriends});
       }
-    });
-    db.collection('users').doc(fromId).get().then(function(doc) {
+    }).then(function() {
+      // Add me to their list
+      return db.collection('users').doc(fromId).get();
+    }).then(function(doc) {
       var theirFriends = doc.data().friends || [];
       if (theirFriends.indexOf(toId) === -1) {
         theirFriends.push(toId);
-        db.collection('users').doc(fromId).update({friends: theirFriends});
+        return db.collection('users').doc(fromId).update({friends: theirFriends});
       }
-    });
-    // Update request status
-    db.collection('friendRequests').doc(request.id).update({status: 'accepted'}).then(function() {
+    }).then(function() {
+      // Reload everything
       loadFriendRequests(toId);
       loadFriends(toId);
+    }).catch(function(e) {
+      console.error('Error accepting friend request:', e);
     });
   }
 
@@ -706,7 +769,20 @@ window.onerror = function(msg, url, line, col, error) {
     var meta = el('div', {style: {flex: '1'}});
     var isMe = owner && state.user && owner.id === state.user.uid;
     meta.appendChild(el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: t.text}}, isMe ? 'You' : (owner ? owner.username : 'User')));
-    meta.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, '📍 ' + post.location + ' · ' + post.date));
+    
+    // Format date and time
+    var dateTimeStr = '📍 ' + post.location + ' · ' + post.date;
+    if (post.createdAt) {
+      var postTime = new Date(post.createdAt);
+      var hours = postTime.getHours();
+      var minutes = postTime.getMinutes();
+      var ampm = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      var timeStr = hours + ':' + (minutes < 10 ? '0' : '') + minutes + ampm;
+      dateTimeStr += ' · ' + timeStr;
+    }
+    meta.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, dateTimeStr));
     
     info.appendChild(avatar);
     info.appendChild(meta);
@@ -1292,6 +1368,38 @@ window.onerror = function(msg, url, line, col, error) {
       }
       info.appendChild(addWrap);
       
+      // Friends List
+      if (state.friends.length > 0) {
+        var friendsSection = el('div', {style: {width: '100%', marginBottom: '20px', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card}});
+        friendsSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: t.text}}, '👥 Friends (' + state.friends.length + ')'));
+        
+        for (var i = 0; i < state.friends.length; i++) {
+          (function(friend) {
+            var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: i < state.friends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
+            
+            if (friend.avatar) {
+              friendItem.appendChild(el('img', {src: friend.avatar, style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
+            } else {
+              friendItem.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+            }
+            
+            var friendInfo = el('div', {style: {flex: '1'}});
+            friendInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
+            if (friend.birthday) {
+              var bParts = friend.birthday.split('-');
+              var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+              friendInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})));
+            }
+            friendItem.appendChild(friendInfo);
+            
+            friendItem.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '→'));
+            
+            friendsSection.appendChild(friendItem);
+          })(state.friends[i]);
+        }
+        info.appendChild(friendsSection);
+      }
+      
       // Calendar
       var cal = el('div', {style: {width: '100%', borderRadius: '16px', border: '1px solid ' + t.border, padding: '16px', background: t.card}});
       cal.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: t.text}}, 'Your Postcards'));
@@ -1343,6 +1451,115 @@ window.onerror = function(msg, url, line, col, error) {
       info.appendChild(cal);
       
       page.appendChild(info);
+      app.appendChild(page);
+      return;
+    }
+    
+    // Friend Profile view
+    if (state.view === 'friendProfile' && state.friendProfile) {
+      var friend = state.friendProfile;
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
+      
+      var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('profile'); }}, '←'));
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
+      header.appendChild(el('div', {style: {width: '48px'}}));
+      page.appendChild(header);
+      
+      var info = el('div', {style: {display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px'}});
+      
+      if (friend.avatar) {
+        info.appendChild(el('img', {src: friend.avatar, style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover', marginBottom: '12px'}}));
+      } else {
+        info.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff', marginBottom: '12px'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+      }
+      
+      info.appendChild(el('h2', {style: {margin: '0 0 4px', fontSize: '22px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
+      
+      if (friend.birthday) {
+        var bParts = friend.birthday.split('-');
+        var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+        info.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '14px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'long', day: 'numeric'})));
+      }
+      
+      var stats = el('div', {style: {display: 'flex', gap: '24px', padding: '20px', borderRadius: '16px', border: '1px solid ' + t.border, width: '100%', background: t.card, marginBottom: '20px'}});
+      var stat1 = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'}});
+      stat1.appendChild(el('span', {style: {fontSize: '24px', fontWeight: '700', color: t.text}}, friend.posts ? friend.posts.length : 0));
+      stat1.appendChild(el('span', {style: {fontSize: '13px', color: t.muted}}, 'Postcards'));
+      stats.appendChild(stat1);
+      info.appendChild(stats);
+      
+      // Friend's Calendar
+      var cal = el('div', {style: {width: '100%', borderRadius: '16px', border: '1px solid ' + t.border, padding: '16px', background: t.card}});
+      cal.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: t.text}}, friend.username + "'s Postcards"));
+      
+      var calNav = el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}});
+      calNav.appendChild(el('span', {className: 'tap', style: {fontSize: '24px', padding: '4px 12px', color: t.text}, onClick: function() { setState({friendCalDate: new Date(state.friendCalDate.getFullYear(), state.friendCalDate.getMonth() - 1, 1)}); }}, '‹'));
+      calNav.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, fmtMonth(state.friendCalDate)));
+      calNav.appendChild(el('span', {className: 'tap', style: {fontSize: '24px', padding: '4px 12px', color: t.text}, onClick: function() { setState({friendCalDate: new Date(state.friendCalDate.getFullYear(), state.friendCalDate.getMonth() + 1, 1)}); }}, '›'));
+      cal.appendChild(calNav);
+      
+      var dayHeaders = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: '8px'}});
+      var dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      for (var i = 0; i < 7; i++) {
+        dayHeaders.appendChild(el('div', {style: {textAlign: 'center', fontSize: '12px', fontWeight: '600', padding: '8px', color: t.muted}}, dayNames[i]));
+      }
+      cal.appendChild(dayHeaders);
+      
+      var days = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px'}});
+      var startDay = getStartDay(state.friendCalDate);
+      var daysInMonth = getDaysInMonth(state.friendCalDate);
+      var now = new Date();
+      var isCurrent = state.friendCalDate.getMonth() === now.getMonth() && state.friendCalDate.getFullYear() === now.getFullYear();
+      
+      for (var i = 0; i < startDay; i++) {
+        days.appendChild(el('div'));
+      }
+      for (var day = 1; day <= daysInMonth; day++) {
+        (function(d) {
+          // Find friend's post for this date
+          var month = String(state.friendCalDate.getMonth() + 1);
+          if (month.length < 2) month = '0' + month;
+          var dayStr = String(d);
+          if (dayStr.length < 2) dayStr = '0' + dayStr;
+          var ds = state.friendCalDate.getFullYear() + '-' + month + '-' + dayStr;
+          var post = null;
+          if (friend.posts) {
+            for (var j = 0; j < friend.posts.length; j++) {
+              if (friend.posts[j].date === ds) {
+                post = friend.posts[j];
+                break;
+              }
+            }
+          }
+          
+          var isToday = isCurrent && d === now.getDate();
+          var cell = el('div', {className: post ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: post ? t.accent : 'transparent', color: post ? '#fff' : t.text, border: isToday ? '2px solid ' + t.accent : 'none', fontWeight: isToday ? '700' : '400', flexDirection: 'column'}});
+          if (post) {
+            cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
+            cell.appendChild(el('span', {style: {fontSize: '8px'}}, '📮'));
+            cell.onclick = function() { setState({friendDayPost: post, view: 'friendDayDetail'}); };
+          } else {
+            cell.appendChild(el('span', {style: {fontSize: '12px'}}, d));
+          }
+          days.appendChild(cell);
+        })(day);
+      }
+      cal.appendChild(days);
+      info.appendChild(cal);
+      
+      page.appendChild(info);
+      app.appendChild(page);
+      return;
+    }
+    
+    // Friend Day Detail view
+    if (state.view === 'friendDayDetail' && state.friendDayPost) {
+      var page = el('div', {style: {minHeight: '100vh', padding: '16px'}});
+      page.appendChild(el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '12px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10'}, onClick: function() { setState({view: 'friendProfile', friendDayPost: null}); }}, '✕'));
+      var wrap = el('div', {style: {paddingTop: '40px'}});
+      wrap.appendChild(postcardEl(state.friendDayPost, state.friendProfile, {showPrivate: false, isOwner: false, showMenu: false}));
+      page.appendChild(wrap);
       app.appendChild(page);
       return;
     }
