@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.4';
+var APP_VERSION = '1.4.5';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -203,7 +203,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.1': '🔔 FIXED: Update notifications now show badge on mailbox icon! Song search now uses free CORS proxy (allOrigins) - no setup needed. Improved forgot password with better error messages and validation.',
     '1.4.2': '🎵 Audio stops when you leave the app (no more background playback). Fixed duplicate post bug with stronger submit protection. Button now properly disabled while uploading.',
     '1.4.3': '👥 FIXED: Groups now display names properly! Theme Chooser shows actual username instead of "Loading...". Pending invites show real names. Current members display correctly with avatars.',
-    '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!'
+    '1.4.4': '🎵 IMPROVED: Audio plays immediately when postcard appears (30% visible, was 50%). Audio stops instantly when swiping off app (added pagehide event). No more delays!',
+    '1.4.5': '❤️ FIXED: Mailbox now shows ALL reactions (not just unread). Calendar day view now displays reactions below your postcard with emoji and username (only visible on YOUR calendar, not friends\' calendars).'
   };
 
   var state = {
@@ -3178,17 +3179,16 @@ window.onerror = function(msg, url, line, col, error) {
       }
       page.appendChild(weeklySection);
       
-      // Reactions Section - Only show UNREAD reactions, dismiss on tap
-      var unreadReactions = reactionNotifs.filter(function(n) { return !n.read; });
+      // Reactions Section - Show all reactions
       var reactSection = el('div', {style: {marginBottom: '24px'}});
-      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ New Reactions'));
+      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ Reactions'));
       
-      if (unreadReactions.length > 0) {
-        for (var i = 0; i < unreadReactions.length; i++) {
+      if (reactionNotifs.length > 0) {
+        for (var i = 0; i < reactionNotifs.length; i++) {
           (function(notif) {
             if (!notif || !notif.data) return; // Skip invalid notifications
             
-            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : (t.accent + '11'), border: '1px solid ' + t.border, marginBottom: '8px', opacity: notif.read ? '0.7' : '1'}, onClick: function() { 
               // Mark as read and remove from notifications
               removeNotification(notif.id);
             }});
@@ -3203,10 +3203,10 @@ window.onerror = function(msg, url, line, col, error) {
             item.appendChild(el('span', {style: {fontSize: '12px', color: t.muted, padding: '4px 8px', background: t.bg, borderRadius: '6px'}}, 'Tap to dismiss'));
             
             reactSection.appendChild(item);
-          })(unreadReactions[i]);
+          })(reactionNotifs[i]);
         }
       } else {
-        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No new reactions'));
+        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No reactions yet'));
       }
       page.appendChild(reactSection);
       
@@ -4473,6 +4473,40 @@ window.onerror = function(msg, url, line, col, error) {
       for (var k in state.userData) owner[k] = state.userData[k];
       owner.id = state.user ? state.user.uid : null;
       wrap.appendChild(postcardEl(state.dayPost, owner, {showPrivate: true, isOwner: true, showMenu: true, showStamp: true}));
+      
+      // Show reactions list below postcard (only on user's own calendar)
+      var reactions = state.dayPost.reactions || {};
+      var reactionIds = Object.keys(reactions);
+      if (reactionIds.length > 0) {
+        var reactionsBox = el('div', {style: {marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
+        reactionsBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: t.text}}, '❤️ Reactions (' + reactionIds.length + ')'));
+        
+        var reactionsList = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '8px'}});
+        
+        for (var i = 0; i < reactionIds.length; i++) {
+          (function(reactorId, emoji) {
+            var reactionItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: t.bg, borderRadius: '12px'}});
+            
+            // Emoji display
+            reactionItem.appendChild(el('div', {style: {width: '40px', height: '40px', borderRadius: '10px', background: t.card, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px'}}, emoji));
+            
+            // User info (will be filled by async call)
+            var nameSpan = el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, 'Loading...');
+            reactionItem.appendChild(nameSpan);
+            
+            // Fetch user info
+            getMemberInfo(reactorId, function(info) {
+              nameSpan.textContent = info.username || 'Unknown';
+            });
+            
+            reactionsList.appendChild(reactionItem);
+          })(reactionIds[i], reactions[reactionIds[i]]);
+        }
+        
+        reactionsBox.appendChild(reactionsList);
+        wrap.appendChild(reactionsBox);
+      }
+      
       page.appendChild(wrap);
       app.appendChild(page);
       return;
