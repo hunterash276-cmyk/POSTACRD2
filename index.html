@@ -1382,6 +1382,66 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
   
+  function deleteGroup(groupId) {
+    if (!confirm('Are you sure you want to delete this group? This cannot be undone.')) {
+      return;
+    }
+    
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy !== state.user.uid) {
+        alert('Only the group creator can delete the group');
+        return;
+      }
+      
+      db.collection('groups').doc(groupId).delete().then(function() {
+        alert('Group deleted');
+        setState({view: 'groups', groupView: 'list', currentGroup: null});
+      }).catch(function(err) {
+        alert('Error deleting group: ' + err.message);
+      });
+    });
+  }
+  
+  function leaveGroup(groupId) {
+    if (!confirm('Are you sure you want to leave this group?')) {
+      return;
+    }
+    
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy === state.user.uid) {
+        alert('As the creator, you cannot leave the group. You can delete it instead.');
+        return;
+      }
+      
+      var members = group.members.filter(function(id) { return id !== state.user.uid; });
+      var orientations = group.orientations || {};
+      delete orientations[state.user.uid];
+      
+      var updates = {
+        members: members,
+        orientations: orientations
+      };
+      
+      // If you were theme chooser, pick new one
+      if (group.themeChooserId === state.user.uid && members.length > 0) {
+        updates.themeChooserId = members[Math.floor(Math.random() * members.length)];
+      }
+      
+      db.collection('groups').doc(groupId).update(updates).then(function() {
+        alert('You left the group');
+        setState({view: 'groups', groupView: 'list', currentGroup: null});
+      }).catch(function(err) {
+        alert('Error leaving group: ' + err.message);
+      });
+    });
+  }
+  
   // Add notification to another user (stored in their user doc or a notifications collection)
   function addGroupNotification(userId, type, data) {
     db.collection('notifications').add({
@@ -3319,8 +3379,16 @@ window.onerror = function(msg, url, line, col, error) {
         groupHeader.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: t.text}}, group.name));
         groupHeader.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
         
-        // View Members button
-        groupHeader.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.bg, color: t.accent, fontSize: '13px', fontWeight: '600', border: '1px solid ' + t.accent}, onClick: function() { setState({groupView: 'members'}); }}, '👥 View Members'));
+        // View Members button and Leave Group button
+        var buttonsContainer = el('div', {style: {display: 'flex', gap: '8px', marginBottom: '0'}});
+        buttonsContainer.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '8px 16px', borderRadius: '8px', background: t.bg, color: t.accent, fontSize: '13px', fontWeight: '600', border: '1px solid ' + t.accent, textAlign: 'center'}, onClick: function() { setState({groupView: 'members'}); }}, '👥 View Members'));
+        
+        // Only show Leave Group button if not creator
+        if (group.createdBy !== state.user.uid) {
+          buttonsContainer.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '8px 16px', borderRadius: '8px', background: '#ffebee', color: '#d32f2f', fontSize: '13px', fontWeight: '600', border: '1px solid #ef5350', textAlign: 'center'}, onClick: function() { leaveGroup(group.id); }}, '🚪 Leave Group'));
+        }
+        
+        groupHeader.appendChild(buttonsContainer);
         
         // Time info
         var timeInfo = el('div', {style: {marginTop: '12px', padding: '10px', background: t.bg, borderRadius: '10px', fontSize: '11px', color: t.muted}});
@@ -3556,6 +3624,15 @@ window.onerror = function(msg, url, line, col, error) {
           membersBox.appendChild(addList);
         }
         
+        // Delete Group button (only for creator)
+        var deleteBox = el('div', {style: {marginTop: '24px', padding: '16px', background: '#ffebee', borderRadius: '12px', border: '1px solid #ef5350'}});
+        deleteBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#c62828'}}, '⚠️ Danger Zone'));
+        deleteBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: '#d32f2f'}}, 'Deleting this group will remove it for all members. This cannot be undone.'));
+        deleteBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '12px', borderRadius: '10px', background: '#d32f2f', color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() {
+          deleteGroup(group.id);
+        }}, 'Delete Group Forever'));
+        membersBox.appendChild(deleteBox);
+        
         page.appendChild(membersBox);
         app.appendChild(page);
         return;
@@ -3726,7 +3803,34 @@ window.onerror = function(msg, url, line, col, error) {
             info.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
             
             var hasSubmitted = hasSubmittedToday(group);
-            item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: hasSubmitted ? '#4CAF50' : t.bg, color: hasSubmitted ? '#fff' : t.muted, fontWeight: '500'}}, hasSubmitted ? '✓ Done' : 'Pending'));
+            var statusText = hasSubmitted ? '✓ Done' : 'Pending';
+            var statusBg = hasSubmitted ? '#4CAF50' : t.bg;
+            var statusColor = hasSubmitted ? '#fff' : t.muted;
+            
+            // Show theme chooser name if available
+            if (group.themeChooserId) {
+              statusText = '👑 ';
+              if (group.themeChooserId === state.user.uid) {
+                statusText += 'You';
+              } else {
+                // Try to find the name from friends
+                var found = false;
+                for (var fi = 0; fi < state.friends.length; fi++) {
+                  if (state.friends[fi].id === group.themeChooserId) {
+                    statusText += state.friends[fi].username;
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  statusText += 'Someone';
+                }
+              }
+              statusBg = t.accent + '22';
+              statusColor = t.accent;
+            }
+            
+            item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: statusBg, color: statusColor, fontWeight: '500'}}, statusText));
             
             item.appendChild(el('span', {style: {fontSize: '20px', color: t.muted}}, '›'));
             
