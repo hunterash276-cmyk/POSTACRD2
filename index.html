@@ -1032,7 +1032,8 @@ window.onerror = function(msg, url, line, col, error) {
     var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
     
     // Show reaction picker only if: showing reactions, hasn't reacted yet, and it's not my post
-    if (opts.showReactions && post.id && !myReaction) {
+    var hasAlreadyReacted = myReaction !== null && myReaction !== undefined;
+    if (opts.showReactions && post.id && !hasAlreadyReacted) {
       var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
       
       for (var i = 0; i < reactionEmojis.length; i++) {
@@ -1051,6 +1052,12 @@ window.onerror = function(msg, url, line, col, error) {
               border: '2px solid ' + t.border
             },
             onClick: function() {
+              // Double check we haven't reacted yet
+              var currentReactions = post.reactions || {};
+              if (currentReactions[state.user.uid]) {
+                render(); // Just re-render to update UI
+                return;
+              }
               setReaction(post.id, owner.id, emoji);
             }
           }, emoji);
@@ -1062,7 +1069,7 @@ window.onerror = function(msg, url, line, col, error) {
     }
     
     // Show my locked-in reaction if I've already reacted
-    if (opts.showReactions && myReaction) {
+    if (opts.showReactions && hasAlreadyReacted) {
       var myReactWrap = el('div', {style: {marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px'}});
       var myChip = el('span', {style: {
         display: 'inline-flex',
@@ -1345,6 +1352,24 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       var posts = getAllTodayPosts();
+      
+      // Only show friends' posts if you've posted today
+      if (!state.posted) {
+        // Filter to only show your own posts (if any)
+        posts = [];
+        for (var i = 0; i < state.myPosts.length; i++) {
+          var today = new Date().toISOString().split('T')[0];
+          if (state.myPosts[i].date === today) {
+            var p = {};
+            for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
+            p.friend = {};
+            for (var k in state.userData) p.friend[k] = state.userData[k];
+            p.friend.id = state.user ? state.user.uid : null;
+            posts.push(p);
+          }
+        }
+      }
+      
       if (posts.length === 0 && state.posted) {
         var empty = el('div', {style: {padding: '40px 20px', textAlign: 'center'}});
         empty.appendChild(el('p', {style: {color: t.muted, fontSize: '15px'}}, 'No postcards from friends today yet.'));
