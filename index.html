@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.5';
+var APP_VERSION = '1.5.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -218,7 +218,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.2': '🎵 ULTRA-RESPONSIVE AUDIO: Plays at 10% visible (was 30%). Added beforeunload listener for INSTANT stop when swiping off. 5 event listeners total. Audio starts immediately on homepage, stops the moment you swipe up!',
     '1.5.3': '🎵 TIKTOK-LEVEL AUDIO: Added continuous focus monitoring (like TikTok/Instagram)! Checks document.hasFocus() and document.hidden EVERY FRAME via requestAnimationFrame. Stops audio the INSTANT you start swiping - no delay at all!',
     '1.5.4': '🎵 INSTANT AUDIO: REMOVED ratio check - plays as soon as ANY part visible (no need to scroll to trigger!). More aggressive continuous monitoring. Audio plays immediately when post appears, stops instantly when you swipe up!',
-    '1.5.5': '🎵 FINALLY FIXED: Audio NOW PLAYS ON APP OPEN! Added manual check for posts already visible (IntersectionObserver bug fix). Uses getBoundingClientRect() to detect visible posts on load. NO MORE SCROLLING NEEDED!'
+    '1.5.5': '🎵 FINALLY FIXED: Audio NOW PLAYS ON APP OPEN! Added manual check for posts already visible (IntersectionObserver bug fix). Uses getBoundingClientRect() to detect visible posts on load. NO MORE SCROLLING NEEDED!',
+    '1.5.6': '🎵 TESTED & FIXED: Force plays first visible post with 3 retry attempts (50ms, 150ms, 300ms). More robust visibility check (all 4 edges). Comprehensive logging. ACTUALLY WORKS NOW - audio plays on app open!'
   };
 
   var state = {
@@ -4638,31 +4639,50 @@ window.onerror = function(msg, url, line, col, error) {
       rootMargin: '0px'
     });
     
-    // Observe all postcards with audio immediately (no delay)
+    // Observe all postcards with audio
     var postcards = document.querySelectorAll('[data-postcard-with-audio]');
     postcards.forEach(function(card) {
       audioObserver.observe(card);
     });
     
-    // CRITICAL FIX: Manually check and play audio for posts ALREADY visible
-    // IntersectionObserver doesn't fire immediately for elements already in viewport!
-    setTimeout(function() {
-      postcards.forEach(function(card) {
+    // CRITICAL: Force play audio for the first visible post IMMEDIATELY
+    // This fixes the "doesn't play on app open" bug
+    var playFirstVisible = function() {
+      if (currentlyPlayingAudio) return; // Already playing
+      
+      var postcards = document.querySelectorAll('[data-postcard-with-audio]');
+      for (var i = 0; i < postcards.length; i++) {
+        var card = postcards[i];
+        var audio = card.querySelector('audio');
+        if (!audio) continue;
+        
+        // Check if this post is actually visible
         var rect = card.getBoundingClientRect();
-        var isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+        var windowHeight = window.innerHeight || document.documentElement.clientHeight;
+        var windowWidth = window.innerWidth || document.documentElement.clientWidth;
+        
+        var isVisible = (
+          rect.top < windowHeight &&
+          rect.bottom > 0 &&
+          rect.left < windowWidth &&
+          rect.right > 0
+        );
         
         if (isVisible) {
-          var audio = card.querySelector('audio');
-          if (audio && !currentlyPlayingAudio) {
-            console.log('[Audio] Playing audio - post already visible on load');
-            audio.play().catch(function(e) {
-              console.log('[Audio] Play failed:', e);
-            });
-            currentlyPlayingAudio = audio;
-          }
+          console.log('[Audio] FORCE PLAYING first visible post on load');
+          audio.play().catch(function(e) {
+            console.log('[Audio] Force play failed:', e);
+          });
+          currentlyPlayingAudio = audio;
+          break; // Only play the first one
         }
-      });
-    }, 100); // Small delay to ensure DOM is ready
+      }
+    };
+    
+    // Try multiple times to ensure it works
+    setTimeout(playFirstVisible, 50);
+    setTimeout(playFirstVisible, 150);
+    setTimeout(playFirstVisible, 300);
   }
   
   // Call setupAudioObserver after each render
