@@ -3317,7 +3317,10 @@ window.onerror = function(msg, url, line, col, error) {
         // Group header
         var groupHeader = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
         groupHeader.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: t.text}}, group.name));
-        groupHeader.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+        groupHeader.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+        
+        // View Members button
+        groupHeader.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', padding: '8px 16px', borderRadius: '8px', background: t.bg, color: t.accent, fontSize: '13px', fontWeight: '600', border: '1px solid ' + t.accent}, onClick: function() { setState({groupView: 'members'}); }}, '👥 View Members'));
         
         // Time info
         var timeInfo = el('div', {style: {marginTop: '12px', padding: '10px', background: t.bg, borderRadius: '10px', fontSize: '11px', color: t.muted}});
@@ -3345,10 +3348,12 @@ window.onerror = function(msg, url, line, col, error) {
           }
         } else {
           // Show who is theme chooser
-          var chooserName = 'Loading...';
-          challengeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', color: t.muted}}, '👑 Theme Chooser: Loading...'));
+          var chooserNameEl = el('p', {style: {margin: '0 0 8px', fontSize: '13px', color: t.muted}}, '👑 Theme Chooser: Loading...');
+          challengeBox.appendChild(chooserNameEl);
           getMemberInfo(group.themeChooserId, function(info) {
-            // This is async so we can't update the element directly, but for now show placeholder
+            if (info && info.username) {
+              chooserNameEl.textContent = '👑 Theme Chooser: ' + info.username;
+            }
           });
           
           if (group.theme) {
@@ -3437,35 +3442,46 @@ window.onerror = function(msg, url, line, col, error) {
             
             // We need to show member info - for now show placeholder
             var isMe = memberId === state.user.uid;
-            var isMeCreator = memberId === group.createdBy;
-            
-            getMemberInfo(memberId, function(info) {
-              // This is async, so we can't easily update. For now, render what we have.
-            });
+            var isCreator = memberId === group.createdBy;
             
             // Find in friends or show placeholder
             var memberName = isMe ? 'You' : 'Loading...';
             var memberAvatar = null;
             if (isMe) {
-              memberName = 'You (Creator)';
+              memberName = isCreator ? 'You (Creator)' : 'You';
               memberAvatar = state.userData ? state.userData.avatar : null;
             } else {
               for (var fi = 0; fi < state.friends.length; fi++) {
                 if (state.friends[fi].id === memberId) {
                   memberName = state.friends[fi].username;
+                  if (isCreator) memberName += ' (Creator)';
                   memberAvatar = state.friends[fi].avatar;
                   break;
                 }
               }
             }
             
-            if (memberAvatar) {
-              memberItem.appendChild(el('img', {src: memberAvatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
-            } else {
-              memberItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, memberName[0].toUpperCase()));
-            }
+            var avatarEl = memberAvatar 
+              ? el('img', {src: memberAvatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}})
+              : el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, memberName[0].toUpperCase());
+            memberItem.appendChild(avatarEl);
             
-            memberItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, memberName));
+            var nameEl = el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, memberName);
+            memberItem.appendChild(nameEl);
+            
+            // Async update if name is still loading
+            if (!isMe && memberName === 'Loading...') {
+              getMemberInfo(memberId, function(info) {
+                if (info && info.username) {
+                  var displayName = info.username;
+                  if (isCreator) displayName += ' (Creator)';
+                  nameEl.textContent = displayName;
+                  if (avatarEl.tagName === 'DIV' && info.username) {
+                    avatarEl.textContent = info.username[0].toUpperCase();
+                  }
+                }
+              });
+            }
             
             // Remove button (not for creator)
             if (!isMe) {
