@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.0.4';
+var APP_VERSION = '1.0.5';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -136,10 +136,13 @@ window.onerror = function(msg, url, line, col, error) {
   var L = {bg: '#FFF9F5', card: '#FFF', text: '#2D2A26', muted: '#8B8680', border: '#E8E4DF', accent: '#E07A5F'};
   var D = {bg: '#1A1918', card: '#252422', text: '#F5F2EE', muted: '#8B8680', border: '#3D3A36', accent: '#E07A5F'};
   var t = L;
+  
+  // Load dark mode preference from localStorage
+  var savedDarkMode = localStorage.getItem('postcard_darkmode');
 
   var state = {
     view: 'auth',
-    dark: false,
+    dark: savedDarkMode === 'true',
     user: null,
     userData: null,
     friends: [],
@@ -171,6 +174,10 @@ window.onerror = function(msg, url, line, col, error) {
   };
 
   function setState(updates) {
+    // Save dark mode to localStorage when it changes
+    if (updates.hasOwnProperty('dark')) {
+      localStorage.setItem('postcard_darkmode', updates.dark ? 'true' : 'false');
+    }
     for (var key in updates) {
       state[key] = updates[key];
     }
@@ -1370,22 +1377,23 @@ window.onerror = function(msg, url, line, col, error) {
             for (var k in state.userData) p.friend[k] = state.userData[k];
           }
           p.friend.id = state.user ? state.user.uid : null;
+          p.isOwn = true;
           posts.push(p);
         }
       }
       
-      // Only add friends' posts if I've posted today
-      if (state.posted) {
-        for (var i = 0; i < state.friends.length; i++) {
-          var f = state.friends[i];
-          var friendPosts = f.posts || [];
-          for (var j = 0; j < friendPosts.length; j++) {
-            if (friendPosts[j].date === today) {
-              var p = {};
-              for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
-              p.friend = f;
-              posts.push(p);
-            }
+      // Always add friends' posts (but mark as blurred if not posted)
+      for (var i = 0; i < state.friends.length; i++) {
+        var f = state.friends[i];
+        var friendPosts = f.posts || [];
+        for (var j = 0; j < friendPosts.length; j++) {
+          if (friendPosts[j].date === today) {
+            var p = {};
+            for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
+            p.friend = f;
+            p.isOwn = false;
+            p.isBlurred = !state.posted;
+            posts.push(p);
           }
         }
       }
@@ -1400,13 +1408,46 @@ window.onerror = function(msg, url, line, col, error) {
       for (var i = 0; i < posts.length; i++) {
         (function(p) {
           var isMyPost = state.user && p.userId === state.user.uid;
-          var item = el('div');
-          item.appendChild(postcardEl(p, p.friend, {
+          var item = el('div', {style: {position: 'relative'}});
+          
+          // Create postcard
+          var postcard = postcardEl(p, p.friend, {
             showPrivate: isMyPost,
-            showReactions: !isMyPost,
+            showReactions: !isMyPost && !p.isBlurred,
             showReactionsReadOnly: isMyPost,
             showStamp: false
-          }));
+          });
+          
+          // Apply blur if needed
+          if (p.isBlurred) {
+            postcard.style.filter = 'blur(12px)';
+            postcard.style.pointerEvents = 'none';
+          }
+          
+          item.appendChild(postcard);
+          
+          // Add overlay for blurred posts
+          if (p.isBlurred) {
+            var overlay = el('div', {style: {
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              bottom: '0',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.1)',
+              borderRadius: '16px',
+              zIndex: '10'
+            }});
+            overlay.appendChild(el('span', {style: {fontSize: '32px', marginBottom: '8px'}}, '🔒'));
+            overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, 'Post your postcard to see this'));
+            overlay.appendChild(el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '13px', fontWeight: '600'}, onClick: function() { nav('post'); }}, 'Send postcard ✉️'));
+            item.appendChild(overlay);
+          }
+          
           postsWrap.appendChild(item);
         })(posts[i]);
       }
