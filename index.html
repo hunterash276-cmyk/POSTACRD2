@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.3.2';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -185,7 +185,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.',
     '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".',
     '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and at midnight UTC a beautiful collage is automatically created from all submitted photos (no blank spaces!). All times are UTC-based with local time conversions shown.',
-    '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.'
+    '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.',
+    '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page instead of home.'
   };
 
   var state = {
@@ -3240,15 +3241,21 @@ window.onerror = function(msg, url, line, col, error) {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 120px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
       
-      // Back button - goes to feed from list, goes to list from detail/other views
-      var backTarget = (state.groupView === 'list' || !state.groupView) ? 'feed' : 'list';
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { 
-        if (backTarget === 'feed') {
-          nav('feed');
+      // Back button navigation - improved to track history
+      var backAction = function() {
+        if (state.groupView === 'members' || state.groupView === 'history' || state.groupView === 'camera') {
+          // From members, history, or camera, go back to detail view
+          setState({groupView: 'detail', groupPhoto: null});
+        } else if (state.groupView === 'detail' || state.groupView === 'create' || state.groupView === 'info') {
+          // From detail, create, or info, go back to list
+          setState({groupView: 'list', currentGroup: null, groupPhoto: null});
         } else {
-          setState({groupView: 'list', currentGroup: null, groupPhoto: null}); 
+          // From list, go back to feed
+          nav('feed');
         }
-      }}, '←'));
+      };
+      
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: backAction}, '←'));
       
       // Title changes based on view
       var title = '👥 Groups';
@@ -3801,36 +3808,30 @@ window.onerror = function(msg, url, line, col, error) {
             var info = el('div', {style: {flex: '1'}});
             info.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '600', color: t.text}}, group.name));
             info.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '13px', color: t.muted}}, group.members.length + ' members'));
+            item.appendChild(info);
             
-            var hasSubmitted = hasSubmittedToday(group);
-            var statusText = hasSubmitted ? '✓ Done' : 'Pending';
-            var statusBg = hasSubmitted ? '#4CAF50' : t.bg;
-            var statusColor = hasSubmitted ? '#fff' : t.muted;
-            
-            // Show theme chooser name if available
-            if (group.themeChooserId) {
-              statusText = '👑 ';
-              if (group.themeChooserId === state.user.uid) {
-                statusText += 'You';
-              } else {
-                // Try to find the name from friends
-                var found = false;
-                for (var fi = 0; fi < state.friends.length; fi++) {
-                  if (state.friends[fi].id === group.themeChooserId) {
-                    statusText += state.friends[fi].username;
-                    found = true;
-                    break;
-                  }
-                }
-                if (!found) {
-                  statusText += 'Someone';
+            // Show today's theme chooser
+            var chooserText = '👑 ';
+            if (group.themeChooserId === state.user.uid) {
+              chooserText += 'You';
+            } else if (group.themeChooserId) {
+              // Try to find the name from friends
+              var found = false;
+              for (var fi = 0; fi < state.friends.length; fi++) {
+                if (state.friends[fi].id === group.themeChooserId) {
+                  chooserText += state.friends[fi].username;
+                  found = true;
+                  break;
                 }
               }
-              statusBg = t.accent + '22';
-              statusColor = t.accent;
+              if (!found) {
+                chooserText += 'Someone';
+              }
+            } else {
+              chooserText += '...';
             }
             
-            item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: statusBg, color: statusColor, fontWeight: '500'}}, statusText));
+            item.appendChild(el('span', {style: {fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: t.accent + '22', color: t.accent, fontWeight: '500'}}, chooserText));
             
             item.appendChild(el('span', {style: {fontSize: '20px', color: t.muted}}, '›'));
             
