@@ -67,6 +67,11 @@ window.onerror = function(msg, url, line, col, error) {
   var db = firebase.firestore();
   var auth = firebase.auth();
   var storage = firebase.storage();
+  
+  // Set auth persistence to LOCAL so users stay logged in
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(e) {
+    console.error('Auth persistence error:', e);
+  });
 
   var FONTS = [
     {n: 'Classic', v: '-apple-system,sans-serif'},
@@ -86,6 +91,7 @@ window.onerror = function(msg, url, line, col, error) {
     user: null,
     userData: null,
     friends: [],
+    friendRequests: [],
     myPosts: [],
     posted: false,
     sel: null,
@@ -146,6 +152,7 @@ window.onerror = function(msg, url, line, col, error) {
         for (var k in data) state.userData[k] = data[k];
         loadPosts(uid);
         loadFriends(uid);
+        loadFriendRequests(uid);
         setState({view: 'feed'});
       }
     });
@@ -209,6 +216,98 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
 
+  function loadFriendRequests(uid) {
+    db.collection('friendRequests').where('toId', '==', uid).where('status', '==', 'pending').get().then(function(snap) {
+      var requests = [];
+      var completed = 0;
+      if (snap.empty) {
+        setState({friendRequests: []});
+        return;
+      }
+      snap.forEach(function(d) {
+        var req = {id: d.id};
+        var data = d.data();
+        for (var k in data) req[k] = data[k];
+        db.collection('users').doc(req.fromId).get().then(function(userDoc) {
+          if (userDoc.exists) {
+            req.fromUser = userDoc.data();
+            req.fromUser.id = req.fromId;
+          }
+          requests.push(req);
+          completed++;
+          if (completed === snap.size) {
+            setState({friendRequests: requests});
+          }
+        });
+      });
+    });
+  }
+
+  function sendFriendRequest(toId) {
+    if (!state.user) return;
+    var fromId = state.user.uid;
+    // Check if already friends
+    db.collection('users').doc(fromId).get().then(function(doc) {
+      var friends = doc.data().friends || [];
+      if (friends.indexOf(toId) !== -1) {
+        alert('Already friends!');
+        return;
+      }
+      // Check if request already exists
+      db.collection('friendRequests')
+        .where('fromId', '==', fromId)
+        .where('toId', '==', toId)
+        .where('status', '==', 'pending')
+        .get().then(function(snap) {
+          if (!snap.empty) {
+            alert('Friend request already sent!');
+            return;
+          }
+          // Create request
+          db.collection('friendRequests').add({
+            fromId: fromId,
+            toId: toId,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+          }).then(function() {
+            alert('Friend request sent!');
+            setState({friendCode: ''});
+          });
+        });
+    });
+  }
+
+  function acceptFriendRequest(request) {
+    var fromId = request.fromId;
+    var toId = state.user.uid;
+    // Add each other as friends
+    db.collection('users').doc(toId).get().then(function(doc) {
+      var myFriends = doc.data().friends || [];
+      if (myFriends.indexOf(fromId) === -1) {
+        myFriends.push(fromId);
+        db.collection('users').doc(toId).update({friends: myFriends});
+      }
+    });
+    db.collection('users').doc(fromId).get().then(function(doc) {
+      var theirFriends = doc.data().friends || [];
+      if (theirFriends.indexOf(toId) === -1) {
+        theirFriends.push(toId);
+        db.collection('users').doc(fromId).update({friends: theirFriends});
+      }
+    });
+    // Update request status
+    db.collection('friendRequests').doc(request.id).update({status: 'accepted'}).then(function() {
+      loadFriendRequests(toId);
+      loadFriends(toId);
+    });
+  }
+
+  function declineFriendRequest(request) {
+    db.collection('friendRequests').doc(request.id).update({status: 'declined'}).then(function() {
+      loadFriendRequests(state.user.uid);
+    });
+  }
+
   function handleSignup() {
     var a = state.authData;
     if (!a.email || !a.password || !a.username || !a.birthday) {
@@ -252,6 +351,27 @@ window.onerror = function(msg, url, line, col, error) {
       setState({authLoading: false});
     }).catch(function(e) {
       setState({authError: 'Invalid email or password', authLoading: false});
+    });
+  }
+
+  function handleForgotPassword() {
+    var email = state.authData.email;
+    if (!email) {
+      setState({authError: 'Please enter your email address first'});
+      return;
+    }
+    setState({authLoading: true, authError: ''});
+    auth.sendPasswordResetEmail(email).then(function() {
+      setState({authLoading: false, authError: ''});
+      alert('Password reset email sent! Check your inbox.');
+    }).catch(function(e) {
+      var msg = 'Could not send reset email';
+      if (e.code === 'auth/user-not-found') {
+        msg = 'No account found with this email';
+      } else if (e.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address';
+      }
+      setState({authError: msg, authLoading: false});
     });
   }
 
@@ -336,34 +456,11 @@ window.onerror = function(msg, url, line, col, error) {
       }
       var fid = snap.docs[0].id;
       if (fid === state.user.uid) {
+        alert("That's you!");
         setState({friendCode: ''});
         return;
       }
-      db.collection('users').doc(state.user.uid).get().then(function(doc) {
-        var curr = doc.data().friends || [];
-        var found = false;
-        for (var i = 0; i < curr.length; i++) {
-          if (curr[i] === fid) found = true;
-        }
-        if (!found) {
-          curr.push(fid);
-          db.collection('users').doc(state.user.uid).update({friends: curr}).then(function() {
-            db.collection('users').doc(fid).get().then(function(fDoc) {
-              var ff = fDoc.data().friends || [];
-              var found2 = false;
-              for (var i = 0; i < ff.length; i++) {
-                if (ff[i] === state.user.uid) found2 = true;
-              }
-              if (!found2) {
-                ff.push(state.user.uid);
-                db.collection('users').doc(fid).update({friends: ff});
-              }
-            });
-            loadFriends(state.user.uid);
-          });
-        }
-      });
-      setState({friendCode: ''});
+      sendFriendRequest(fid);
     });
   }
 
@@ -495,6 +592,32 @@ window.onerror = function(msg, url, line, col, error) {
   function fmtMonth(d) {
     var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function getBirthdaysForDate(month, day) {
+    var birthdays = [];
+    // Check friends
+    for (var i = 0; i < state.friends.length; i++) {
+      var f = state.friends[i];
+      if (f.birthday) {
+        var parts = f.birthday.split('-');
+        var bMonth = parseInt(parts[1], 10);
+        var bDay = parseInt(parts[2], 10);
+        if (bMonth === month && bDay === day) {
+          birthdays.push(f);
+        }
+      }
+    }
+    // Check own birthday
+    if (state.userData && state.userData.birthday) {
+      var parts = state.userData.birthday.split('-');
+      var bMonth = parseInt(parts[1], 10);
+      var bDay = parseInt(parts[2], 10);
+      if (bMonth === month && bDay === day) {
+        birthdays.push(state.userData);
+      }
+    }
+    return birthdays;
   }
 
   function el(tag, attrs, children) {
@@ -727,6 +850,11 @@ window.onerror = function(msg, url, line, col, error) {
       passField.appendChild(passInput);
       fields.appendChild(passField);
       
+      if (state.authMode === 'login') {
+        var forgotLink = el('span', {className: 'tap', style: {display: 'block', textAlign: 'right', fontSize: '13px', color: t.accent, marginTop: '8px'}, onClick: handleForgotPassword}, 'Forgot password?');
+        fields.appendChild(forgotLink);
+      }
+      
       if (state.authMode === 'signup') {
         var bdayField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
         bdayField.appendChild(el('span', null, '🎂'));
@@ -757,11 +885,14 @@ window.onerror = function(msg, url, line, col, error) {
       
       var btns = el('div', {style: {display: 'flex', gap: '8px'}});
       btns.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { nav('settings'); }}, '⚙️'));
-      var profBtn = el('span', {className: 'tap', style: {padding: '8px'}, onClick: function() { nav('profile'); }});
+      var profBtn = el('span', {className: 'tap', style: {padding: '8px', position: 'relative'}, onClick: function() { nav('profile'); }});
       if (state.userData && state.userData.avatar) {
         profBtn.appendChild(el('img', {src: state.userData.avatar, style: {width: '36px', height: '36px', borderRadius: '12px', objectFit: 'cover'}}));
       } else {
         profBtn.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
+      }
+      if (state.friendRequests.length > 0) {
+        profBtn.appendChild(el('div', {style: {position: 'absolute', top: '4px', right: '4px', width: '18px', height: '18px', borderRadius: '50%', background: '#e53935', color: '#fff', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + t.bg}}, state.friendRequests.length));
       }
       btns.appendChild(profBtn);
       
@@ -895,6 +1026,13 @@ window.onerror = function(msg, url, line, col, error) {
             var input = el('input', {placeholder: f.ph, value: state.np[f.key], style: {flex: '1', background: 'transparent', border: 'none', fontSize: '16px', color: t.text, outline: 'none'}});
             input.oninput = function(e) {
               state.np[f.key] = e.target.value;
+              // Update button state without full re-render
+              var nextBtn = document.getElementById('step2NextBtn');
+              if (nextBtn) {
+                var canGo = state.np.songTitle && state.np.songArtist && state.np.loc;
+                nextBtn.style.opacity = canGo ? '1' : '0.4';
+                nextBtn.style.background = canGo ? t.accent : t.border;
+              }
             };
             field.appendChild(input);
             content.appendChild(field);
@@ -904,7 +1042,8 @@ window.onerror = function(msg, url, line, col, error) {
         var btns = el('div', {style: {display: 'flex', gap: '12px', marginTop: '8px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 1}); }}, '←'));
         var canNext = state.np.songTitle && state.np.songArtist && state.np.loc;
-        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: canNext ? '1' : '0.4'}, onClick: function() { if (state.np.songTitle && state.np.songArtist && state.np.loc) setState({step: 3}); }}, 'Next →'));
+        var nextBtn = el('span', {className: 'tap', id: 'step2NextBtn', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: canNext ? t.accent : t.border, opacity: canNext ? '1' : '0.4'}, onClick: function() { if (state.np.songTitle && state.np.songArtist && state.np.loc) setState({step: 3}); }}, 'Next →');
+        btns.appendChild(nextBtn);
         content.appendChild(btns);
         
         page.appendChild(content);
@@ -1106,6 +1245,37 @@ window.onerror = function(msg, url, line, col, error) {
       stats.appendChild(stat2);
       info.appendChild(stats);
       
+      // Friend Requests
+      if (state.friendRequests.length > 0) {
+        var reqSection = el('div', {style: {width: '100%', marginBottom: '20px', padding: '16px', borderRadius: '16px', background: '#fff8e1', border: '1px solid #ffcc80'}});
+        reqSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#e65100'}}, '👋 Friend Requests (' + state.friendRequests.length + ')'));
+        
+        for (var i = 0; i < state.friendRequests.length; i++) {
+          (function(req) {
+            var reqItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: '#fff', marginBottom: i < state.friendRequests.length - 1 ? '8px' : '0'}});
+            
+            if (req.fromUser && req.fromUser.avatar) {
+              reqItem.appendChild(el('img', {src: req.fromUser.avatar, style: {width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover'}}));
+            } else {
+              reqItem.appendChild(el('div', {style: {width: '40px', height: '40px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, (req.fromUser && req.fromUser.username) ? req.fromUser.username[0].toUpperCase() : '?'));
+            }
+            
+            var reqInfo = el('div', {style: {flex: '1'}});
+            reqInfo.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '600', color: t.text}}, req.fromUser ? req.fromUser.username : 'Someone'));
+            reqInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '11px', color: t.muted}}, 'wants to be friends'));
+            reqItem.appendChild(reqInfo);
+            
+            var reqBtns = el('div', {style: {display: 'flex', gap: '6px'}});
+            reqBtns.appendChild(el('span', {className: 'tap', style: {padding: '8px 12px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '12px', fontWeight: '600'}, onClick: function() { acceptFriendRequest(req); }}, '✓'));
+            reqBtns.appendChild(el('span', {className: 'tap', style: {padding: '8px 12px', borderRadius: '8px', background: t.border, color: t.muted, fontSize: '12px', fontWeight: '600'}, onClick: function() { declineFriendRequest(req); }}, '✕'));
+            reqItem.appendChild(reqBtns);
+            
+            reqSection.appendChild(reqItem);
+          })(state.friendRequests[i]);
+        }
+        info.appendChild(reqSection);
+      }
+      
       // Add friend
       var addWrap = el('div', {style: {width: '100%', marginBottom: '20px'}});
       addWrap.appendChild(el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '14px', background: t.accent, color: '#fff', fontWeight: '600', fontSize: '14px'}, onClick: function() { setState({showAddFriend: !state.showAddFriend}); }}, state.showAddFriend ? '✕ Close' : '👥 Add Friends'));
@@ -1152,13 +1322,19 @@ window.onerror = function(msg, url, line, col, error) {
         (function(d) {
           var post = getPostForDate(d);
           var isToday = isCurrent && d === now.getDate();
-          var cell = el('div', {className: post ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: post ? t.accent : 'transparent', color: post ? '#fff' : t.text, border: isToday ? '2px solid ' + t.accent : 'none', fontWeight: isToday ? '700' : '400', flexDirection: 'column'}});
+          var birthdays = getBirthdaysForDate(state.calDate.getMonth() + 1, d);
+          var hasBirthday = birthdays.length > 0;
+          var cellBg = post ? t.accent : (hasBirthday ? '#fff3e0' : 'transparent');
+          var cell = el('div', {className: post ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: cellBg, color: post ? '#fff' : t.text, border: isToday ? '2px solid ' + t.accent : 'none', fontWeight: isToday ? '700' : '400', flexDirection: 'column', position: 'relative'}});
           if (post) {
             cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
             cell.appendChild(el('span', {style: {fontSize: '8px'}}, '📮'));
             cell.onclick = function() { setState({dayPost: post, view: 'dayDetail'}); };
           } else {
             cell.appendChild(el('span', {style: {fontSize: '12px'}}, d));
+          }
+          if (hasBirthday && !post) {
+            cell.appendChild(el('span', {style: {fontSize: '8px', position: 'absolute', bottom: '2px'}}, '🎂'));
           }
           days.appendChild(cell);
         })(day);
