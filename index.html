@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.4.9';
+var APP_VERSION = '1.5.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -210,7 +210,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.4.6': '👥 GROUPS REFINED: Groups list now shows theme chooser and uses custom icons/colors. Customization properly saves and displays. "Invite New Member" moved above friends list. All duplicate code removed. Everything displays cleanly!',
     '1.4.7': '❤️ FIXED: Reactions now only show until dismissed (not all forever). Tap to dismiss = disappears from mailbox. Added debug logging for badge count to help troubleshoot "8 notifications but nothing there" issue.',
     '1.4.8': '👥 GROUPS SIMPLIFIED: Removed all color customization. Groups now show: NAME (displays in groups tab), ICON (displays in groups tab), and theme chooser info. Customization = change name + icon only. Clean and simple!',
-    '1.4.9': '🔔 FIXED: Update notifications NO LONGER count toward badge. Green update banner now works on first tap (not second). Debug logging enhanced to show "Updates NOT counted". Badge now accurate!'
+    '1.4.9': '🔔 FIXED: Update notifications NO LONGER count toward badge. Green update banner now works on first tap (not second). Debug logging enhanced to show "Updates NOT counted". Badge now accurate!',
+    '1.5.0': '🎵 FIXED: Song title and artist text below album cover now perfectly centered! Added max-width (280px) and proper padding to ensure text is balanced on both sides of the postcard middle. Applies to feed, downloads, and preview!'
   };
 
   var state = {
@@ -1257,7 +1258,7 @@ window.onerror = function(msg, url, line, col, error) {
     var avatarHtml = (owner && owner.avatar) ? '<img src="' + owner.avatar + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : ((owner && owner.username) ? owner.username[0].toUpperCase() : '?');
     var quoteHtml = post.quote ? '<p style="margin:14px 0 0;font-size:17px;font-style:italic;color:#2D2A26">"' + post.quote + '"</p>' : '';
     
-    c.innerHTML = '<div style="background:#fff"><div style="position:relative;display:flex;height:360px"><div style="flex:1;overflow:hidden;position:relative"><img src="' + (post.outfitPhoto || post.outfit) + '" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:' + (50 + (post.outfitX || 0)) + '% ' + (50 + (post.outfitY || 0)) + '%"/></div><div style="width:4px;background:#fff"></div><div style="flex:1;overflow:hidden;position:relative"><img src="' + post.photo + '" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:' + (50 + (post.photoX || 0)) + '% ' + (50 + (post.photoY || 0)) + '%"/></div><div style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.95);display:flex;flex-direction:column;align-items:center;justify-content:center"><p style="margin:0;font-size:20px;font-weight:600;color:' + color + ';font-family:' + font + ';text-align:center;width:100%">🎵 ' + (post.song ? post.song.title : '') + '</p><p style="margin:4px 0 0;font-size:15px;color:' + color + ';font-family:' + font + ';text-align:center;width:100%">' + (post.song ? post.song.artist : '') + '</p></div><div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#E07A5F;color:#fff;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700">📮 POSTCARD</div></div><div style="padding:20px;border-top:2px solid #E8E4DF"><div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:14px;background:#E07A5F;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;overflow:hidden">' + avatarHtml + '</div><div><p style="margin:0;font-size:17px;font-weight:600;color:#2D2A26">' + (owner ? owner.username : 'You') + '</p><p style="margin:2px 0 0;font-size:13px;color:#8B8680">📍 ' + (post.location || '') + ' · ' + (post.date || '') + '</p></div></div>' + quoteHtml + '</div></div>';
+    c.innerHTML = '<div style="background:#fff"><div style="position:relative;display:flex;height:360px"><div style="flex:1;overflow:hidden;position:relative"><img src="' + (post.outfitPhoto || post.outfit) + '" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:' + (50 + (post.outfitX || 0)) + '% ' + (50 + (post.outfitY || 0)) + '%"/></div><div style="width:4px;background:#fff"></div><div style="flex:1;overflow:hidden;position:relative"><img src="' + post.photo + '" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;object-position:' + (50 + (post.photoX || 0)) + '% ' + (50 + (post.photoY || 0)) + '%"/></div><div style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px"><p style="margin:0;font-size:20px;font-weight:600;color:' + color + ';font-family:' + font + ';text-align:center;max-width:280px">🎵 ' + (post.song ? post.song.title : '') + '</p><p style="margin:4px 0 0;font-size:15px;color:' + color + ';font-family:' + font + ';text-align:center;max-width:280px">' + (post.song ? post.song.artist : '') + '</p></div><div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#E07A5F;color:#fff;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700">📮 POSTCARD</div></div><div style="padding:20px;border-top:2px solid #E8E4DF"><div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:14px;background:#E07A5F;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;overflow:hidden">' + avatarHtml + '</div><div><p style="margin:0;font-size:17px;font-weight:600;color:#2D2A26">' + (owner ? owner.username : 'You') + '</p><p style="margin:2px 0 0;font-size:13px;color:#8B8680">📍 ' + (post.location || '') + ' · ' + (post.date || '') + '</p></div></div>' + quoteHtml + '</div></div>';
     
     var imgs = c.querySelectorAll('img');
     var loaded = 0;
@@ -2181,8 +2182,8 @@ window.onerror = function(msg, url, line, col, error) {
       song.appendChild(artwork);
     }
     
-    song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%'}}, '🎵 ' + (post.song ? post.song.title : '')));
-    song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%'}}, post.song ? post.song.artist : ''));
+    song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, '🎵 ' + (post.song ? post.song.title : '')));
+    song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.artist : ''));
     
     // Add hidden audio element for preview (will be controlled by IntersectionObserver)
     if (post.song && post.song.preview && opts.enablePreview) {
@@ -3008,8 +3009,8 @@ window.onerror = function(msg, url, line, col, error) {
         var font = FONTS[state.np.songFont].v;
         var color = COLORS[state.np.songColor];
         var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95)', padding: '10px 16px', borderRadius: '8px', background: state.activeEdit === 'song' ? 'rgba(255,255,255,.2)' : 'transparent', border: state.activeEdit === 'song' ? '2px dashed ' + t.accent : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}, onClick: function() { setState({activeEdit: 'song'}); }});
-        song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%'}}, '🎵 ' + state.np.songTitle));
-        song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, textAlign: 'center', width: '100%'}}, state.np.songArtist));
+        song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, '🎵 ' + state.np.songTitle));
+        song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, state.np.songArtist));
         
         imgArea.appendChild(left);
         imgArea.appendChild(el('div', {style: {width: '3px', background: t.card}}));
