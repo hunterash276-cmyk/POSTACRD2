@@ -749,6 +749,40 @@ window.onerror = function(msg, url, line, col, error) {
     });
   }
 
+  function toggleReaction(postId, ownerId, emoji) {
+    if (!state.user) return;
+    var uid = state.user.uid;
+    
+    // Find the post in friends' posts
+    for (var i = 0; i < state.friends.length; i++) {
+      var f = state.friends[i];
+      if (f.id === ownerId && f.posts) {
+        for (var j = 0; j < f.posts.length; j++) {
+          if (f.posts[j].id === postId) {
+            var post = f.posts[j];
+            var reactions = post.reactions || {};
+            
+            // Toggle reaction
+            if (reactions[uid] === emoji) {
+              delete reactions[uid];
+            } else {
+              reactions[uid] = emoji;
+            }
+            
+            // Update Firestore
+            db.collection('posts').doc(postId).update({reactions: reactions}).then(function() {
+              post.reactions = reactions;
+              render();
+            }).catch(function(e) {
+              console.error('Error updating reaction:', e);
+            });
+            return;
+          }
+        }
+      }
+    }
+  }
+
   function getAllTodayPosts() {
     var today = new Date().toISOString().split('T')[0];
     var result = [];
@@ -870,11 +904,12 @@ window.onerror = function(msg, url, line, col, error) {
     opts = opts || {};
     var font = FONTS[post.songFont || 0].v;
     var color = COLORS[post.songColor || 0];
+    var imgHeight = opts.compact ? '200px' : '280px';
     
     var wrap = el('div', {style: {position: 'relative'}});
     var card = el('div', {style: {background: t.card, borderRadius: '16px', border: '1px solid ' + t.border, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,.08)'}});
     
-    var imgArea = el('div', {style: {position: 'relative', display: 'flex', height: '200px'}});
+    var imgArea = el('div', {style: {position: 'relative', display: 'flex', height: imgHeight}});
     
     // Left
     var left = el('div', {style: {flex: '1', overflow: 'hidden', position: 'relative'}});
@@ -892,14 +927,16 @@ window.onerror = function(msg, url, line, col, error) {
     song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font}}, '🎵 ' + (post.song ? post.song.title : '')));
     song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, opacity: '0.95'}}, post.song ? post.song.artist : ''));
     
-    // Stamp
-    var stamp = el('div', {style: {position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: t.accent, color: '#fff', padding: '5px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: '700'}}, '📮 POSTCARD');
-    
     imgArea.appendChild(left);
     imgArea.appendChild(divider);
     imgArea.appendChild(right);
     imgArea.appendChild(song);
-    imgArea.appendChild(stamp);
+    
+    // Stamp - only show if not in feed
+    if (opts.showStamp) {
+      var stamp = el('div', {style: {position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: t.accent, color: '#fff', padding: '5px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: '700'}}, '📮 POSTCARD');
+      imgArea.appendChild(stamp);
+    }
     
     // Bottom
     var bottom = el('div', {style: {padding: '14px', borderTop: '1px solid ' + t.border}});
@@ -942,6 +979,50 @@ window.onerror = function(msg, url, line, col, error) {
       var pn = el('div', {style: {marginTop: '8px', padding: '8px', background: '#fff8e1', borderRadius: '6px', border: '1px dashed #ffc107'}});
       pn.appendChild(el('p', {style: {margin: '0', fontSize: '10px', color: '#f57c00'}}, '🔒 ' + post.privateNote));
       bottom.appendChild(pn);
+    }
+    
+    // Reactions - only for friends' posts in feed
+    if (opts.showReactions && post.id) {
+      var reactions = post.reactions || {};
+      var myReaction = reactions[state.user.uid] || null;
+      var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
+      
+      var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
+      
+      for (var i = 0; i < reactionEmojis.length; i++) {
+        (function(emoji) {
+          // Count this emoji
+          var count = 0;
+          for (var uid in reactions) {
+            if (reactions[uid] === emoji) count++;
+          }
+          var isSelected = myReaction === emoji;
+          
+          var btn = el('span', {
+            className: 'tap',
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '6px 10px',
+              borderRadius: '20px',
+              fontSize: '16px',
+              background: isSelected ? t.accent + '22' : t.bg,
+              border: '1px solid ' + (isSelected ? t.accent : t.border)
+            },
+            onClick: function() {
+              toggleReaction(post.id, owner.id, emoji);
+            }
+          });
+          btn.appendChild(el('span', null, emoji));
+          if (count > 0) {
+            btn.appendChild(el('span', {style: {fontSize: '12px', color: t.text, fontWeight: '500'}}, count));
+          }
+          reactWrap.appendChild(btn);
+        })(reactionEmojis[i]);
+      }
+      
+      bottom.appendChild(reactWrap);
     }
     
     card.appendChild(imgArea);
@@ -1140,8 +1221,13 @@ window.onerror = function(msg, url, line, col, error) {
       var postsWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px'}});
       for (var i = 0; i < posts.length; i++) {
         (function(p) {
-          var item = el('div', {className: 'tap', onClick: function() { setState({sel: p, view: 'detail'}); }});
-          item.appendChild(postcardEl(p, p.friend, {showPrivate: state.user && p.userId === state.user.uid}));
+          var isMyPost = state.user && p.userId === state.user.uid;
+          var item = el('div');
+          item.appendChild(postcardEl(p, p.friend, {
+            showPrivate: isMyPost,
+            showReactions: !isMyPost,
+            showStamp: false
+          }));
           postsWrap.appendChild(item);
         })(posts[i]);
       }
@@ -1163,7 +1249,7 @@ window.onerror = function(msg, url, line, col, error) {
       page.appendChild(el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '12px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10'}, onClick: function() { nav('feed'); }}, '✕'));
       var wrap = el('div', {style: {paddingTop: '40px'}});
       var isOwner = state.user && state.sel.userId === state.user.uid;
-      wrap.appendChild(postcardEl(state.sel, state.sel.friend, {showPrivate: isOwner, isOwner: isOwner, showMenu: true}));
+      wrap.appendChild(postcardEl(state.sel, state.sel.friend, {showPrivate: isOwner, isOwner: isOwner, showMenu: true, showStamp: true}));
       page.appendChild(wrap);
       app.appendChild(page);
       return;
@@ -1401,7 +1487,7 @@ window.onerror = function(msg, url, line, col, error) {
           privateNote: state.np.privateNote,
           date: 'Today'
         };
-        content.appendChild(postcardEl(previewPost, state.userData, {showPrivate: true}));
+        content.appendChild(postcardEl(previewPost, state.userData, {showPrivate: true, showStamp: true}));
         
         var btns = el('div', {style: {display: 'flex', gap: '12px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 3}); }}, '← Edit'));
@@ -1778,7 +1864,7 @@ window.onerror = function(msg, url, line, col, error) {
       var page = el('div', {style: {minHeight: '100vh', padding: '16px'}});
       page.appendChild(el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '12px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10'}, onClick: function() { setState({view: 'friendProfile', friendDayPost: null}); }}, '✕'));
       var wrap = el('div', {style: {paddingTop: '40px'}});
-      wrap.appendChild(postcardEl(state.friendDayPost, state.friendProfile, {showPrivate: false, isOwner: false, showMenu: false}));
+      wrap.appendChild(postcardEl(state.friendDayPost, state.friendProfile, {showPrivate: false, isOwner: false, showMenu: false, showStamp: true}));
       page.appendChild(wrap);
       app.appendChild(page);
       return;
@@ -1792,7 +1878,7 @@ window.onerror = function(msg, url, line, col, error) {
       var owner = {};
       for (var k in state.userData) owner[k] = state.userData[k];
       owner.id = state.user ? state.user.uid : null;
-      wrap.appendChild(postcardEl(state.dayPost, owner, {showPrivate: true, isOwner: true, showMenu: true}));
+      wrap.appendChild(postcardEl(state.dayPost, owner, {showPrivate: true, isOwner: true, showMenu: true, showStamp: true}));
       page.appendChild(wrap);
       app.appendChild(page);
       return;
