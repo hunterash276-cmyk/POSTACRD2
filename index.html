@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.4';
+var APP_VERSION = '1.5.5';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -217,7 +217,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.1': '🔔 FIXED (AGAIN): Update banner FINALLY works on first tap! Uses dismissed flag instead of version on click. Banner onclick sets "dismissed=true", reload saves new version and clears flag. No more double tap!',
     '1.5.2': '🎵 ULTRA-RESPONSIVE AUDIO: Plays at 10% visible (was 30%). Added beforeunload listener for INSTANT stop when swiping off. 5 event listeners total. Audio starts immediately on homepage, stops the moment you swipe up!',
     '1.5.3': '🎵 TIKTOK-LEVEL AUDIO: Added continuous focus monitoring (like TikTok/Instagram)! Checks document.hasFocus() and document.hidden EVERY FRAME via requestAnimationFrame. Stops audio the INSTANT you start swiping - no delay at all!',
-    '1.5.4': '🎵 INSTANT AUDIO: REMOVED ratio check - plays as soon as ANY part visible (no need to scroll to trigger!). More aggressive continuous monitoring. Audio plays immediately when post appears, stops instantly when you swipe up!'
+    '1.5.4': '🎵 INSTANT AUDIO: REMOVED ratio check - plays as soon as ANY part visible (no need to scroll to trigger!). More aggressive continuous monitoring. Audio plays immediately when post appears, stops instantly when you swipe up!',
+    '1.5.5': '🎵 FINALLY FIXED: Audio NOW PLAYS ON APP OPEN! Added manual check for posts already visible (IntersectionObserver bug fix). Uses getBoundingClientRect() to detect visible posts on load. NO MORE SCROLLING NEEDED!'
   };
 
   var state = {
@@ -4642,6 +4643,26 @@ window.onerror = function(msg, url, line, col, error) {
     postcards.forEach(function(card) {
       audioObserver.observe(card);
     });
+    
+    // CRITICAL FIX: Manually check and play audio for posts ALREADY visible
+    // IntersectionObserver doesn't fire immediately for elements already in viewport!
+    setTimeout(function() {
+      postcards.forEach(function(card) {
+        var rect = card.getBoundingClientRect();
+        var isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+        
+        if (isVisible) {
+          var audio = card.querySelector('audio');
+          if (audio && !currentlyPlayingAudio) {
+            console.log('[Audio] Playing audio - post already visible on load');
+            audio.play().catch(function(e) {
+              console.log('[Audio] Play failed:', e);
+            });
+            currentlyPlayingAudio = audio;
+          }
+        }
+      });
+    }, 100); // Small delay to ensure DOM is ready
   }
   
   // Call setupAudioObserver after each render
