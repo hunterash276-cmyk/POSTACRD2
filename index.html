@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.3.3';
+var APP_VERSION = '1.3.4';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -187,7 +187,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.3.0': '🎉 NEW: Groups feature! Create groups with friends for daily photo challenges. Each day a random Theme Chooser sets the theme, everyone takes photos in assigned orientations, and at midnight UTC a beautiful collage is automatically created from all submitted photos (no blank spaces!). All times are UTC-based with local time conversions shown.',
     '1.3.1': 'Groups improvements: Invitations must now be accepted before joining a group. Fixed duplicate group creation. Group creators can now add/remove members via the ⚙️ settings button. Improved navigation - back arrow in groups now properly returns to group list.',
     '1.3.2': '👥 Groups Update: Today\'s Theme Chooser now displayed in group list. Group creators can delete groups. Members can leave groups. "View Members" button added to group details. Member names now load properly. Navigation improved - back button returns to previous page.',
-    '1.3.3': '🎨 Group Customization: Creators can now edit group names, set custom group icons (emoji), choose color themes for each group, and customize background colors. Each group can have its own unique look! Access customization in group settings (⚙️).'
+    '1.3.3': '🎨 Group Customization: Creators can now edit group names, set custom group icons (emoji), choose color themes for each group, and customize background colors. Each group can have its own unique look! Access customization in group settings (⚙️).',
+    '1.3.4': '🔧 Bug Fixes: All group members can now view the members list (not just creators). Fixed signup/login issues - new accounts now properly navigate to the feed after creation. Improved account creation reliability.'
   };
 
   var state = {
@@ -803,7 +804,18 @@ window.onerror = function(msg, url, line, col, error) {
         };
         db.collection('users').doc(cred.user.uid).set(userData).then(function() {
           userData.id = cred.user.uid;
-          setState({userData: userData, authLoading: false});
+          state.userData = userData;
+          state.user = cred.user;
+          setState({authLoading: false, view: 'feed'});
+          // Trigger data loading
+          loadPosts(cred.user.uid);
+          loadFriends(cred.user.uid);
+          loadFriendRequests(cred.user.uid);
+          loadGroups(cred.user.uid);
+          loadGroupNotifications(cred.user.uid);
+        }).catch(function(err) {
+          console.error('Error saving user data:', err);
+          setState({authError: 'Error creating account: ' + err.message, authLoading: false});
         });
       };
       
@@ -3548,13 +3560,8 @@ window.onerror = function(msg, url, line, col, error) {
         var group = state.currentGroup;
         var isCreator = group.createdBy === state.user.uid;
         
-        if (!isCreator) {
-          setState({groupView: 'detail'});
-          return;
-        }
-        
         var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
-        membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '⚙️ Manage Members'));
+        membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, isCreator ? '⚙️ Manage Members' : '👥 Group Members'));
         
         // Current members
         membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + group.members.length + ')'));
@@ -3606,8 +3613,8 @@ window.onerror = function(msg, url, line, col, error) {
               });
             }
             
-            // Remove button (not for creator)
-            if (!isMe) {
+            // Remove button (only for group creator, not for themselves)
+            if (!isMe && isCreator) {
               memberItem.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '6px', background: '#ffebee', color: '#c62828', fontSize: '11px', fontWeight: '600'}, onClick: function() {
                 if (confirm('Remove this member from the group?')) {
                   removeMemberFromGroup(group.id, memberId);
@@ -3620,39 +3627,41 @@ window.onerror = function(msg, url, line, col, error) {
         }
         membersBox.appendChild(membersList);
         
-        // Pending invites
-        var pendingInvites = group.pendingInvites || [];
-        if (pendingInvites.length > 0) {
-          membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Pending Invites (' + pendingInvites.length + ')'));
-          var pendingList = el('div', {style: {marginBottom: '20px'}});
-          for (var i = 0; i < pendingInvites.length; i++) {
-            (function(inviteId) {
-              var inviteItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: '#fff8e1', borderRadius: '10px', marginBottom: '6px'}});
-              
-              var inviteName = 'Loading...';
-              for (var fi = 0; fi < state.friends.length; fi++) {
-                if (state.friends[fi].id === inviteId) {
-                  inviteName = state.friends[fi].username;
-                  break;
+        // Creator-only sections
+        if (isCreator) {
+          // Pending invites
+          var pendingInvites = group.pendingInvites || [];
+          if (pendingInvites.length > 0) {
+            membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Pending Invites (' + pendingInvites.length + ')'));
+            var pendingList = el('div', {style: {marginBottom: '20px'}});
+            for (var i = 0; i < pendingInvites.length; i++) {
+              (function(inviteId) {
+                var inviteItem = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: '#fff8e1', borderRadius: '10px', marginBottom: '6px'}});
+                
+                var inviteName = 'Loading...';
+                for (var fi = 0; fi < state.friends.length; fi++) {
+                  if (state.friends[fi].id === inviteId) {
+                    inviteName = state.friends[fi].username;
+                    break;
+                  }
                 }
-              }
-              
-              inviteItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: '#ffcc80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'}}, '⏳'));
-              inviteItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, inviteName));
-              inviteItem.appendChild(el('span', {style: {fontSize: '11px', color: t.muted}}, 'Pending'));
-              
-              pendingList.appendChild(inviteItem);
-            })(pendingInvites[i]);
+                
+                inviteItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: '#ffcc80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'}}, '⏳'));
+                inviteItem.appendChild(el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, inviteName));
+                inviteItem.appendChild(el('span', {style: {fontSize: '11px', color: t.muted}}, 'Pending'));
+                
+                pendingList.appendChild(inviteItem);
+              })(pendingInvites[i]);
+            }
+            membersBox.appendChild(pendingList);
           }
-          membersBox.appendChild(pendingList);
-        }
-        
-        // Add new member
-        membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Invite New Member'));
-        
-        // Show friends not already in group
-        var availableFriends = state.friends.filter(function(f) {
-          return group.members.indexOf(f.id) === -1 && (group.pendingInvites || []).indexOf(f.id) === -1;
+          
+          // Add new member
+          membersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Invite New Member'));
+          
+          // Show friends not already in group
+          var availableFriends = state.friends.filter(function(f) {
+            return group.members.indexOf(f.id) === -1 && (group.pendingInvites || []).indexOf(f.id) === -1;
         });
         
         if (availableFriends.length === 0) {
@@ -3804,6 +3813,8 @@ window.onerror = function(msg, url, line, col, error) {
           deleteGroup(group.id);
         }}, 'Delete Group Forever'));
         membersBox.appendChild(deleteBox);
+        
+        } // End isCreator block
         
         page.appendChild(membersBox);
         app.appendChild(page);
