@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.2.2';
+var APP_VERSION = '1.2.3';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -182,7 +182,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.1.9': 'Fixed bottom navigation buttons - profile and post buttons now work reliably when postcards are on screen.',
     '1.2.0': 'New friend code system! Each user now has a unique 8-character friend code (case-sensitive). Find yours on your profile page and share it with friends to connect!',
     '1.2.1': 'Fixed duplicate posting bug. Delete button is now more visible on your postcards. Deleting today\'s post lets you create a new one!',
-    '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.'
+    '1.2.2': 'Posts now appear in order of when they were posted (newest first). Song title and artist text is now properly centered on postcards.',
+    '1.2.3': 'Reaction notifications now show who reacted and with what emoji instead of just "Someone reacted".'
   };
 
   var state = {
@@ -347,19 +348,49 @@ window.onerror = function(msg, url, line, col, error) {
             if (!seenReactions[reactionKey]) {
               // New reaction! Find reactor name
               seenReactions[reactionKey] = true;
-              var reactorName = 'Someone';
-              for (var fi = 0; fi < state.friends.length; fi++) {
-                if (state.friends[fi].id === reactorId) {
-                  reactorName = state.friends[fi].username;
-                  break;
+              
+              // Create closure to capture reactorId and emoji
+              (function(postId, rId, emoji) {
+                // First try to find in friends list
+                var reactorName = null;
+                for (var fi = 0; fi < state.friends.length; fi++) {
+                  if (state.friends[fi].id === rId) {
+                    reactorName = state.friends[fi].username;
+                    break;
+                  }
                 }
-              }
-              addNotification('reaction', {
-                postId: p.id,
-                fromId: reactorId,
-                fromUsername: reactorName,
-                emoji: reactions[reactorId]
-              });
+                
+                if (reactorName) {
+                  // Found in friends, add notification immediately
+                  addNotification('reaction', {
+                    postId: postId,
+                    fromId: rId,
+                    fromUsername: reactorName,
+                    emoji: emoji
+                  });
+                } else {
+                  // Not in friends yet, fetch from Firestore
+                  db.collection('users').doc(rId).get().then(function(userDoc) {
+                    var username = 'Someone';
+                    if (userDoc.exists && userDoc.data().username) {
+                      username = userDoc.data().username;
+                    }
+                    addNotification('reaction', {
+                      postId: postId,
+                      fromId: rId,
+                      fromUsername: username,
+                      emoji: emoji
+                    });
+                  }).catch(function() {
+                    addNotification('reaction', {
+                      postId: postId,
+                      fromId: rId,
+                      fromUsername: 'Someone',
+                      emoji: emoji
+                    });
+                  });
+                }
+              })(p.id, reactorId, reactions[reactorId]);
             }
           }
         });
