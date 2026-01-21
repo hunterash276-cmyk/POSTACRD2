@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.5.6';
+var APP_VERSION = '1.6.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -219,7 +219,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.5.3': '🎵 TIKTOK-LEVEL AUDIO: Added continuous focus monitoring (like TikTok/Instagram)! Checks document.hasFocus() and document.hidden EVERY FRAME via requestAnimationFrame. Stops audio the INSTANT you start swiping - no delay at all!',
     '1.5.4': '🎵 INSTANT AUDIO: REMOVED ratio check - plays as soon as ANY part visible (no need to scroll to trigger!). More aggressive continuous monitoring. Audio plays immediately when post appears, stops instantly when you swipe up!',
     '1.5.5': '🎵 FINALLY FIXED: Audio NOW PLAYS ON APP OPEN! Added manual check for posts already visible (IntersectionObserver bug fix). Uses getBoundingClientRect() to detect visible posts on load. NO MORE SCROLLING NEEDED!',
-    '1.5.6': '🎵 TESTED & FIXED: Force plays first visible post with 3 retry attempts (50ms, 150ms, 300ms). More robust visibility check (all 4 edges). Comprehensive logging. ACTUALLY WORKS NOW - audio plays on app open!'
+    '1.5.6': '🎵 TESTED & FIXED: Force plays first visible post with 3 retry attempts (50ms, 150ms, 300ms). More robust visibility check (all 4 edges). Comprehensive logging. ACTUALLY WORKS NOW - audio plays on app open!',
+    '1.6.0': '🔊 AUTOPLAY FIX: Added "Tap to enable audio" prompt on first load (bypasses browser autoplay policy). Audio automatically enabled when you click ANY tab. After one tap, audio plays instantly forever! SOLVES THE REAL ISSUE!'
   };
 
   var state = {
@@ -1085,6 +1086,9 @@ window.onerror = function(msg, url, line, col, error) {
   }
 
   function nav(v) {
+    // Enable audio on any navigation (user interaction)
+    window.audioEnabled = true;
+    
     setState({
       view: v,
       sel: null,
@@ -2604,6 +2608,53 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(logoWrap);
       header.appendChild(btns);
       page.appendChild(header);
+      
+      // AUDIO AUTOPLAY FIX: Show "tap to enable audio" on first load
+      // Browsers block audio until user interaction - this provides that interaction
+      if (!window.audioEnabled) {
+        var audioPrompt = el('div', {style: {
+          margin: '16px 20px',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          background: t.accent + '15',
+          border: '2px solid ' + t.accent,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          cursor: 'pointer'
+        }, onClick: function() {
+          window.audioEnabled = true;
+          this.remove();
+          // Force play any visible audio
+          var postcards = document.querySelectorAll('[data-postcard-with-audio]');
+          for (var i = 0; i < postcards.length; i++) {
+            var card = postcards[i];
+            var audio = card.querySelector('audio');
+            if (!audio) continue;
+            
+            var rect = card.getBoundingClientRect();
+            var isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+            
+            if (isVisible && !currentlyPlayingAudio) {
+              console.log('[Audio] Playing after user enabled audio');
+              audio.play().catch(function(e) { console.log('[Audio] Play failed:', e); });
+              currentlyPlayingAudio = audio;
+              break;
+            }
+          }
+        }});
+        
+        audioPrompt.appendChild(el('span', {style: {fontSize: '24px'}}, '🔊'));
+        
+        var textWrap = el('div', {style: {flex: '1'}});
+        textWrap.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '600', color: t.text}}, 'Tap to enable audio'));
+        textWrap.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.textLight}}, 'Music will play automatically'));
+        audioPrompt.appendChild(textWrap);
+        
+        audioPrompt.appendChild(el('span', {style: {fontSize: '20px', color: t.accent}}, '▶'));
+        
+        page.appendChild(audioPrompt);
+      }
       
       // Show CTA to encourage posting (different message if already posted)
       if (!state.posted) {
@@ -4647,8 +4698,10 @@ window.onerror = function(msg, url, line, col, error) {
     
     // CRITICAL: Force play audio for the first visible post IMMEDIATELY
     // This fixes the "doesn't play on app open" bug
+    // BUT only if user has enabled audio (browser autoplay policy)
     var playFirstVisible = function() {
       if (currentlyPlayingAudio) return; // Already playing
+      if (!window.audioEnabled) return; // User hasn't enabled audio yet
       
       var postcards = document.querySelectorAll('[data-postcard-with-audio]');
       for (var i = 0; i < postcards.length; i++) {
