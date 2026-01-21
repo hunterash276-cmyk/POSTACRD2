@@ -24,7 +24,7 @@
   </style>
 </head>
 <body>
-<div id="updateBanner" onclick="location.reload()">New version available! Tap to update.</div>
+<div id="updateBanner" onclick="location.reload(true)">New version available! Tap to update.</div>
 <div class="app">
   <div id="loading">
     <div class="spinner">📮</div>
@@ -35,17 +35,50 @@
 </div>
 
 <script>
-// App version for cache busting
-var APP_VERSION = '1.0.1';
+// App version - CHANGE THIS when you update the app
+var APP_VERSION = '1.0.3';
 
-// Check for app updates periodically
+// Force update check for iOS PWA
 (function checkForUpdates() {
-  // Store version in localStorage
   var storedVersion = localStorage.getItem('postcard_version');
+  
+  console.log('Current version:', APP_VERSION, 'Stored version:', storedVersion);
+  
+  // If version changed, show update banner
   if (storedVersion && storedVersion !== APP_VERSION) {
+    console.log('Update available!');
     document.getElementById('updateBanner').style.display = 'block';
+    // Clear any caches we can
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var i = 0; i < names.length; i++) {
+          caches.delete(names[i]);
+        }
+      });
+    }
   }
+  
+  // Always store current version
   localStorage.setItem('postcard_version', APP_VERSION);
+  
+  // For iOS: check for updates when app becomes visible
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      fetch(window.location.href.split('?')[0] + '?_=' + Date.now(), {
+        cache: 'no-store',
+        headers: {'Cache-Control': 'no-cache'}
+      })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          var match = html.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+          if (match && match[1] !== APP_VERSION) {
+            console.log('New version detected:', match[1]);
+            document.getElementById('updateBanner').style.display = 'block';
+          }
+        })
+        .catch(function(e) { console.log('Update check failed:', e); });
+    }
+  });
 })();
 
 window.onerror = function(msg, url, line, col, error) {
@@ -130,6 +163,7 @@ window.onerror = function(msg, url, line, col, error) {
     activeEdit: null,
     showMenu: false,
     saving: false,
+    savedImage: null,
     uploading: false,
     editProfile: {username: '', avatar: null, newAvatar: null},
     editingProfile: false,
@@ -699,15 +733,26 @@ window.onerror = function(msg, url, line, col, error) {
     function doCapture() {
       html2canvas(c, {scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#fff'}).then(function(canvas) {
         document.body.removeChild(c);
-        canvas.toBlob(function(blob) {
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = 'postcard-' + (post.date || new Date().toISOString().split('T')[0]) + '.png';
-          a.click();
-          URL.revokeObjectURL(url);
-          setState({saving: false});
-        }, 'image/png');
+        var dataUrl = canvas.toDataURL('image/png');
+        
+        // Check if iOS
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        if (isIOS) {
+          // On iOS, show the image so user can long-press to save
+          setState({saving: false, savedImage: dataUrl});
+        } else {
+          // On other devices, trigger download
+          canvas.toBlob(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'postcard-' + (post.date || new Date().toISOString().split('T')[0]) + '.png';
+            a.click();
+            URL.revokeObjectURL(url);
+            setState({saving: false});
+          }, 'image/png');
+        }
       }).catch(function(e) {
         console.error(e);
         document.body.removeChild(c);
@@ -984,18 +1029,14 @@ window.onerror = function(msg, url, line, col, error) {
     // Reactions - only for friends' posts in feed
     if (opts.showReactions && post.id) {
       var reactions = post.reactions || {};
-      var myReaction = reactions[state.user.uid] || null;
+      var myReaction = state.user ? (reactions[state.user.uid] || null) : null;
       var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
       
+      // Reaction buttons row
       var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
       
       for (var i = 0; i < reactionEmojis.length; i++) {
         (function(emoji) {
-          // Count this emoji
-          var count = 0;
-          for (var uid in reactions) {
-            if (reactions[uid] === emoji) count++;
-          }
           var isSelected = myReaction === emoji;
           
           var btn = el('span', {
@@ -1003,26 +1044,69 @@ window.onerror = function(msg, url, line, col, error) {
             style: {
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              padding: '6px 10px',
-              borderRadius: '20px',
-              fontSize: '16px',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              fontSize: '18px',
               background: isSelected ? t.accent + '22' : t.bg,
-              border: '1px solid ' + (isSelected ? t.accent : t.border)
+              border: '2px solid ' + (isSelected ? t.accent : t.border)
             },
             onClick: function() {
               toggleReaction(post.id, owner.id, emoji);
             }
-          });
-          btn.appendChild(el('span', null, emoji));
-          if (count > 0) {
-            btn.appendChild(el('span', {style: {fontSize: '12px', color: t.text, fontWeight: '500'}}, count));
-          }
+          }, emoji);
           reactWrap.appendChild(btn);
         })(reactionEmojis[i]);
       }
       
       bottom.appendChild(reactWrap);
+      
+      // Show confirmed reactions below (who reacted with what)
+      var hasReactions = false;
+      for (var uid in reactions) {
+        if (reactions[uid]) {
+          hasReactions = true;
+          break;
+        }
+      }
+      
+      if (hasReactions) {
+        var confirmedWrap = el('div', {style: {marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px'}});
+        
+        for (var uid in reactions) {
+          (function(reactorId, emoji) {
+            // Find reactor name
+            var reactorName = 'Someone';
+            if (state.user && reactorId === state.user.uid) {
+              reactorName = 'You';
+            } else {
+              for (var fi = 0; fi < state.friends.length; fi++) {
+                if (state.friends[fi].id === reactorId) {
+                  reactorName = state.friends[fi].username;
+                  break;
+                }
+              }
+            }
+            
+            var chip = el('span', {style: {
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 10px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              background: t.bg,
+              color: t.muted
+            }});
+            chip.appendChild(el('span', {style: {fontSize: '14px'}}, emoji));
+            chip.appendChild(el('span', null, reactorName));
+            confirmedWrap.appendChild(chip);
+          })(uid, reactions[uid]);
+        }
+        
+        bottom.appendChild(confirmedWrap);
+      }
     }
     
     card.appendChild(imgArea);
@@ -1077,8 +1161,25 @@ window.onerror = function(msg, url, line, col, error) {
       var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '1000'}});
       var box = el('div', {style: {background: t.card, padding: '28px', borderRadius: '20px', textAlign: 'center'}});
       box.appendChild(el('div', {style: {fontSize: '32px', marginBottom: '12px'}}, '💾'));
-      box.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '500', color: t.text}}, 'Saving to photos...'));
+      box.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '500', color: t.text}}, 'Creating image...'));
       overlay.appendChild(box);
+      app.appendChild(overlay);
+    }
+    
+    // Saved image overlay (for iOS)
+    if (state.savedImage) {
+      var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: '1000', padding: '20px'}});
+      
+      overlay.appendChild(el('p', {style: {color: '#fff', fontSize: '16px', fontWeight: '600', marginBottom: '16px', textAlign: 'center'}}, '📱 Hold down on image to save'));
+      
+      var img = el('img', {src: state.savedImage, style: {maxWidth: '100%', maxHeight: '70vh', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,.3)'}});
+      overlay.appendChild(img);
+      
+      overlay.appendChild(el('p', {style: {color: '#aaa', fontSize: '13px', marginTop: '12px', textAlign: 'center'}}, 'Long press → "Add to Photos"'));
+      
+      var closeBtn = el('span', {className: 'tap', style: {marginTop: '20px', padding: '14px 32px', background: t.accent, color: '#fff', borderRadius: '12px', fontSize: '15px', fontWeight: '600'}, onClick: function() { setState({savedImage: null}); }}, 'Done');
+      overlay.appendChild(closeBtn);
+      
       app.appendChild(overlay);
     }
     
