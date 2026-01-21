@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.0.8';
+var APP_VERSION = '1.1.0';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -139,6 +139,19 @@ window.onerror = function(msg, url, line, col, error) {
   
   // Load dark mode preference from localStorage
   var savedDarkMode = localStorage.getItem('postcard_darkmode');
+  
+  // Load notifications from localStorage
+  var savedNotifications = localStorage.getItem('postcard_notifications');
+  var loadedNotifications = [];
+  try {
+    if (savedNotifications) loadedNotifications = JSON.parse(savedNotifications);
+  } catch(e) {}
+  
+  // App update notes
+  var UPDATE_NOTES = {
+    '1.0.9': 'Added notifications center with friend requests, reactions, and weekly lookbacks. You can now see all your updates in one place!',
+    '1.1.0': 'Reactions now close after 24 hours. React to your friends\' postcards within a day or miss your chance! Existing reactions stay forever.'
+  };
 
   var state = {
     view: 'auth',
@@ -171,13 +184,19 @@ window.onerror = function(msg, url, line, col, error) {
     editProfile: {username: '', avatar: null, newAvatar: null},
     editingProfile: false,
     savingProfile: false,
-    birthdayPopup: null
+    birthdayPopup: null,
+    notifications: loadedNotifications,
+    weeklyLookbackPosts: null
   };
 
   function setState(updates) {
     // Save dark mode to localStorage when it changes
     if (updates.hasOwnProperty('dark')) {
       localStorage.setItem('postcard_darkmode', updates.dark ? 'true' : 'false');
+    }
+    // Save notifications to localStorage when they change
+    if (updates.hasOwnProperty('notifications')) {
+      localStorage.setItem('postcard_notifications', JSON.stringify(updates.notifications));
     }
     for (var key in updates) {
       state[key] = updates[key];
@@ -232,6 +251,9 @@ window.onerror = function(msg, url, line, col, error) {
       postsUnsubscribe();
     }
     
+    // Track seen reactions to detect new ones
+    var seenReactions = JSON.parse(localStorage.getItem('postcard_seen_reactions') || '{}');
+    
     // Set up real-time listener for my posts
     postsUnsubscribe = db.collection('posts')
       .where('userId', '==', uid)
@@ -242,7 +264,35 @@ window.onerror = function(msg, url, line, col, error) {
           var data = d.data();
           for (var k in data) p[k] = data[k];
           posts.push(p);
+          
+          // Check for new reactions on this post
+          var reactions = data.reactions || {};
+          for (var reactorId in reactions) {
+            if (reactorId === uid) continue; // Skip my own reactions
+            var reactionKey = p.id + '_' + reactorId;
+            if (!seenReactions[reactionKey]) {
+              // New reaction! Find reactor name
+              seenReactions[reactionKey] = true;
+              var reactorName = 'Someone';
+              for (var fi = 0; fi < state.friends.length; fi++) {
+                if (state.friends[fi].id === reactorId) {
+                  reactorName = state.friends[fi].username;
+                  break;
+                }
+              }
+              addNotification('reaction', {
+                postId: p.id,
+                fromId: reactorId,
+                fromUsername: reactorName,
+                emoji: reactions[reactorId]
+              });
+            }
+          }
         });
+        
+        // Save seen reactions
+        localStorage.setItem('postcard_seen_reactions', JSON.stringify(seenReactions));
+        
         // Sort by date descending
         posts.sort(function(a, b) {
           return b.date.localeCompare(a.date);
@@ -467,6 +517,94 @@ window.onerror = function(msg, url, line, col, error) {
     db.collection('friendRequests').doc(request.id).update({status: 'declined'}).then(function() {
       loadFriendRequests(state.user.uid);
     });
+  }
+
+  // Notification helpers
+  function addNotification(type, data) {
+    var notif = {
+      id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      type: type, // 'friendRequest', 'reaction', 'weeklyLookback', 'update'
+      data: data,
+      createdAt: new Date().toISOString(),
+      read: false
+    };
+    var newNotifs = [notif].concat(state.notifications);
+    // Keep only last 50 notifications
+    if (newNotifs.length > 50) newNotifs = newNotifs.slice(0, 50);
+    setState({notifications: newNotifs});
+  }
+  
+  function markNotificationRead(notifId) {
+    var newNotifs = state.notifications.map(function(n) {
+      if (n.id === notifId) {
+        return Object.assign({}, n, {read: true});
+      }
+      return n;
+    });
+    setState({notifications: newNotifs});
+  }
+  
+  function getUnreadCount() {
+    var count = 0;
+    for (var i = 0; i < state.notifications.length; i++) {
+      if (!state.notifications[i].read) count++;
+    }
+    // Also add pending friend requests
+    count += state.friendRequests.length;
+    return count;
+  }
+  
+  function checkWeeklyLookback() {
+    // Check if it's Sunday and we haven't shown this week's lookback
+    var now = new Date();
+    if (now.getDay() !== 0) return; // Only on Sundays
+    
+    // Get the week identifier (year + week number)
+    var startOfYear = new Date(now.getFullYear(), 0, 1);
+    var weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
+    var weekId = now.getFullYear() + '-W' + weekNum;
+    
+    // Check if we already have a lookback for this week
+    var hasLookback = state.notifications.some(function(n) {
+      return n.type === 'weeklyLookback' && n.data && n.data.weekId === weekId;
+    });
+    
+    if (!hasLookback && state.myPosts.length > 0) {
+      // Get posts from this week
+      var weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      var weekPosts = state.myPosts.filter(function(p) {
+        var postDate = new Date(p.date);
+        return postDate >= weekStart && postDate <= now;
+      });
+      
+      if (weekPosts.length > 0) {
+        addNotification('weeklyLookback', {
+          weekId: weekId,
+          weekLabel: getWeekLabel(weekStart, now),
+          postCount: weekPosts.length,
+          posts: weekPosts.map(function(p) { return p.id; })
+        });
+      }
+    }
+  }
+  
+  function getWeekLabel(start, end) {
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[start.getMonth()] + ' ' + start.getDate() + ' - ' + months[end.getMonth()] + ' ' + end.getDate();
+  }
+  
+  function checkForUpdateNotification() {
+    var lastSeenVersion = localStorage.getItem('postcard_last_seen_version');
+    if (lastSeenVersion !== APP_VERSION && UPDATE_NOTES[APP_VERSION]) {
+      addNotification('update', {
+        version: APP_VERSION,
+        notes: UPDATE_NOTES[APP_VERSION]
+      });
+      localStorage.setItem('postcard_last_seen_version', APP_VERSION);
+    }
   }
 
   function handleSignup() {
@@ -814,6 +952,14 @@ window.onerror = function(msg, url, line, col, error) {
           if (f.posts[j].id === postId) {
             var post = f.posts[j];
             
+            // Check if post is within 24 hours
+            var postTime = post.createdAt ? new Date(post.createdAt).getTime() : new Date(post.date).getTime();
+            var hoursSincePost = (Date.now() - postTime) / (1000 * 60 * 60);
+            if (hoursSincePost >= 24) {
+              render(); // Re-render to show closed message
+              return;
+            }
+            
             // Initialize reactions object if needed
             if (!post.reactions) {
               post.reactions = {};
@@ -1045,9 +1191,15 @@ window.onerror = function(msg, url, line, col, error) {
     var myReaction = state.user ? (reactions[state.user.uid] || null) : null;
     var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
     
-    // Show reaction picker only if: showing reactions, hasn't reacted yet, and it's not my post
+    // Check if post is within 24 hours (can still react)
+    var postTime = post.createdAt ? new Date(post.createdAt).getTime() : new Date(post.date).getTime();
+    var now = Date.now();
+    var hoursSincePost = (now - postTime) / (1000 * 60 * 60);
+    var canStillReact = hoursSincePost < 24;
+    
+    // Show reaction picker only if: showing reactions, hasn't reacted yet, not my post, and within 24hrs
     var hasAlreadyReacted = myReaction !== null && myReaction !== undefined;
-    if (opts.showReactions && post.id && !hasAlreadyReacted) {
+    if (opts.showReactions && post.id && !hasAlreadyReacted && canStillReact) {
       var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
       
       for (var i = 0; i < reactionEmojis.length; i++) {
@@ -1080,6 +1232,12 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       bottom.appendChild(reactWrap);
+    }
+    
+    // Show "reactions closed" message if past 24hrs and hasn't reacted
+    if (opts.showReactions && post.id && !hasAlreadyReacted && !canStillReact) {
+      var closedMsg = el('p', {style: {marginTop: '12px', fontSize: '12px', color: t.muted, fontStyle: 'italic'}}, '⏰ Reactions closed after 24 hours');
+      bottom.appendChild(closedMsg);
     }
     
     // Show my locked-in reaction if I've already reacted
@@ -1333,6 +1491,10 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Feed
     if (state.view === 'feed') {
+      // Check for weekly lookback on feed load
+      checkWeeklyLookback();
+      checkForUpdateNotification();
+      
       var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px'}});
@@ -1340,16 +1502,23 @@ window.onerror = function(msg, url, line, col, error) {
       logoWrap.appendChild(el('span', {style: {fontSize: '26px', fontWeight: '700', color: t.text}}, 'postcard'));
       logoWrap.appendChild(el('span', {style: {fontSize: '18px'}}, '✈️'));
       
-      var btns = el('div', {style: {display: 'flex', gap: '8px'}});
+      var btns = el('div', {style: {display: 'flex', gap: '4px', alignItems: 'center'}});
+      
+      // Mailbox/Notifications button
+      var unreadCount = getUnreadCount();
+      var mailBtn = el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted, position: 'relative'}, onClick: function() { nav('notifications'); }});
+      mailBtn.appendChild(el('span', null, '📬'));
+      if (unreadCount > 0) {
+        mailBtn.appendChild(el('div', {style: {position: 'absolute', top: '2px', right: '2px', minWidth: '18px', height: '18px', borderRadius: '50%', background: '#e53935', color: '#fff', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + t.bg, padding: '0 4px'}}, unreadCount > 9 ? '9+' : unreadCount));
+      }
+      btns.appendChild(mailBtn);
+      
       btns.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { nav('settings'); }}, '⚙️'));
       var profBtn = el('span', {className: 'tap', style: {padding: '8px', position: 'relative'}, onClick: function() { nav('profile'); }});
       if (state.userData && state.userData.avatar) {
         profBtn.appendChild(el('img', {src: state.userData.avatar, style: {width: '36px', height: '36px', borderRadius: '12px', objectFit: 'cover'}}));
       } else {
         profBtn.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
-      }
-      if (state.friendRequests.length > 0) {
-        profBtn.appendChild(el('div', {style: {position: 'absolute', top: '4px', right: '4px', width: '18px', height: '18px', borderRadius: '50%', background: '#e53935', color: '#fff', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + t.bg}}, state.friendRequests.length));
       }
       btns.appendChild(profBtn);
       
@@ -1801,6 +1970,167 @@ window.onerror = function(msg, url, line, col, error) {
         
         page.appendChild(content);
       }
+      
+      app.appendChild(page);
+      return;
+    }
+    
+    // Notifications
+    if (state.view === 'notifications') {
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
+      var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('feed'); }}, '←'));
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '📬 Notifications'));
+      header.appendChild(el('div', {style: {width: '48px'}}));
+      page.appendChild(header);
+      
+      // Separate notifications by type
+      var friendRequestNotifs = state.friendRequests || [];
+      var reactionNotifs = state.notifications.filter(function(n) { return n.type === 'reaction'; });
+      var weeklyNotifs = state.notifications.filter(function(n) { return n.type === 'weeklyLookback'; });
+      var updateNotifs = state.notifications.filter(function(n) { return n.type === 'update'; });
+      
+      // Friend Requests Section
+      if (friendRequestNotifs.length > 0) {
+        var section = el('div', {style: {marginBottom: '20px'}});
+        section.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👋 Friend Requests'));
+        
+        for (var i = 0; i < friendRequestNotifs.length; i++) {
+          (function(req) {
+            var item = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.card, border: '1px solid ' + t.border, marginBottom: '8px'}});
+            
+            if (req.fromUser && req.fromUser.avatar) {
+              item.appendChild(el('img', {src: req.fromUser.avatar, style: {width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover'}}));
+            } else {
+              item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, (req.fromUser && req.fromUser.username) ? req.fromUser.username[0].toUpperCase() : '?'));
+            }
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, req.fromUser ? req.fromUser.username : 'Someone'));
+            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'wants to be friends'));
+            item.appendChild(info);
+            
+            var btnsWrap = el('div', {style: {display: 'flex', gap: '6px'}});
+            btnsWrap.appendChild(el('span', {className: 'tap', style: {padding: '10px 14px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600'}, onClick: function() { acceptFriendRequest(req); }}, '✓'));
+            btnsWrap.appendChild(el('span', {className: 'tap', style: {padding: '10px 14px', borderRadius: '10px', background: t.border, color: t.muted, fontSize: '13px', fontWeight: '600'}, onClick: function() { declineFriendRequest(req); }}, '✕'));
+            item.appendChild(btnsWrap);
+            
+            section.appendChild(item);
+          })(friendRequestNotifs[i]);
+        }
+        page.appendChild(section);
+      }
+      
+      // Reactions Section
+      if (reactionNotifs.length > 0) {
+        var section = el('div', {style: {marginBottom: '20px'}});
+        section.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ Reactions'));
+        
+        for (var i = 0; i < reactionNotifs.length; i++) {
+          (function(notif) {
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { markNotificationRead(notif.id); }});
+            
+            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, notif.data.emoji));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '500', color: t.text}}, notif.data.fromUsername + ' reacted ' + notif.data.emoji));
+            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'to your postcard'));
+            item.appendChild(info);
+            
+            section.appendChild(item);
+          })(reactionNotifs[i]);
+        }
+        page.appendChild(section);
+      }
+      
+      // Weekly Lookbacks Section
+      if (weeklyNotifs.length > 0) {
+        var section = el('div', {style: {marginBottom: '20px'}});
+        section.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📅 Weekly Lookbacks'));
+        
+        for (var i = 0; i < weeklyNotifs.length; i++) {
+          (function(notif) {
+            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() {
+              markNotificationRead(notif.id);
+              // Show weekly lookback posts
+              var weekPosts = state.myPosts.filter(function(p) {
+                return notif.data.posts.indexOf(p.id) !== -1;
+              });
+              setState({weeklyLookbackPosts: weekPosts, view: 'weeklyLookback'});
+            }});
+            
+            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px'}}, '📮'));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, notif.data.weekLabel));
+            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, notif.data.postCount + ' postcard' + (notif.data.postCount !== 1 ? 's' : '')));
+            item.appendChild(info);
+            
+            item.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '›'));
+            
+            section.appendChild(item);
+          })(weeklyNotifs[i]);
+        }
+        page.appendChild(section);
+      }
+      
+      // Updates Section
+      if (updateNotifs.length > 0) {
+        var section = el('div', {style: {marginBottom: '20px'}});
+        section.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '🆕 Updates'));
+        
+        for (var i = 0; i < updateNotifs.length; i++) {
+          (function(notif) {
+            var item = el('div', {className: 'tap', style: {padding: '14px', borderRadius: '14px', background: notif.read ? t.card : t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { markNotificationRead(notif.id); }});
+            
+            var header = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px'}});
+            header.appendChild(el('span', {style: {fontSize: '20px'}}, '✨'));
+            header.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, 'Version ' + notif.data.version));
+            item.appendChild(header);
+            
+            item.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, lineHeight: '1.5'}}, notif.data.notes));
+            
+            section.appendChild(item);
+          })(updateNotifs[i]);
+        }
+        page.appendChild(section);
+      }
+      
+      // Empty state
+      if (friendRequestNotifs.length === 0 && reactionNotifs.length === 0 && weeklyNotifs.length === 0 && updateNotifs.length === 0) {
+        var empty = el('div', {style: {textAlign: 'center', padding: '60px 20px'}});
+        empty.appendChild(el('div', {style: {fontSize: '48px', marginBottom: '16px'}}, '📭'));
+        empty.appendChild(el('p', {style: {margin: '0', fontSize: '16px', color: t.muted}}, 'No notifications yet'));
+        page.appendChild(empty);
+      }
+      
+      app.appendChild(page);
+      return;
+    }
+    
+    // Weekly Lookback View
+    if (state.view === 'weeklyLookback' && state.weeklyLookbackPosts) {
+      var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
+      var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('notifications'); }}, '←'));
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '📅 Weekly Lookback'));
+      header.appendChild(el('div', {style: {width: '48px'}}));
+      page.appendChild(header);
+      
+      page.appendChild(el('p', {style: {textAlign: 'center', color: t.muted, fontSize: '14px', marginBottom: '20px'}}, state.weeklyLookbackPosts.length + ' postcard' + (state.weeklyLookbackPosts.length !== 1 ? 's' : '') + ' this week'));
+      
+      var postsWrap = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '16px'}});
+      for (var i = 0; i < state.weeklyLookbackPosts.length; i++) {
+        (function(p) {
+          var owner = {};
+          if (state.userData) {
+            for (var k in state.userData) owner[k] = state.userData[k];
+          }
+          owner.id = state.user ? state.user.uid : null;
+          postsWrap.appendChild(postcardEl(p, owner, {showPrivate: true, showStamp: false}));
+        })(state.weeklyLookbackPosts[i]);
+      }
+      page.appendChild(postsWrap);
       
       app.appendChild(page);
       return;
