@@ -36,7 +36,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.1.0';
+var APP_VERSION = '1.1.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -150,7 +150,8 @@ window.onerror = function(msg, url, line, col, error) {
   // App update notes
   var UPDATE_NOTES = {
     '1.0.9': 'Added notifications center with friend requests, reactions, and weekly lookbacks. You can now see all your updates in one place!',
-    '1.1.0': 'Reactions now close after 24 hours. React to your friends\' postcards within a day or miss your chance! Existing reactions stay forever.'
+    '1.1.0': 'Reactions now close after 24 hours. React to your friends\' postcards within a day or miss your chance! Existing reactions stay forever.',
+    '1.1.1': 'Bug fix: Resolved an issue that could cause the app to freeze on some devices.'
   };
 
   var state = {
@@ -236,9 +237,22 @@ window.onerror = function(msg, url, line, col, error) {
         loadPosts(uid);
         loadFriends(uid);
         loadFriendRequests(uid);
+        
+        // Check for update notification (only once on load)
+        checkForUpdateNotification();
+        
         setState({view: 'feed'});
       }
     });
+  }
+  
+  // Check for weekly lookback periodically (once per session)
+  var weeklyLookbackChecked = false;
+  function maybeCheckWeeklyLookback() {
+    if (!weeklyLookbackChecked && state.myPosts.length > 0) {
+      weeklyLookbackChecked = true;
+      checkWeeklyLookback();
+    }
   }
 
   var postsUnsubscribe = null;
@@ -302,7 +316,13 @@ window.onerror = function(msg, url, line, col, error) {
         for (var i = 0; i < posts.length; i++) {
           if (posts[i].date === today) hasPosted = true;
         }
-        setState({myPosts: posts, posted: hasPosted});
+        state.myPosts = posts;
+        state.posted = hasPosted;
+        
+        // Check for weekly lookback after posts are loaded
+        maybeCheckWeeklyLookback();
+        
+        render();
       }, function(error) {
         console.error('Posts listener error:', error);
         // Fallback to one-time fetch
@@ -557,7 +577,7 @@ window.onerror = function(msg, url, line, col, error) {
   function checkWeeklyLookback() {
     // Check if it's Sunday and we haven't shown this week's lookback
     var now = new Date();
-    if (now.getDay() !== 0) return; // Only on Sundays
+    if (now.getDay() !== 0) return false; // Only on Sundays
     
     // Get the week identifier (year + week number)
     var startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -581,14 +601,26 @@ window.onerror = function(msg, url, line, col, error) {
       });
       
       if (weekPosts.length > 0) {
-        addNotification('weeklyLookback', {
-          weekId: weekId,
-          weekLabel: getWeekLabel(weekStart, now),
-          postCount: weekPosts.length,
-          posts: weekPosts.map(function(p) { return p.id; })
-        });
+        // Add notification directly without calling setState
+        var notif = {
+          id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          type: 'weeklyLookback',
+          data: {
+            weekId: weekId,
+            weekLabel: getWeekLabel(weekStart, now),
+            postCount: weekPosts.length,
+            posts: weekPosts.map(function(p) { return p.id; })
+          },
+          createdAt: new Date().toISOString(),
+          read: false
+        };
+        state.notifications = [notif].concat(state.notifications);
+        if (state.notifications.length > 50) state.notifications = state.notifications.slice(0, 50);
+        localStorage.setItem('postcard_notifications', JSON.stringify(state.notifications));
+        return true; // Indicates a notification was added
       }
     }
+    return false;
   }
   
   function getWeekLabel(start, end) {
@@ -599,12 +631,24 @@ window.onerror = function(msg, url, line, col, error) {
   function checkForUpdateNotification() {
     var lastSeenVersion = localStorage.getItem('postcard_last_seen_version');
     if (lastSeenVersion !== APP_VERSION && UPDATE_NOTES[APP_VERSION]) {
-      addNotification('update', {
-        version: APP_VERSION,
-        notes: UPDATE_NOTES[APP_VERSION]
-      });
+      // Add notification directly without calling setState
+      var notif = {
+        id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        type: 'update',
+        data: {
+          version: APP_VERSION,
+          notes: UPDATE_NOTES[APP_VERSION]
+        },
+        createdAt: new Date().toISOString(),
+        read: false
+      };
+      state.notifications = [notif].concat(state.notifications);
+      if (state.notifications.length > 50) state.notifications = state.notifications.slice(0, 50);
+      localStorage.setItem('postcard_notifications', JSON.stringify(state.notifications));
       localStorage.setItem('postcard_last_seen_version', APP_VERSION);
+      return true; // Indicates a notification was added
     }
+    return false;
   }
 
   function handleSignup() {
@@ -1491,10 +1535,6 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Feed
     if (state.view === 'feed') {
-      // Check for weekly lookback on feed load
-      checkWeeklyLookback();
-      checkForUpdateNotification();
-      
       var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px'}});
