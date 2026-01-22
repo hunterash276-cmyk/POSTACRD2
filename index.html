@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.0';
+var APP_VERSION = '3.0.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -426,7 +426,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!',
     '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!',
     '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!',
-    '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again! ✅ MUSIC SEARCH REWRITE - Uses JSONP (bypasses CORS entirely). Auto-search as you type. Smooth loading, no popups. No more glitchy searches!'
+    '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again!',
+    '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2107,110 +2108,81 @@ window.onerror = function(msg, url, line, col, error) {
     console.log('[Music] Searching for:', query);
     setState({itunesSearching: true, itunesResults: [], itunesError: ''});
     
-    // JSONP approach - bypasses CORS entirely by loading as script tag
-    var callbackName = 'itunesCallback_' + Date.now();
-    var script = document.createElement('script');
-    var timeoutId;
+    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=40&country=US';
     
-    // Cleanup function
-    function cleanup() {
-      clearTimeout(timeoutId);
-      if (script.parentNode) script.parentNode.removeChild(script);
-      delete window[callbackName];
-    }
+    // Try multiple approaches
+    var proxyUrls = [
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(itunesUrl),
+      'https://corsproxy.io/?' + encodeURIComponent(itunesUrl),
+      'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(itunesUrl)
+    ];
     
-    // Success callback
-    window[callbackName] = function(data) {
-      cleanup();
-      console.log('[Music] Got response:', data.resultCount, 'results');
-      
-      if (!data.results || data.results.length === 0) {
-        setState({itunesResults: [], itunesSearching: false, itunesError: 'No songs found'});
+    var currentProxy = 0;
+    
+    function tryNext() {
+      if (currentProxy >= proxyUrls.length) {
+        console.log('[Music] All proxies failed');
+        setState({itunesSearching: false, itunesResults: [], itunesError: 'Search unavailable. Try again later.'});
         return;
       }
       
-      // Score and rank results by relevance
-      var scoredResults = data.results.map(function(song) {
-        var score = 0;
-        var searchLower = query.toLowerCase();
-        var trackLower = (song.trackName || '').toLowerCase();
-        var artistLower = (song.artistName || '').toLowerCase();
-        
-        // Exact match = highest priority
-        if (trackLower === searchLower) score += 1000;
-        if (artistLower === searchLower) score += 500;
-        
-        // Starts with query = high priority
-        if (trackLower.indexOf(searchLower) === 0) score += 800;
-        if (artistLower.indexOf(searchLower) === 0) score += 300;
-        
-        // Contains query
-        if (trackLower.indexOf(searchLower) > -1) score += 400;
-        if (artistLower.indexOf(searchLower) > -1) score += 200;
-        
-        // Word matching for multi-word queries
-        var words = searchLower.split(/\s+/);
-        for (var i = 0; i < words.length; i++) {
-          var word = words[i];
-          if (word.length > 2) {
-            if (trackLower.indexOf(word) > -1) score += 100;
-            if (artistLower.indexOf(word) > -1) score += 50;
+      var url = proxyUrls[currentProxy];
+      console.log('[Music] Trying proxy', currentProxy + 1);
+      
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+      
+      fetch(url, { signal: controller.signal })
+        .then(function(response) {
+          clearTimeout(timeoutId);
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.text();
+        })
+        .then(function(text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            throw new Error('Invalid JSON');
           }
-        }
-        
-        // Bonus for having preview URL and artwork
-        if (song.previewUrl) score += 30;
-        if (song.artworkUrl100) score += 20;
-        
-        return { song: song, score: score };
-      });
-      
-      // Sort by score and take top 12
-      scoredResults.sort(function(a, b) { return b.score - a.score; });
-      var topResults = scoredResults.slice(0, 12).map(function(item) { return item.song; });
-      
-      console.log('[Music] Returning', topResults.length, 'sorted results');
-      setState({itunesResults: topResults, itunesSearching: false, itunesError: ''});
-    };
-    
-    // Error handling
-    script.onerror = function() {
-      cleanup();
-      console.log('[Music] Script load failed');
-      setState({itunesSearching: false, itunesResults: [], itunesError: 'Search failed - check your connection'});
-    };
-    
-    // Timeout - 15 seconds
-    timeoutId = setTimeout(function() {
-      cleanup();
-      console.log('[Music] Search timed out');
-      setState({itunesSearching: false, itunesResults: [], itunesError: 'Search timed out - try again'});
-    }, 15000);
-    
-    // Build the JSONP URL - Apple's iTunes API supports callback parameter
-    var url = 'https://itunes.apple.com/search?term=' + 
-      encodeURIComponent(query) + 
-      '&media=music&entity=song&limit=50&country=US&callback=' + callbackName;
-    
-    script.src = url;
-    document.head.appendChild(script);
-  }
-  
-  // Debounced search - waits for user to stop typing
-  var searchTimeout = null;
-  function debouncedSearch() {
-    clearTimeout(searchTimeout);
-    var query = state.itunesSearch.trim();
-    
-    if (query.length < 2) {
-      setState({itunesResults: [], itunesError: ''});
-      return;
+          
+          if (!data.results || data.results.length === 0) {
+            setState({itunesResults: [], itunesSearching: false, itunesError: 'No songs found'});
+            return;
+          }
+          
+          // Score and sort results
+          var scoredResults = data.results.map(function(song) {
+            var score = 0;
+            var searchLower = query.toLowerCase();
+            var trackLower = (song.trackName || '').toLowerCase();
+            var artistLower = (song.artistName || '').toLowerCase();
+            
+            if (trackLower === searchLower) score += 1000;
+            if (artistLower === searchLower) score += 500;
+            if (trackLower.indexOf(searchLower) === 0) score += 800;
+            if (trackLower.indexOf(searchLower) > -1) score += 400;
+            if (artistLower.indexOf(searchLower) > -1) score += 200;
+            if (song.previewUrl) score += 30;
+            
+            return { song: song, score: score };
+          });
+          
+          scoredResults.sort(function(a, b) { return b.score - a.score; });
+          var topResults = scoredResults.slice(0, 12).map(function(item) { return item.song; });
+          
+          console.log('[Music] Found', topResults.length, 'results');
+          setState({itunesResults: topResults, itunesSearching: false, itunesError: ''});
+        })
+        .catch(function(e) {
+          clearTimeout(timeoutId);
+          console.log('[Music] Proxy', currentProxy + 1, 'failed:', e.message);
+          currentProxy++;
+          tryNext();
+        });
     }
     
-    setState({itunesSearching: true});
-    searchTimeout = setTimeout(function() {
-      searchItunes();
-    }, 400);
+    tryNext();
   }
 
   function selectSong(song) {
@@ -4063,7 +4035,7 @@ window.onerror = function(msg, url, line, col, error) {
         if (!state.online) {
           var offlineWarning = el('div', {style: {padding: '12px 16px', borderRadius: '12px', background: '#ff9800', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px'}});
           offlineWarning.appendChild(el('div', {style: {fontSize: '20px'}}, '📡'));
-          offlineWarning.appendChild(el('div', {style: {flex: '1', fontSize: '13px', lineHeight: '1.4'}}, 'Music search requires internet. You can skip this step and add music later.'));
+          offlineWarning.appendChild(el('div', {style: {flex: '1', fontSize: '13px', lineHeight: '1.4'}}, 'Music search requires internet. You can skip this step.'));
           songSection.appendChild(offlineWarning);
         }
         
@@ -4082,20 +4054,22 @@ window.onerror = function(msg, url, line, col, error) {
           selectedSong.appendChild(el('span', {className: 'tap', style: {fontSize: '18px', padding: '8px', color: t.muted, borderRadius: '8px'}, onClick: function() { setNp({songTitle: '', songArtist: '', songArtwork: '', songPreview: ''}); setState({itunesSearch: '', itunesResults: []}); }}, '✕'));
           songSection.appendChild(selectedSong);
         } else {
-          // Search input with instant search
-          var searchBox = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
+          // Search input - button triggered, not auto-search
+          var searchBox = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
           searchBox.appendChild(el('span', {style: {fontSize: '16px', color: t.muted}}, '🔍'));
           var searchInput = el('input', {
-            placeholder: 'Search songs...', 
+            id: 'musicSearchInput',
+            placeholder: 'Search for a song...', 
             value: state.itunesSearch || '', 
             autocomplete: 'off',
             autocorrect: 'off',
+            autocapitalize: 'off',
             spellcheck: false,
             style: {flex: '1', background: 'transparent', border: 'none', fontSize: '16px', color: t.text, outline: 'none'}
           });
+          // Don't use setState on input - just track the value
           searchInput.oninput = function(e) {
             state.itunesSearch = e.target.value;
-            debouncedSearch();
           };
           searchInput.onkeydown = function(e) {
             e.stopPropagation();
@@ -4106,10 +4080,13 @@ window.onerror = function(msg, url, line, col, error) {
           };
           searchBox.appendChild(searchInput);
           
-          // Clear button when there's text
-          if (state.itunesSearch) {
-            searchBox.appendChild(el('span', {className: 'tap', style: {fontSize: '14px', padding: '4px 8px', color: t.muted}, onClick: function() { setState({itunesSearch: '', itunesResults: [], itunesError: ''}); }}, '✕'));
-          }
+          // Search button
+          var searchBtn = el('span', {
+            className: 'tap', 
+            style: {padding: '8px 14px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', background: t.accent, whiteSpace: 'nowrap'}, 
+            onClick: function() { searchItunes(); }
+          }, state.itunesSearching ? '...' : 'Search');
+          searchBox.appendChild(searchBtn);
           
           songSection.appendChild(searchBox);
           
@@ -4121,19 +4098,19 @@ window.onerror = function(msg, url, line, col, error) {
             songSection.appendChild(loadingBox);
           }
           
-          // Error message (subtle, not alert)
+          // Error message
           if (state.itunesError && !state.itunesSearching) {
-            songSection.appendChild(el('div', {style: {padding: '12px 16px', borderRadius: '10px', background: t.bg, color: t.muted, fontSize: '13px', textAlign: 'center'}}, state.itunesError));
+            songSection.appendChild(el('div', {style: {padding: '12px 16px', borderRadius: '10px', background: '#ffebee', color: '#c62828', fontSize: '13px', textAlign: 'center'}}, state.itunesError));
           }
           
           // Search results
           if (state.itunesResults && state.itunesResults.length > 0 && !state.itunesSearching) {
-            var resultsBox = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '350px', overflowY: 'auto', WebkitOverflowScrolling: 'touch'}});
+            var resultsBox = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto', WebkitOverflowScrolling: 'touch'}});
             for (var i = 0; i < state.itunesResults.length; i++) {
-              (function(song, index) {
+              (function(song) {
                 var result = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '12px', background: t.card, border: '1px solid ' + t.border}, onClick: function() { selectSong(song); }});
                 if (song.artworkUrl100) {
-                  result.appendChild(el('img', {src: song.artworkUrl100.replace('100x100', '60x60'), style: {width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', flexShrink: '0'}}));
+                  result.appendChild(el('img', {src: song.artworkUrl100, style: {width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', flexShrink: '0'}}));
                 } else {
                   result.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '6px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: '0'}}, '🎵'));
                 }
@@ -4141,16 +4118,16 @@ window.onerror = function(msg, url, line, col, error) {
                 info.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '500', color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, song.trackName || 'Unknown'));
                 info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}, song.artistName || 'Unknown'));
                 result.appendChild(info);
-                result.appendChild(el('span', {style: {fontSize: '14px', color: t.accent}}, '+'));
+                result.appendChild(el('span', {style: {fontSize: '16px', color: t.accent, fontWeight: 'bold'}}, '+'));
                 resultsBox.appendChild(result);
-              })(state.itunesResults[i], i);
+              })(state.itunesResults[i]);
             }
             songSection.appendChild(resultsBox);
           }
           
-          // Hint text when no search yet
-          if (!state.itunesSearch && !state.itunesResults.length && !state.itunesSearching) {
-            songSection.appendChild(el('div', {style: {padding: '16px', textAlign: 'center', color: t.muted, fontSize: '13px', lineHeight: '1.5'}}, 'Type to search millions of songs'));
+          // Hint when empty
+          if (!state.itunesSearch && !state.itunesResults.length && !state.itunesSearching && !state.itunesError) {
+            songSection.appendChild(el('div', {style: {padding: '12px', textAlign: 'center', color: t.muted, fontSize: '13px'}}, 'Type a song name and tap Search'));
           }
         }
         
