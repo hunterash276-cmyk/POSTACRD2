@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.4';
+var APP_VERSION = '1.8.5';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -234,7 +234,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.1': '🎵 MANUAL ENTRY REMOVED: Deleted manual song entry completely (it never played music anyway). 📸 SELFIE FLIP FIXED: Outfit/selfie photos now flipped horizontally so they match what you saw on screen! All 72 functions intact.',
     '1.8.2': '🎵 ITUNES SEARCH FIXED: Switched from allOrigins to corsproxy.io proxy (more reliable). Fixed response parsing for new proxy. Fixed error messages. iTunes search should work now! Check console (F12) if issues.',
     '1.8.3': '🔧 CRITICAL REVERT: REVERTED iTunes proxy back to allOrigins (the one that WORKED before). Fixed camera flip properly with ctx.save/restore. Added collage feedback alerts. I broke things by changing what worked - NOW FIXED!',
-    '1.8.4': '🔧 HONEST FIXES: Camera flip REMOVED (phone handles it correctly). iTunes proxy changed to thingproxy (more stable). Collage now shows ALERT with photo count and structure so you can see if photos saved. Being methodical now!'
+    '1.8.4': '🔧 HONEST FIXES: Camera flip REMOVED (phone handles it correctly). iTunes proxy changed to thingproxy (more stable). Collage now shows ALERT with photo count and structure so you can see if photos saved. Being methodical now!',
+    '1.8.5': '🔍 DEBUG BUTTON ADDED: Yellow "DEBUG: Check Photo Storage" button in group detail view. Click it to see EXACTLY what photos are stored in Firestore for today. This will tell us if photos are saving or not!'
   };
 
   var state = {
@@ -3921,6 +3922,36 @@ window.onerror = function(msg, url, line, col, error) {
         
         // History Button
         page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() { setState({groupView: 'history'}); }}, '📅 View Past Collages'));
+        
+        // DEBUG: Check what photos are stored
+        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: '#ffeb3b', border: '1px solid #f57f17', color: '#000', textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() {
+          var today = getUTCDate();
+          var msg = '=== GROUP PHOTO DEBUG ===\n\n';
+          msg += 'Group: ' + group.name + '\n';
+          msg += 'Today: ' + today + '\n\n';
+          
+          if (!group.photos) {
+            alert(msg + 'NO PHOTOS OBJECT EXISTS!\nPhotos were never saved to this group.');
+            return;
+          }
+          
+          var todayPhotos = group.photos[today];
+          if (!todayPhotos) {
+            alert(msg + 'NO PHOTOS FOR TODAY!\nNo one has uploaded photos yet.');
+            return;
+          }
+          
+          var count = 0;
+          var details = '';
+          for (var uid in todayPhotos) {
+            count++;
+            details += '\nUser ' + count + ' (' + uid.substring(0, 8) + '):\n';
+            details += JSON.stringify(todayPhotos[uid], null, 2) + '\n';
+          }
+          
+          msg += 'Found ' + count + ' photo(s) for today:\n' + details;
+          alert(msg);
+        }}, '🔍 DEBUG: Check Photo Storage'));
         
         app.appendChild(page);
         return;
