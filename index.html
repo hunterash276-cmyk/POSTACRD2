@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.1';
+var APP_VERSION = '2.7.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -262,7 +262,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!',
     '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!',
     '2.7.0': '📱 PWA CACHE FIX (CRITICAL): ✅ SOLVES "needs web server" error! Aggressive cache busting: clears ALL caches + service workers on version change. Auto-reload with ?v= query param. Uses sessionStorage to track reload state. No more deleting from homescreen! Just refresh page once and new version loads. TESTED & WORKS!',
-    '2.7.1': '🏆 BADGE MIGRATION FIX: ✅ FIXES missing founding member badges! Migration now re-runs for users with foundingMember=false. Changed cutoff to 2026-01-24 (tomorrow) so ALL current users get badges. Added detailed console logging. Re-runs migration if user should be founding but isn\'t. Users just need to refresh once!'
+    '2.7.1': '🏆 BADGE MIGRATION FIX: ✅ FIXES missing founding member badges! Migration now re-runs for users with foundingMember=false. Changed cutoff to 2026-01-24 (tomorrow) so ALL current users get badges. Added detailed console logging. Re-runs migration if user should be founding but isn\'t. Users just need to refresh once!',
+    '2.7.2': '✏️ DRAFT EDITING + CALENDAR: ✅ Edit drafts later! New "✏️ Edit" button loads draft into camera to add music when you have service. ⚠️ Shows "No music added" warning. 📅 Smart upload button: "Upload to Feed" (same day) or "Upload to Calendar" (past midnight). Editing preserves original date. Updates existing draft instead of creating new one!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -333,6 +334,8 @@ window.onerror = function(msg, url, line, col, error) {
     showAllFriends: false,  // Show collapsed or expanded friends list
     friendSearch: '',  // Search query for friends
     savedDrafts: [],  // Offline drafts ready to upload
+    editingDraftId: null,  // ID of draft being edited
+    editingDraftDate: null,  // Original date of draft being edited
     // Groups feature
     groups: [],
     currentGroup: null,
@@ -457,9 +460,14 @@ window.onerror = function(msg, url, line, col, error) {
       state.savedDrafts = [];
     }
     
+    // Check if we're editing an existing draft
+    var isEditing = state.editingDraftId !== null;
+    var draftId = isEditing ? state.editingDraftId : Date.now().toString();
+    var draftDate = isEditing ? state.editingDraftDate : new Date().toISOString().split('T')[0];
+    
     var draft = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: draftId,
+      date: draftDate,
       savedAt: new Date().toISOString(),
       photo: draftData.photo,
       outfit: draftData.outfit,
@@ -478,17 +486,37 @@ window.onerror = function(msg, url, line, col, error) {
       songColor: draftData.songColor || 0
     };
     
-    state.savedDrafts.push(draft);
+    if (isEditing) {
+      // Update existing draft
+      var index = state.savedDrafts.findIndex(function(d) { return d.id === draftId; });
+      if (index !== -1) {
+        state.savedDrafts[index] = draft;
+        console.log('[Drafts] Updated existing draft:', draft.id);
+      } else {
+        // Draft not found, add as new
+        state.savedDrafts.push(draft);
+        console.log('[Drafts] Draft not found, added as new:', draft.id);
+      }
+      
+      // Clear editing state
+      state.editingDraftId = null;
+      state.editingDraftDate = null;
+    } else {
+      // Add new draft
+      state.savedDrafts.push(draft);
+      console.log('[Drafts] Saved new draft:', draft.id);
+    }
     
     var draftsKey = 'postcard_saved_drafts_' + state.user.uid;
     try {
       localStorage.setItem(draftsKey, JSON.stringify(state.savedDrafts));
-      console.log('[Drafts] Saved draft:', draft.id);
       return draft;
     } catch (e) {
       console.error('[Drafts] Failed to save draft:', e);
-      // Remove from array if save failed
-      state.savedDrafts.pop();
+      // Remove from array if save failed (only if it was new)
+      if (!isEditing) {
+        state.savedDrafts.pop();
+      }
       return null;
     }
   }
@@ -3928,17 +3956,18 @@ window.onerror = function(msg, url, line, col, error) {
         for (var i = 0; i < state.savedDrafts.length; i++) {
           (function(draft) {
             var today = new Date().toISOString().split('T')[0];
-            var canUpload = draft.date === today;
+            var canUploadToFeed = draft.date === today;
             var draftDate = new Date(draft.date);
             var dateStr = draftDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
             
-            var item = el('div', {style: {padding: '14px', borderRadius: '14px', background: canUpload ? '#e8f5e9' : t.card, border: '1px solid ' + (canUpload ? '#4caf50' : t.border), marginBottom: '8px'}});
+            // Changed: Use neutral colors for all drafts
+            var item = el('div', {style: {padding: '14px', borderRadius: '14px', background: t.card, border: '1px solid ' + t.border, marginBottom: '8px'}});
             
             var header = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px'}});
-            header.appendChild(el('div', {style: {fontSize: '24px'}}, canUpload ? '✨' : '📅'));
+            header.appendChild(el('div', {style: {fontSize: '24px'}}, '📝'));
             
             var info = el('div', {style: {flex: '1'}});
-            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, canUpload ? 'Ready to Upload!' : 'Past Draft'));
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, 'Draft'));
             info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'From ' + dateStr));
             header.appendChild(info);
             item.appendChild(header);
@@ -3953,28 +3982,69 @@ window.onerror = function(msg, url, line, col, error) {
             }
             var details = el('div', {style: {flex: '1'}});
             if (draft.loc) details.appendChild(el('p', {style: {margin: '0 0 4px', fontSize: '12px', color: t.text}}, '📍 ' + draft.loc));
-            if (draft.songTitle) details.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, '🎵 ' + draft.songTitle));
+            if (draft.songTitle) {
+              details.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, '🎵 ' + draft.songTitle));
+            } else {
+              details.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: '#ff9800', fontWeight: '600'}}, '⚠️ No music added'));
+            }
             preview.appendChild(details);
             item.appendChild(preview);
             
-            if (canUpload) {
+            // Status message
+            if (canUploadToFeed) {
               item.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: '#2e7d32'}}, '✓ Can upload to today\'s feed'));
             } else {
-              item.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: t.muted}}, 'Will be added to your calendar only (not feed)'));
+              item.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: t.muted}}, 'Can be uploaded to calendar only (past midnight)'));
             }
             
+            // Buttons
             var btns = el('div', {style: {display: 'flex', gap: '8px'}});
+            
+            // Edit button - always available
+            btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', textAlign: 'center'}, onClick: function() { 
+              // Load draft into new post state
+              state.np = {
+                photo: draft.photo,
+                outfit: draft.outfit,
+                songTitle: draft.songTitle || '',
+                songArtist: draft.songArtist || '',
+                songArtwork: draft.songArtwork || '',
+                songPreview: draft.songPreview || '',
+                loc: draft.loc || '',
+                quote: draft.quote || '',
+                privateNote: draft.privateNote || '',
+                outfitX: draft.outfitX || 0,
+                outfitY: draft.outfitY || 0,
+                photoX: draft.photoX || 0,
+                photoY: draft.photoY || 0,
+                songFont: draft.songFont || 0,
+                songColor: draft.songColor || 0
+              };
+              
+              // Store draft ID to update instead of creating new
+              state.editingDraftId = draft.id;
+              state.editingDraftDate = draft.date;
+              
+              // Go to step 3 (music selection) so they can add/change music
+              setState({step: 3, view: 'feed'});
+            }}, '✏️ Edit'));
+            
+            // Upload button - text changes based on date
             if (state.online) {
-              btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', textAlign: 'center'}, onClick: function() { uploadDraft(draft); }}, 'Upload'));
+              var uploadText = canUploadToFeed ? '📤 Upload to Feed' : '📅 Upload to Calendar';
+              btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '10px', borderRadius: '10px', background: canUploadToFeed ? '#4caf50' : '#2196f3', color: '#fff', fontSize: '13px', fontWeight: '600', textAlign: 'center'}, onClick: function() { uploadDraft(draft); }}, uploadText));
             } else {
               btns.appendChild(el('span', {style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.border, color: t.muted, fontSize: '13px', fontWeight: '600', textAlign: 'center'}}, 'Offline - Can\'t Upload'));
             }
+            
+            // Delete button
             btns.appendChild(el('span', {className: 'tap', style: {padding: '10px 14px', borderRadius: '10px', background: t.border, color: t.muted, fontSize: '13px', fontWeight: '600'}, onClick: function() { 
               if (confirm('Delete this draft?')) {
                 deleteDraft(draft.id);
                 render();
               }
             }}, '🗑️'));
+            
             item.appendChild(btns);
             
             draftsSection.appendChild(item);
