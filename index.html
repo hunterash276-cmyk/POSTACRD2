@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.4';
+var APP_VERSION = '2.7.5';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -265,7 +265,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.1': '🏆 BADGE MIGRATION FIX: ✅ FIXES missing founding member badges! Migration now re-runs for users with foundingMember=false. Changed cutoff to 2026-01-24 (tomorrow) so ALL current users get badges. Added detailed console logging. Re-runs migration if user should be founding but isn\'t. Users just need to refresh once!',
     '2.7.2': '✏️ DRAFT EDITING + CALENDAR: ✅ Edit drafts later! New "✏️ Edit" button loads draft into camera to add music when you have service. ⚠️ Shows "No music added" warning. 📅 Smart upload button: "Upload to Feed" (same day) or "Upload to Calendar" (past midnight). Editing preserves original date. Updates existing draft instead of creating new one!',
     '2.7.3': '🔧 MAJOR FIXES: ✅ Drafts now COUNT as posting (can\'t make 2nd postcard same day). ✅ Edit button goes to FULL upload page (step 1) not just music. ✅ iTunes search: 15sec timeout, better errors, handles "dont look back" searches. ✅ AbortController for timeouts. ✅ More helpful error messages. All careful fixes!',
-    '2.7.4': '🚫 DUPLICATE FIX (CRITICAL): ✅ FINALLY FIXED duplicates! uploadPost now checks Firebase BEFORE uploading. Checks state.myPosts AND queries Firebase for today\'s date. Rejects with error if duplicate found. Will NOT waste storage/money on duplicates anymore! 🔤 iTunes search confirmed case-insensitive (always was). "dont look back" = "DONT LOOK BACK".'
+    '2.7.4': '🚫 DUPLICATE FIX (CRITICAL): ✅ FINALLY FIXED duplicates! uploadPost now checks Firebase BEFORE uploading. Checks state.myPosts AND queries Firebase for today\'s date. Rejects with error if duplicate found. Will NOT waste storage/money on duplicates anymore! 🔤 iTunes search confirmed case-insensitive (always was). "dont look back" = "DONT LOOK BACK".',
+    '2.7.5': '🔓 DRAFT FIX (CRITICAL): ✅ FIXED! Draft now ONLY blocks camera (can\'t make 2nd postcard) BUT friends\' posts STAY BLURRED until you UPLOAD the draft! Two states: posted (unblurs) vs hasPostcardToday (blocks camera). Draft = can\'t use camera BUT still see blurred posts. Upload draft = posts unblur! Exactly as requested!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -301,7 +302,8 @@ window.onerror = function(msg, url, line, col, error) {
     friends: [],
     friendRequests: [],
     myPosts: [],
-    posted: false,
+    posted: false,  // True only when actually posted (unblurs friends' posts)
+    hasPostcardToday: false,  // True if draft OR posted (blocks camera)
     sel: null,
     step: 1,
     np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0},
@@ -888,24 +890,28 @@ window.onerror = function(msg, url, line, col, error) {
           return b.date.localeCompare(a.date);
         });
         var today = new Date().toISOString().split('T')[0];
+        
+        // Check if actually posted (for UNBLURRING friends' posts)
         var hasPosted = false;
         for (var i = 0; i < posts.length; i++) {
           if (posts[i].date === today) hasPosted = true;
         }
         
-        // Also check if they have a draft for today (drafts count as "posted")
-        if (state.savedDrafts && state.savedDrafts.length > 0) {
+        // Check if has draft or post (for BLOCKING camera)
+        var hasPostcardToday = hasPosted;
+        if (!hasPostcardToday && state.savedDrafts && state.savedDrafts.length > 0) {
           for (var i = 0; i < state.savedDrafts.length; i++) {
             if (state.savedDrafts[i].date === today) {
-              hasPosted = true;
-              console.log('[Drafts] Found draft for today - counting as posted');
+              hasPostcardToday = true;
+              console.log('[Drafts] Found draft for today - will block camera but NOT unblur posts');
               break;
             }
           }
         }
         
         state.myPosts = posts;
-        state.posted = hasPosted;
+        state.posted = hasPosted;  // Only TRUE if actually posted (unblurs friends)
+        state.hasPostcardToday = hasPostcardToday;  // TRUE if draft OR posted (blocks camera)
         
         // Check for weekly lookback after posts are loaded
         maybeCheckWeeklyLookback();
@@ -3364,8 +3370,8 @@ window.onerror = function(msg, url, line, col, error) {
         }
       }
       
-      // Show CTA to encourage posting (different message if already posted)
-      if (!state.posted) {
+      // Show CTA to encourage posting (hide if draft or posted)
+      if (!state.hasPostcardToday) {
         var cta = el('div', {style: {margin: '0 20px 20px', padding: '24px', borderRadius: '20px', textAlign: 'center', border: '2px dashed ' + t.border, background: t.card}});
         cta.appendChild(el('div', {style: {fontSize: '40px', marginBottom: '8px'}}, '📮'));
         cta.appendChild(el('p', {style: {color: t.text, margin: '0 0 14px', fontSize: '15px'}}, "Share your day to see friends' postcards"));
@@ -3579,8 +3585,8 @@ window.onerror = function(msg, url, line, col, error) {
       // Groups button
       navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '22px', padding: '10px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('groups'); }}, '👥'));
       
-      // + button - disabled if already posted today
-      if (state.posted) {
+      // + button - disabled if already have postcard today (draft OR posted)
+      if (state.hasPostcardToday) {
         var disabledBtn = el('span', {style: {width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#fff', background: t.border, opacity: '0.5'}}, '✓');
         navbar.appendChild(disabledBtn);
       } else {
@@ -3615,8 +3621,8 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Post (Steps 1-4)
     if (state.view === 'post') {
-      // If already posted today, redirect to feed
-      if (state.posted) {
+      // If already have postcard today (draft OR posted), redirect to feed
+      if (state.hasPostcardToday) {
         var page = el('div', {style: {minHeight: '100vh', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center'}});
         page.appendChild(el('div', {style: {fontSize: '64px', marginBottom: '16px'}}, '✅'));
         page.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '22px', fontWeight: '600', color: t.text}}, "You've posted today!"));
