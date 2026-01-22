@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.4';
+var APP_VERSION = '3.0.6';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -430,7 +430,9 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!',
     '3.0.2': '🔧 BUG FIXES: ✅ Duplicate posts fixed - no more ghost posts appearing after upload. ✅ Reactions no longer restart the song - music keeps playing when you react to posts!',
     '3.0.3': '✏️ EDIT SCREEN FIXES: ✅ Song display now shows album artwork + text wrapped at 15 chars (matches final postcard). ✅ Up/down arrows fixed - now move images in the correct direction. ✅ Edit hint is now more prominent so users notice it.',
-    '3.0.4': '🔔 UPDATE NOTIFICATIONS FIXED: ✅ Now shows a prominent popup modal when there is a new update - impossible to miss! The modal shows version number and what changed.'
+    '3.0.4': '🔔 UPDATE NOTIFICATIONS FIXED: ✅ Now shows a prominent popup modal when there is a new update - impossible to miss! The modal shows version number and what changed.',
+    '3.0.5': '🏷️ CUSTOM BADGES: ✅ Badge system now uses customBadge field in Firebase! When users log in, their badge (CREATOR/FOUNDER) is saved to Firebase. You can now change anyone\'s badge directly in Firebase Console → Firestore → users → [user] → customBadge. Set it to anything you want!',
+    '3.0.6': '🏷️ AUTO-BADGE: ✅ Badges are now written to Firebase automatically when loading friends - no login required! Just open the app and all your friends get their customBadge field set. You can then edit them in Firebase Console.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -846,13 +848,32 @@ window.onerror = function(msg, url, line, col, error) {
             console.log('[Migration] Adding email:', state.user.email);
           }
           
+          // Check if this is the creator
+          var isCreator = state.user && state.user.email === 'ashthunter@icloud.com';
+          
           // If account created before migration date, they're a founding member
-          if (shouldBeFounding) {
+          if (isCreator) {
+            updateData.foundingMember = false;
+            updateData.customBadge = 'CREATOR';
+            state.userData.foundingMember = false;
+            state.userData.customBadge = 'CREATOR';
+            
+            console.log('[Migration] ✅ MARKING AS CREATOR');
+            
+            db.collection('users').doc(uid).update(updateData).then(function() {
+              console.log('[Migration] ✅✅✅ SUCCESS! customBadge set to CREATOR in Firebase');
+              render();
+            }).catch(function(err) {
+              console.error('[Migration] ❌❌❌ FAILED to save:', err);
+            });
+          } else if (shouldBeFounding) {
             updateData.foundingMember = true;
             updateData.foundingMemberSince = new Date().toISOString();
+            updateData.customBadge = 'FOUNDER';
             
             // Update state immediately
             state.userData.foundingMember = true;
+            state.userData.customBadge = 'FOUNDER';
             if (updateData.email) state.userData.email = updateData.email;
             
             console.log('[Migration] ✅ MARKING AS FOUNDING MEMBER');
@@ -860,7 +881,7 @@ window.onerror = function(msg, url, line, col, error) {
             
             db.collection('users').doc(uid).update(updateData).then(function() {
               console.log('[Migration] ✅✅✅ SUCCESS! User is now FOUNDING MEMBER in Firebase');
-              console.log('[Migration] Badge should now appear on profile and in feed');
+              console.log('[Migration] customBadge set to FOUNDER - you can edit this in Firebase Console');
               render(); // Force re-render to show badge
             }).catch(function(err) {
               console.error('[Migration] ❌❌❌ FAILED to save:', err);
@@ -1146,6 +1167,26 @@ window.onerror = function(msg, url, line, col, error) {
             var fdata = fDoc.data();
             for (var k in fdata) f[k] = fdata[k];
             f.posts = [];
+            
+            // Auto-write customBadge if friend doesn't have one yet
+            if (!fdata.customBadge) {
+              var badge = null;
+              if (fdata.email === 'ashthunter@icloud.com') {
+                badge = 'CREATOR';
+              } else if (isFoundingMember(fdata)) {
+                badge = 'FOUNDER';
+              }
+              
+              if (badge) {
+                console.log('[Badge] Auto-setting customBadge for', fdata.username || fid, '→', badge);
+                db.collection('users').doc(fid).update({ customBadge: badge }).then(function() {
+                  console.log('[Badge] ✅ Saved customBadge for', fdata.username || fid);
+                  f.customBadge = badge; // Update local state too
+                }).catch(function(err) {
+                  console.error('[Badge] Failed to save customBadge:', err);
+                });
+              }
+            }
             
             // Set up real-time listener for this friend's posts (no orderBy to avoid index requirement)
             var unsubFriendPosts = db.collection('posts')
@@ -3226,12 +3267,40 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Debug: Log owner data to see what we have
     if (owner) {
-      console.log('[Badge Debug] Owner:', owner.username, 'Email:', owner.email, 'createdAt:', owner.createdAt, 'foundingMember field:', owner.foundingMember, 'isFoundingMember():', isFoundingMember(owner));
+      console.log('[Badge Debug] Owner:', owner.username, 'Email:', owner.email, 'customBadge:', owner.customBadge, 'isFoundingMember():', isFoundingMember(owner));
     }
     
-    // Add badge if applicable
-    if (owner && owner.email === 'ashthunter@icloud.com') {
-      // Creator badge - blue, no emoji
+    // Add badge if applicable - check customBadge field first (editable in Firebase Console)
+    if (owner && owner.customBadge) {
+      // Custom badge from Firebase - can be anything you set
+      var badgeColor = '#2196F3'; // Default blue
+      var badgeStyle = {
+        padding: '2px 5px',
+        borderRadius: '3px',
+        color: '#fff',
+        fontSize: '8px',
+        fontWeight: '700',
+        letterSpacing: '0.5px',
+        textTransform: 'uppercase'
+      };
+      
+      // Set color based on badge type
+      if (owner.customBadge === 'CREATOR') {
+        badgeStyle.background = '#2196F3'; // Blue
+      } else if (owner.customBadge === 'FOUNDER') {
+        badgeStyle.background = 'rgba(255,255,255,0.1)';
+        badgeStyle.border = '1px solid rgba(255,255,255,0.15)';
+        badgeStyle.color = t.text;
+        badgeStyle.opacity = '0.7';
+      } else {
+        // Custom badge - use accent color
+        badgeStyle.background = t.accent;
+      }
+      
+      console.log('[Badge] Showing custom badge:', owner.customBadge, 'for', owner.username);
+      userNameRow.appendChild(el('span', {style: badgeStyle}, owner.customBadge));
+    } else if (owner && owner.email === 'ashthunter@icloud.com') {
+      // Fallback: Creator badge - blue
       console.log('[Badge] Showing CREATOR badge for', owner.username);
       userNameRow.appendChild(el('span', {style: {
         padding: '2px 5px',
@@ -3244,9 +3313,8 @@ window.onerror = function(msg, url, line, col, error) {
         textTransform: 'uppercase'
       }}, 'CREATOR'));
     } else if (owner && isFoundingMember(owner)) {
-      // Founding member badge - subtle, no emoji
-      // Works even if user hasn't logged in (checks createdAt date)
-      console.log('[Badge] Showing FOUNDING badge for', owner.username);
+      // Fallback: Founding member badge - subtle
+      console.log('[Badge] Showing FOUNDER badge for', owner.username);
       userNameRow.appendChild(el('span', {style: {
         padding: '2px 5px',
         borderRadius: '3px',
@@ -3260,7 +3328,7 @@ window.onerror = function(msg, url, line, col, error) {
         opacity: '0.7'
       }}, 'FOUNDER'));
     } else if (owner) {
-      console.log('[Badge] NO badge for', owner.username, '- not founding member');
+      console.log('[Badge] NO badge for', owner.username);
     }
     
     meta.appendChild(userNameRow);
@@ -5584,12 +5652,36 @@ window.onerror = function(msg, url, line, col, error) {
       var nameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}});
       nameRow.appendChild(el('h2', {style: {margin: '0', fontSize: '22px', fontWeight: '600', color: t.text}}, state.userData ? state.userData.username : 'User'));
       
-      // Add badge if user has one
-      if (state.userData && state.user) {
-        var userEmail = state.user.email;
+      // Add badge if user has one - check customBadge first
+      if (state.userData) {
+        var badge = state.userData.customBadge;
+        var userEmail = state.user ? state.user.email : '';
         
-        if (userEmail === 'ashthunter@icloud.com') {
-          // Creator badge - blue, no emoji
+        if (badge) {
+          // Custom badge from Firebase
+          var badgeStyle = {
+            padding: '3px 8px',
+            borderRadius: '4px',
+            color: '#fff',
+            fontSize: '10px',
+            fontWeight: '700',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          };
+          
+          if (badge === 'CREATOR') {
+            badgeStyle.background = '#2196F3';
+          } else if (badge === 'FOUNDER') {
+            badgeStyle.background = 'rgba(255,255,255,0.1)';
+            badgeStyle.border = '1px solid rgba(255,255,255,0.2)';
+            badgeStyle.color = t.text;
+          } else {
+            badgeStyle.background = t.accent;
+          }
+          
+          nameRow.appendChild(el('span', {style: badgeStyle}, badge));
+        } else if (userEmail === 'ashthunter@icloud.com') {
+          // Fallback: Creator badge
           nameRow.appendChild(el('span', {style: {
             padding: '3px 8px',
             borderRadius: '4px',
@@ -5601,7 +5693,7 @@ window.onerror = function(msg, url, line, col, error) {
             textTransform: 'uppercase'
           }}, 'CREATOR'));
         } else if (isFoundingMember(state.userData)) {
-          // Founding member badge - uses helper function (works even without Firebase field)
+          // Fallback: Founding member badge
           nameRow.appendChild(el('span', {style: {
             padding: '3px 8px',
             borderRadius: '4px',
@@ -5764,8 +5856,31 @@ window.onerror = function(msg, url, line, col, error) {
                   var nameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}});
                   nameRow.appendChild(el('span', {style: {fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
                   
-                  // Add badge if friend has one
-                  if (friend.email === 'ashthunter@icloud.com') {
+                  // Add badge if friend has one - check customBadge first
+                  if (friend.customBadge) {
+                    var badgeStyle = {
+                      padding: '2px 5px',
+                      borderRadius: '3px',
+                      color: '#fff',
+                      fontSize: '8px',
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase'
+                    };
+                    
+                    if (friend.customBadge === 'CREATOR') {
+                      badgeStyle.background = '#2196F3';
+                    } else if (friend.customBadge === 'FOUNDER') {
+                      badgeStyle.background = 'rgba(255,255,255,0.1)';
+                      badgeStyle.border = '1px solid rgba(255,255,255,0.15)';
+                      badgeStyle.color = t.text;
+                      badgeStyle.opacity = '0.7';
+                    } else {
+                      badgeStyle.background = t.accent;
+                    }
+                    
+                    nameRow.appendChild(el('span', {style: badgeStyle}, friend.customBadge));
+                  } else if (friend.email === 'ashthunter@icloud.com') {
                     nameRow.appendChild(el('span', {style: {
                       padding: '2px 5px',
                       borderRadius: '3px',
@@ -5975,9 +6090,31 @@ window.onerror = function(msg, url, line, col, error) {
       var nameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}});
       nameRow.appendChild(el('h2', {style: {margin: '0', fontSize: '22px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
       
-      // Add badge if friend has one
-      if (friend.email === 'ashthunter@icloud.com') {
-        // Creator badge
+      // Add badge if friend has one - check customBadge first
+      if (friend.customBadge) {
+        var badgeStyle = {
+          padding: '3px 8px',
+          borderRadius: '4px',
+          color: '#fff',
+          fontSize: '10px',
+          fontWeight: '700',
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase'
+        };
+        
+        if (friend.customBadge === 'CREATOR') {
+          badgeStyle.background = '#2196F3';
+        } else if (friend.customBadge === 'FOUNDER') {
+          badgeStyle.background = 'rgba(255,255,255,0.1)';
+          badgeStyle.border = '1px solid rgba(255,255,255,0.2)';
+          badgeStyle.color = t.text;
+        } else {
+          badgeStyle.background = t.accent;
+        }
+        
+        nameRow.appendChild(el('span', {style: badgeStyle}, friend.customBadge));
+      } else if (friend.email === 'ashthunter@icloud.com') {
+        // Fallback: Creator badge
         nameRow.appendChild(el('span', {style: {
           padding: '3px 8px',
           borderRadius: '4px',
@@ -5989,7 +6126,7 @@ window.onerror = function(msg, url, line, col, error) {
           textTransform: 'uppercase'
         }}, 'CREATOR'));
       } else if (isFoundingMember(friend)) {
-        // Founding member badge (works even if they haven't logged in)
+        // Fallback: Founding member badge (works even if they haven't logged in)
         nameRow.appendChild(el('span', {style: {
           padding: '3px 8px',
           borderRadius: '4px',
