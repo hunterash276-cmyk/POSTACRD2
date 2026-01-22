@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.3';
+var APP_VERSION = '1.7.4';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -226,7 +226,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!',
     '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!',
     '1.7.2': '🖼️ COLLAGES FIXED: Collages now clickable for full-screen view! Theme chooser can now CHANGE theme after setting it. Theme chooser sees "Theme set! Everyone can see this" message. All 72 functions intact!',
-    '1.7.3': '🐛 CRITICAL FIXES: Profile button now shows avatar image in bottom nav! Theme NO LONGER disappears when someone joins (moved day reset check to detail view). Collage generation fixed with better photo structure handling + debug logging. All 72 functions intact!'
+    '1.7.3': '🐛 CRITICAL FIXES: Profile button now shows avatar image in bottom nav! Theme NO LONGER disappears when someone joins (moved day reset check to detail view). Collage generation fixed with better photo structure handling + debug logging. All 72 functions intact!',
+    '1.7.4': '🔒 OLDER POSTS BLURRED: Older posts section NOW ALWAYS visible (shows separator so you know if anyone posted today). Both new AND old posts blurred until you post. Group invite notifications fixed with error logging - check console if invite not received!'
   };
 
   var state = {
@@ -1540,13 +1541,19 @@ window.onerror = function(msg, url, line, col, error) {
         db.collection('groups').doc(groupId).update({
           pendingInvites: pending
         }).then(function() {
-          addGroupNotification(friendId, 'group_invite', {
+          console.log('[Group] Sending invite notification to user:', friendId);
+          return addGroupNotification(friendId, 'group_invite', {
             groupId: groupId,
             groupName: group.name,
             invitedBy: state.userData.username,
             invitedById: state.user.uid
           });
+        }).then(function() {
+          console.log('[Group] Invite notification sent successfully');
           alert('Invitation sent!');
+        }).catch(function(e) {
+          console.error('[Group] Error sending invite:', e);
+          alert('Failed to send invitation');
         });
       } else {
         alert('This person is already a member or has been invited');
@@ -1659,12 +1666,19 @@ window.onerror = function(msg, url, line, col, error) {
   
   // Add notification to another user (stored in their user doc or a notifications collection)
   function addGroupNotification(userId, type, data) {
-    db.collection('notifications').add({
+    console.log('[Notification] Adding notification:', {userId: userId, type: type, data: data});
+    return db.collection('notifications').add({
       userId: userId,
       type: type,
       data: data,
       createdAt: new Date().toISOString(),
       read: false
+    }).then(function(docRef) {
+      console.log('[Notification] Added with ID:', docRef.id);
+      return docRef;
+    }).catch(function(e) {
+      console.error('[Notification] Error adding notification:', e);
+      throw e;
     });
   }
   
@@ -2774,68 +2788,107 @@ window.onerror = function(msg, url, line, col, error) {
       }
       page.appendChild(postsWrap);
       
-      // Add separator and older posts section (if user has posted today)
-      if (state.posted) {
-        // Collect older posts (yesterday and before)
-        var olderPosts = [];
-        
-        // My older posts
-        for (var i = 0; i < state.myPosts.length; i++) {
-          if (state.myPosts[i].date !== today) {
+      // Add separator and older posts section (ALWAYS show, blur if not posted)
+      // Collect older posts (yesterday and before)
+      var olderPosts = [];
+      
+      // My older posts
+      for (var i = 0; i < state.myPosts.length; i++) {
+        if (state.myPosts[i].date !== today) {
+          var p = {};
+          for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
+          p.friend = {};
+          if (state.userData) {
+            for (var k in state.userData) p.friend[k] = state.userData[k];
+          }
+          p.friend.id = state.user ? state.user.uid : null;
+          p.isOwn = true;
+          p.isBlurred = !state.posted; // Blur if haven't posted today
+          olderPosts.push(p);
+        }
+      }
+      
+      // Friends' older posts
+      for (var i = 0; i < state.friends.length; i++) {
+        var f = state.friends[i];
+        var friendPosts = f.posts || [];
+        for (var j = 0; j < friendPosts.length; j++) {
+          if (friendPosts[j].date !== today) {
             var p = {};
-            for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
-            p.friend = {};
-            if (state.userData) {
-              for (var k in state.userData) p.friend[k] = state.userData[k];
-            }
-            p.friend.id = state.user ? state.user.uid : null;
+            for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
+            p.friend = f;
+            p.isOwn = false;
+            p.isBlurred = !state.posted; // Blur if haven't posted today
             olderPosts.push(p);
           }
         }
-        
-        // Friends' older posts
-        for (var i = 0; i < state.friends.length; i++) {
-          var f = state.friends[i];
-          var friendPosts = f.posts || [];
-          for (var j = 0; j < friendPosts.length; j++) {
-            if (friendPosts[j].date !== today) {
-              var p = {};
-              for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
-              p.friend = f;
-              olderPosts.push(p);
+      }
+      
+      // Sort older posts by date descending
+      olderPosts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+      
+      // Limit to last 10 older posts
+      olderPosts = olderPosts.slice(0, 10);
+      
+      // ALWAYS show separator (so they can see if anyone posted today)
+      var separator = el('div', {style: {margin: '24px 20px', padding: '16px', borderRadius: '12px', background: t.card, border: '1px solid ' + t.border, textAlign: 'center'}});
+      separator.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, "✨ That's it for today! Here are some older postcards ✨"));
+      page.appendChild(separator);
+      
+      if (olderPosts.length > 0) {
+        // Older posts
+        var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', opacity: '0.7', position: 'relative', zIndex: '1'}});
+        for (var i = 0; i < olderPosts.length; i++) {
+          (function(p) {
+            var isMyPost = state.user && p.userId === state.user.uid;
+            var item = el('div', {style: {position: 'relative'}});
+            
+            var postcard = postcardEl(p, p.friend, {
+              showPrivate: isMyPost,
+              showReactions: false,
+              showReactionsReadOnly: isMyPost,
+              showStamp: false
+            });
+            
+            // Blur older posts if haven't posted today
+            if (p.isBlurred) {
+              postcard.style.filter = 'blur(12px)';
+              postcard.style.pointerEvents = 'none';
             }
-          }
+            
+            item.appendChild(postcard);
+            
+            // Add overlay for blurred older posts
+            if (p.isBlurred) {
+              var overlay = el('div', {style: {
+                position: 'absolute',
+                top: '0',
+                left: '0',
+                right: '0',
+                bottom: '0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.1)',
+                borderRadius: '16px',
+                zIndex: '10'
+              }});
+              overlay.appendChild(el('span', {style: {fontSize: '32px', marginBottom: '8px'}}, '🔒'));
+              overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, 'Post your postcard to see this'));
+              overlay.appendChild(el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '13px', fontWeight: '600'}, onClick: function() { nav('post'); }}, 'Send postcard ✉️'));
+              item.appendChild(overlay);
+            }
+            
+            olderWrap.appendChild(item);
+          })(olderPosts[i]);
         }
-        
-        // Sort older posts by date descending
-        olderPosts.sort(function(a, b) { return b.date.localeCompare(a.date); });
-        
-        // Limit to last 10 older posts
-        olderPosts = olderPosts.slice(0, 10);
-        
-        if (olderPosts.length > 0) {
-          // Separator banner
-          var separator = el('div', {style: {margin: '24px 20px', padding: '16px', borderRadius: '12px', background: t.card, border: '1px solid ' + t.border, textAlign: 'center'}});
-          separator.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, "✨ That's it for today! Here are some older postcards ✨"));
-          page.appendChild(separator);
-          
-          // Older posts
-          var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', opacity: '0.7', position: 'relative', zIndex: '1'}});
-          for (var i = 0; i < olderPosts.length; i++) {
-            (function(p) {
-              var isMyPost = state.user && p.userId === state.user.uid;
-              var item = el('div');
-              item.appendChild(postcardEl(p, p.friend, {
-                showPrivate: isMyPost,
-                showReactions: false,
-                showReactionsReadOnly: isMyPost,
-                showStamp: false
-              }));
-              olderWrap.appendChild(item);
-            })(olderPosts[i]);
-          }
-          page.appendChild(olderWrap);
-        }
+        page.appendChild(olderWrap);
+      } else {
+        // No older posts message
+        var emptyOlder = el('div', {style: {padding: '40px 20px', textAlign: 'center'}});
+        emptyOlder.appendChild(el('p', {style: {color: t.muted, fontSize: '14px'}}, 'No older postcards yet'));
+        page.appendChild(emptyOlder);
       }
       
       var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '12px 16px 30px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', boxShadow: '0 -4px 20px rgba(0,0,0,0.05)', pointerEvents: 'auto'}});
