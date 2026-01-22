@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.7';
+var APP_VERSION = '3.0.9';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -433,7 +433,9 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.4': '🔔 UPDATE NOTIFICATIONS FIXED: ✅ Now shows a prominent popup modal when there is a new update - impossible to miss! The modal shows version number and what changed.',
     '3.0.5': '🏷️ CUSTOM BADGES: ✅ Badge system now uses customBadge field in Firebase! When users log in, their badge (CREATOR/FOUNDER) is saved to Firebase. You can now change anyone\'s badge directly in Firebase Console → Firestore → users → [user] → customBadge. Set it to anything you want!',
     '3.0.6': '🏷️ AUTO-BADGE: ✅ Badges are now written to Firebase automatically when loading friends - no login required! Just open the app and all your friends get their customBadge field set. You can then edit them in Firebase Console.',
-    '3.0.7': '🎨 CUSTOM BADGE COLORS: ✅ You can now set badge colors in Firebase! Add a customBadgeColor field (e.g. #FF5722, #9C27B0, #4CAF50) to any user and the badge background will use that color.'
+    '3.0.7': '🎨 CUSTOM BADGE COLORS: ✅ You can now set badge colors in Firebase! Add a customBadgeColor field (e.g. #FF5722, #9C27B0, #4CAF50) to any user and the badge background will use that color.',
+    '3.0.8': '📜 SCROLL POSITION FIX: ✅ Friend profiles now start at the top (back arrow visible). ✅ When going back from a friend profile, you return to exactly where you were scrolled in the friends list.',
+    '3.0.9': '🎨 PRE-FILLED BADGE COLORS: ✅ customBadgeColor field is now auto-written to Firebase alongside customBadge. CREATOR gets #2196F3 (blue), FOUNDER gets #888888 (gray). Just change the hex code in Firebase to any color you want!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -488,6 +490,7 @@ window.onerror = function(msg, url, line, col, error) {
     friendProfile: null,
     friendCalDate: new Date(),
     friendDayPost: null,
+    savedScrollPosition: 0,  // Save scroll position when entering friend profile
     showAddFriend: false,
     friendCode: '',
     activeEdit: null,
@@ -856,8 +859,10 @@ window.onerror = function(msg, url, line, col, error) {
           if (isCreator) {
             updateData.foundingMember = false;
             updateData.customBadge = 'CREATOR';
+            updateData.customBadgeColor = '#2196F3'; // Blue
             state.userData.foundingMember = false;
             state.userData.customBadge = 'CREATOR';
+            state.userData.customBadgeColor = '#2196F3';
             
             console.log('[Migration] ✅ MARKING AS CREATOR');
             
@@ -871,10 +876,12 @@ window.onerror = function(msg, url, line, col, error) {
             updateData.foundingMember = true;
             updateData.foundingMemberSince = new Date().toISOString();
             updateData.customBadge = 'FOUNDER';
+            updateData.customBadgeColor = '#888888'; // Gray (change to any color)
             
             // Update state immediately
             state.userData.foundingMember = true;
             state.userData.customBadge = 'FOUNDER';
+            state.userData.customBadgeColor = '#888888';
             if (updateData.email) state.userData.email = updateData.email;
             
             console.log('[Migration] ✅ MARKING AS FOUNDING MEMBER');
@@ -1169,20 +1176,44 @@ window.onerror = function(msg, url, line, col, error) {
             for (var k in fdata) f[k] = fdata[k];
             f.posts = [];
             
-            // Auto-write customBadge if friend doesn't have one yet
-            if (!fdata.customBadge) {
-              var badge = null;
-              if (fdata.email === 'ashthunter@icloud.com') {
-                badge = 'CREATOR';
-              } else if (isFoundingMember(fdata)) {
-                badge = 'FOUNDER';
+            // Auto-write customBadge and customBadgeColor if missing
+            if (!fdata.customBadge || !fdata.customBadgeColor) {
+              var badge = fdata.customBadge || null;
+              var badgeColor = fdata.customBadgeColor || null;
+              var needsUpdate = false;
+              
+              // Determine badge if missing
+              if (!badge) {
+                if (fdata.email === 'ashthunter@icloud.com') {
+                  badge = 'CREATOR';
+                } else if (isFoundingMember(fdata)) {
+                  badge = 'FOUNDER';
+                }
               }
               
-              if (badge) {
-                console.log('[Badge] Auto-setting customBadge for', fdata.username || fid, '→', badge);
-                db.collection('users').doc(fid).update({ customBadge: badge }).then(function() {
-                  console.log('[Badge] ✅ Saved customBadge for', fdata.username || fid);
-                  f.customBadge = badge; // Update local state too
+              // Determine color if missing (based on badge type)
+              if (badge && !badgeColor) {
+                if (badge === 'CREATOR') {
+                  badgeColor = '#2196F3'; // Blue
+                } else if (badge === 'FOUNDER') {
+                  badgeColor = '#888888'; // Gray
+                } else {
+                  badgeColor = '#E07A5F'; // Accent color for custom badges
+                }
+                needsUpdate = true;
+              }
+              
+              // Also update if badge was missing
+              if (!fdata.customBadge && badge) {
+                needsUpdate = true;
+              }
+              
+              if (needsUpdate && badge) {
+                console.log('[Badge] Auto-setting for', fdata.username || fid, '→', badge, badgeColor);
+                db.collection('users').doc(fid).update({ customBadge: badge, customBadgeColor: badgeColor }).then(function() {
+                  console.log('[Badge] ✅ Saved customBadge + customBadgeColor for', fdata.username || fid);
+                  f.customBadge = badge;
+                  f.customBadgeColor = badgeColor;
                 }).catch(function(err) {
                   console.error('[Badge] Failed to save customBadge:', err);
                 });
@@ -5848,7 +5879,11 @@ window.onerror = function(msg, url, line, col, error) {
             } else {
               for (var i = 0; i < filteredFriends.length; i++) {
                 (function(friend, idx) {
-                  var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: idx < filteredFriends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
+                  var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: idx < filteredFriends.length - 1 ? '8px' : '0'}, onClick: function() { 
+                    var scrollPos = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+                    setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile', savedScrollPosition: scrollPos}); 
+                    setTimeout(function() { window.scrollTo(0, 0); }, 0);
+                  }});
                   
                   if (friend.avatar) {
                     friendItem.appendChild(cachedImage(friend.avatar, {style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
@@ -6082,7 +6117,11 @@ window.onerror = function(msg, url, line, col, error) {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('profile'); }}, '←'));
+      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { 
+        var scrollPos = state.savedScrollPosition;
+        nav('profile'); 
+        setTimeout(function() { window.scrollTo(0, scrollPos); }, 0);
+      }}, '←'));
       header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
       header.appendChild(el('div', {style: {width: '48px'}}));
       page.appendChild(header);
