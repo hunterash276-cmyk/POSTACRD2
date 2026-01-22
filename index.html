@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.1';
+var APP_VERSION = '1.7.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -224,7 +224,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.6.1': '🔊 BUTTON FIXED: Enable audio button now has 200ms delay for DOM, comprehensive logging, uses display:none instead of remove(). Added tap class. Console shows exactly what happens. BUTTON ACTUALLY WORKS NOW!',
     '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!',
     '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!',
-    '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!'
+    '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!',
+    '1.7.2': '🖼️ COLLAGES FIXED: Collages now clickable for full-screen view! Theme chooser can now CHANGE theme after setting it. Theme chooser sees "Theme set! Everyone can see this" message. All 72 functions intact!'
   };
 
   var state = {
@@ -2452,6 +2453,22 @@ window.onerror = function(msg, url, line, col, error) {
       return; // Don't render anything else
     }
     
+    // Collage viewer modal
+    if (state.viewingCollage) {
+      var modal = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: '10000', padding: '20px'}, onClick: function() { setState({viewingCollage: null}); }});
+      
+      var closeBtn = el('span', {className: 'tap', style: {position: 'absolute', top: '20px', right: '20px', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function(e) { e.stopPropagation(); setState({viewingCollage: null}); }}, '×');
+      modal.appendChild(closeBtn);
+      
+      var img = el('img', {src: state.viewingCollage, style: {maxWidth: '100%', maxHeight: '90vh', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,.5)'}});
+      modal.appendChild(img);
+      
+      modal.appendChild(el('p', {style: {color: '#aaa', fontSize: '13px', marginTop: '16px', textAlign: 'center'}}, 'Tap anywhere to close'));
+      
+      app.appendChild(modal);
+      return;
+    }
+    
     // Saving overlay
     if (state.saving) {
       var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '1000'}});
@@ -3738,13 +3755,25 @@ window.onerror = function(msg, url, line, col, error) {
           challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', color: t.accent, fontWeight: '600'}}, '👑 You are today\'s Theme Chooser!'));
           
           if (!group.theme) {
-            // Theme input
+            // Theme input - hasn't set theme yet
             var themeInput = el('input', {placeholder: 'Set today\'s theme (max 100 chars)', value: state.groupTheme, maxLength: 100, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.accent, background: t.bg, fontSize: '14px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '10px'}});
             themeInput.oninput = function(e) { state.groupTheme = e.target.value; };
             challengeBox.appendChild(themeInput);
             challengeBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '12px', borderRadius: '10px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: '14px'}, onClick: function() { if (state.groupTheme.trim()) setGroupTheme(group.id, state.groupTheme.trim()); }}, 'Set Theme'));
           } else {
-            challengeBox.appendChild(el('p', {style: {margin: '0', fontSize: '18px', fontWeight: '600', color: t.text, textAlign: 'center', padding: '12px', background: t.bg, borderRadius: '10px'}}, '🎯 "' + group.theme + '"'));
+            // Theme is set - show it with option to change
+            challengeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '18px', fontWeight: '600', color: t.text, textAlign: 'center', padding: '12px', background: t.bg, borderRadius: '10px'}}, '🎯 "' + group.theme + '"'));
+            challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: t.muted, textAlign: 'center'}}, 'Theme set! Everyone can see this.'));
+            
+            // Add button to change theme
+            challengeBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.bg, color: t.text, textAlign: 'center', fontWeight: '500', fontSize: '13px', border: '1px solid ' + t.border}, onClick: function() {
+              // Clear theme so they can set a new one
+              db.collection('groups').doc(group.id).update({
+                theme: firebase.firestore.FieldValue.delete()
+              }).then(function() {
+                loadGroups(state.user.uid);
+              });
+            }}, 'Change Theme'));
           }
         } else {
           // Show who is theme chooser
@@ -4088,8 +4117,11 @@ window.onerror = function(msg, url, line, col, error) {
               dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
               
               if (collage && collage.url) {
-                // Show the collage image
-                dayItem.appendChild(el('img', {src: collage.url, style: {width: '100%', borderRadius: '10px', display: 'block'}}));
+                // Show the collage image - clickable for full view
+                var collageImg = el('img', {className: 'tap', src: collage.url, style: {width: '100%', borderRadius: '10px', display: 'block', cursor: 'pointer'}, onClick: function() {
+                  setState({viewingCollage: collage.url});
+                }});
+                dayItem.appendChild(collageImg);
               } else if (dayPhotos && photoCount > 0) {
                 // No collage yet, show photos grid and generate button
                 var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px'}});
