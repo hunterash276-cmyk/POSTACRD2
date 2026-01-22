@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.3';
+var APP_VERSION = '1.8.4';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -49,7 +49,7 @@ var APP_VERSION = '1.8.3';
 //   'https://corsproxy.io/?' 
 //   'https://cors-anywhere.herokuapp.com/'
 //   null (direct API - will be blocked by CORS)
-var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
+var ITUNES_PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -233,7 +233,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.0': '🔒 FINAL VERSION: REMOVED "Change Theme" button - once set, theme is FINAL! Older posts separator ALWAYS shows. Both today and older posts blurred until you post. All 72 functions verified. Everything working as requested!',
     '1.8.1': '🎵 MANUAL ENTRY REMOVED: Deleted manual song entry completely (it never played music anyway). 📸 SELFIE FLIP FIXED: Outfit/selfie photos now flipped horizontally so they match what you saw on screen! All 72 functions intact.',
     '1.8.2': '🎵 ITUNES SEARCH FIXED: Switched from allOrigins to corsproxy.io proxy (more reliable). Fixed response parsing for new proxy. Fixed error messages. iTunes search should work now! Check console (F12) if issues.',
-    '1.8.3': '🔧 CRITICAL REVERT: REVERTED iTunes proxy back to allOrigins (the one that WORKED before). Fixed camera flip properly with ctx.save/restore. Added collage feedback alerts. I broke things by changing what worked - NOW FIXED!'
+    '1.8.3': '🔧 CRITICAL REVERT: REVERTED iTunes proxy back to allOrigins (the one that WORKED before). Fixed camera flip properly with ctx.save/restore. Added collage feedback alerts. I broke things by changing what worked - NOW FIXED!',
+    '1.8.4': '🔧 HONEST FIXES: Camera flip REMOVED (phone handles it correctly). iTunes proxy changed to thingproxy (more stable). Collage now shows ALERT with photo count and structure so you can see if photos saved. Being methodical now!'
   };
 
   var state = {
@@ -1194,9 +1195,9 @@ window.onerror = function(msg, url, line, col, error) {
     // Use proxy if configured
     var url;
     if (ITUNES_PROXY_URL) {
-      // corsproxy.io format: https://corsproxy.io/?url
-      url = ITUNES_PROXY_URL + encodeURIComponent(itunesUrl);
-      console.log('[iTunes] Using CORS proxy:', url);
+      // thingproxy format: https://thingproxy.freeboard.io/fetch/URL
+      url = ITUNES_PROXY_URL + itunesUrl;
+      console.log('[iTunes] Using thingproxy:', url);
     } else {
       url = itunesUrl;
       console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
@@ -2997,36 +2998,11 @@ window.onerror = function(msg, url, line, col, error) {
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  // For outfit/selfie photos, always flip them
-                  // Front-facing cameras save images mirrored
-                  if (k === 'outfit') {
-                    var img = new Image();
-                    img.onload = function() {
-                      // Create canvas to flip the image
-                      var canvas = document.createElement('canvas');
-                      canvas.width = img.width;
-                      canvas.height = img.height;
-                      var ctx = canvas.getContext('2d');
-                      
-                      // Flip horizontally
-                      ctx.save();
-                      ctx.scale(-1, 1);
-                      ctx.drawImage(img, -img.width, 0);
-                      ctx.restore();
-                      
-                      // Get flipped image as data URL
-                      var flippedUrl = canvas.toDataURL('image/jpeg', 0.95);
-                      var upd = {};
-                      upd[k] = flippedUrl;
-                      setNp(upd);
-                    };
-                    img.src = r.result;
-                  } else {
-                    // Don't flip the other photo
-                    var upd = {};
-                    upd[k] = r.result;
-                    setNp(upd);
-                  }
+                  // For outfit/selfie photos, DON'T flip them
+                  // The phone already handles the mirroring correctly
+                  var upd = {};
+                  upd[k] = r.result;
+                  setNp(upd);
                 };
                 r.readAsDataURL(f);
               }
@@ -4235,10 +4211,28 @@ window.onerror = function(msg, url, line, col, error) {
                 
                 // Button to generate collage
                 dayItem.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.accent, color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '500'}, onClick: function() {
-                  console.log('[Collage] Button clicked for date:', date);
-                  console.log('[Collage] Photos data:', dayPhotos);
+                  // Show what we have
+                  var photoCount = 0;
+                  var userIds = [];
+                  for (var uid in dayPhotos) {
+                    photoCount++;
+                    userIds.push(uid);
+                  }
+                  
+                  var msg = 'Found ' + photoCount + ' photo(s) for ' + date + '\n';
+                  msg += 'User IDs: ' + userIds.join(', ') + '\n\n';
+                  
+                  if (photoCount === 0) {
+                    alert('NO PHOTOS FOUND! Photos were not saved to Firestore.');
+                    return;
+                  }
+                  
+                  // Check first photo structure
+                  var firstPhoto = dayPhotos[userIds[0]];
+                  msg += 'First photo structure:\n' + JSON.stringify(firstPhoto, null, 2);
+                  alert(msg);
+                  
                   generateGroupCollage(group.id, date, dayPhotos);
-                  alert('Generating collage... Check browser console (F12) for progress. Reload page in 10 seconds!');
                 }}, '🖼️ Generate Collage'));
               }
               
