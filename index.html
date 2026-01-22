@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.7';
+var APP_VERSION = '2.7.8';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -268,7 +268,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.4': '🚫 DUPLICATE FIX (CRITICAL): ✅ FINALLY FIXED duplicates! uploadPost now checks Firebase BEFORE uploading. Checks state.myPosts AND queries Firebase for today\'s date. Rejects with error if duplicate found. Will NOT waste storage/money on duplicates anymore! 🔤 iTunes search confirmed case-insensitive (always was). "dont look back" = "DONT LOOK BACK".',
     '2.7.5': '🔓 DRAFT FIX (CRITICAL): ✅ FIXED! Draft now ONLY blocks camera (can\'t make 2nd postcard) BUT friends\' posts STAY BLURRED until you UPLOAD the draft! Two states: posted (unblurs) vs hasPostcardToday (blocks camera). Draft = can\'t use camera BUT still see blurred posts. Upload draft = posts unblur! Exactly as requested!',
     '2.7.6': '🎵 AUDIO FIX (CRITICAL): ✅ FIXED wrong audio playing! IntersectionObserver now plays MOST VISIBLE post only (>50% visible). Calculates visibility ratio for each post. Prevents edge cases where 2 posts partially visible. Requires 50% visibility minimum. Multiple threshold checks (0-100%). Audio matches correct post now!',
-    '2.7.7': '🏆 BADGE FIX (CRITICAL): ✅ ALL current users (created before Jan 24, 2026) get FOUNDING MEMBER badge! Migration runs EVERY login (not just once). Added DETAILED logging. Console shows: email, createdAt, shouldBeFounding, migration status. Friends MUST LOG IN to get badge (migration only runs on their login). Badge shows in feed + profile. Tell friends to refresh app!'
+    '2.7.7': '🏆 BADGE FIX (CRITICAL): ✅ ALL current users (created before Jan 24, 2026) get FOUNDING MEMBER badge! Migration runs EVERY login (not just once). Added DETAILED logging. Console shows: email, createdAt, shouldBeFounding, migration status. Friends MUST LOG IN to get badge (migration only runs on their login). Badge shows in feed + profile. Tell friends to refresh app!',
+    '2.7.8': '✏️ EDIT DRAFT FIX (CRITICAL): ✅ Edit button NOW WORKS! Opens FULL upload flow (view: "post" not "feed"). Goes through all 4 steps. When you tap "Send" it UPLOADS and DELETES the draft! Added editingDraftId tracking. Clears editing state after upload. Console logging added. Can now actually edit and upload drafts!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1714,6 +1715,13 @@ window.onerror = function(msg, url, line, col, error) {
     }).then(function() {
       console.log('[Submit] Post created successfully');
       
+      // If we were editing a draft, delete it now (since it's been uploaded)
+      if (state.editingDraftId) {
+        console.log('[Submit] Deleting edited draft:', state.editingDraftId);
+        deleteDraft(state.editingDraftId);
+        loadSavedDrafts();  // Refresh drafts list
+      }
+      
       // Clear draft from localStorage after successful post
       try {
         localStorage.removeItem('postcard_draft_' + state.user.uid);
@@ -1726,6 +1734,8 @@ window.onerror = function(msg, url, line, col, error) {
         posted: true,
         uploading: false,
         step: 1,
+        editingDraftId: null,  // Clear editing state
+        editingDraftDate: null,
         np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0}
       });
       nav('feed');
@@ -4122,12 +4132,15 @@ window.onerror = function(msg, url, line, col, error) {
                 songColor: draft.songColor || 0
               };
               
-              // Store draft ID to update instead of creating new
+              // Store draft ID so we know we're editing (will delete on upload)
               state.editingDraftId = draft.id;
               state.editingDraftDate = draft.date;
               
-              // Go to step 1 (upload page) so they can see everything
-              setState({step: 1, view: 'feed'});
+              console.log('[Drafts] Edit button clicked - opening upload flow');
+              console.log('[Drafts] Editing draft ID:', draft.id);
+              
+              // Go to step 1 of POST VIEW so they can go through full upload flow
+              setState({step: 1, view: 'post'});
             }}, '✏️ Edit'));
             
             // Upload button - text changes based on date
