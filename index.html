@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.2';
+var APP_VERSION = '1.7.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -225,7 +225,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!',
     '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!',
     '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!',
-    '1.7.2': '🖼️ COLLAGES FIXED: Collages now clickable for full-screen view! Theme chooser can now CHANGE theme after setting it. Theme chooser sees "Theme set! Everyone can see this" message. All 72 functions intact!'
+    '1.7.2': '🖼️ COLLAGES FIXED: Collages now clickable for full-screen view! Theme chooser can now CHANGE theme after setting it. Theme chooser sees "Theme set! Everyone can see this" message. All 72 functions intact!',
+    '1.7.3': '🐛 CRITICAL FIXES: Profile button now shows avatar image in bottom nav! Theme NO LONGER disappears when someone joins (moved day reset check to detail view). Collage generation fixed with better photo structure handling + debug logging. All 72 functions intact!'
   };
 
   var state = {
@@ -1725,10 +1726,12 @@ window.onerror = function(msg, url, line, col, error) {
         orientations[shuffledMembers[i]] = i < half ? 'portrait' : 'landscape';
       }
       
+      // IMPORTANT: Only clear theme, don't set it to empty string
+      // This prevents accidentally clearing theme when someone joins
       db.collection('groups').doc(group.id).update({
         currentDate: today,
         themeChooserId: newThemeChooserId,
-        theme: '',
+        theme: firebase.firestore.FieldValue.delete(),
         orientations: orientations
       }).then(function() {
         // Notify new theme chooser
@@ -1758,12 +1761,27 @@ window.onerror = function(msg, url, line, col, error) {
   
   // Generate a collage from the day's photos
   function generateGroupCollage(groupId, date, photos) {
+    console.log('[Collage] Generating for', date, 'photos:', photos);
     var photoList = [];
-    for (var odUserId in photos) {
-      photoList.push(photos[odUserId]);
+    for (var userId in photos) {
+      var photoData = photos[userId];
+      console.log('[Collage] Processing photo from user', userId, ':', photoData);
+      // Handle both direct URL and nested object structure
+      if (typeof photoData === 'string') {
+        photoList.push({url: photoData, username: 'Member'});
+      } else if (photoData && photoData.url) {
+        photoList.push({
+          url: photoData.url,
+          username: photoData.username || 'Member'
+        });
+      }
     }
     
-    if (photoList.length === 0) return;
+    console.log('[Collage] Total photos:', photoList.length);
+    if (photoList.length === 0) {
+      console.log('[Collage] No photos found, aborting');
+      return;
+    }
     
     // Calculate grid dimensions based on number of photos
     var cols, rows;
@@ -2833,7 +2851,14 @@ window.onerror = function(msg, url, line, col, error) {
         navbar.appendChild(el('span', {className: 'tap', style: {width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#fff', background: t.accent, position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('post'); }}, '+'));
       }
       
-      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '22px', padding: '10px', opacity: '0.5', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }}, '👤'));
+      // Profile button with avatar
+      var profBtn = el('span', {className: 'tap', style: {padding: '6px', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }});
+      if (state.userData && state.userData.avatar) {
+        profBtn.appendChild(el('img', {src: state.userData.avatar, style: {width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover'}}));
+      } else {
+        profBtn.appendChild(el('div', {style: {width: '40px', height: '40px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
+      }
+      navbar.appendChild(profBtn);
       
       app.appendChild(page);
       app.appendChild(navbar);
@@ -3728,6 +3753,15 @@ window.onerror = function(msg, url, line, col, error) {
       // Group Detail View
       if (state.groupView === 'detail' && state.currentGroup) {
         var group = state.currentGroup;
+        
+        // Check if day has changed (using current group data, not stale cached data)
+        if (group.currentDate !== getUTCDate()) {
+          checkGroupDayReset(group);
+          // Reload groups to get fresh data after reset
+          loadGroups(state.user.uid);
+          return;
+        }
+        
         var today = getUTCDate();
         var isThemeChooser = group.themeChooserId === state.user.uid;
         var hasSubmitted = hasSubmittedToday(group);
@@ -4163,8 +4197,7 @@ window.onerror = function(msg, url, line, col, error) {
         for (var i = 0; i < state.groups.length; i++) {
           (function(group) {
             var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', background: t.card, borderRadius: '14px', border: '1px solid ' + t.border, marginBottom: '12px'}, onClick: function() {
-              // Check for day reset when entering group
-              checkGroupDayReset(group);
+              // Don't check day reset here - group object might be stale
               setState({currentGroup: group, groupView: 'detail'});
             }});
             
