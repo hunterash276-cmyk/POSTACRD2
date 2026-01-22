@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.2';
+var APP_VERSION = '2.8.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -293,7 +293,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.9': '🏆 BADGES EVERYWHERE (CRITICAL): ✅ CLIENT-SIDE badge logic! New isFoundingMember() function checks createdAt date. NO LOGIN NEEDED! Works even if friends haven\'t logged in. Badges show: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Creator + Founding badges visible to EVERYONE. All users created before Jan 24, 2026 get badges NOW!',
     '2.8.0': '✏️ DRAFT EDITING FIXED (CRITICAL): ✅ Edit bypasses "posted today" check! ✅ Preserves ORIGINAL draft date. ✅ Smart button: same day="Upload to Feed", past midnight="Upload to Calendar". ✅ If offline while editing, can save as draft again. ✅ Uploads with original date to calendar. ✅ Deletes draft after upload. WORKS EXACTLY AS DESIGNED!',
     '2.8.1': '🏷️ BADGE TEXT: Changed all "FOUNDING" badges to "FOUNDER". Shows in: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Cleaner, shorter text!',
-    '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!'
+    '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!',
+    '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3517,7 +3518,7 @@ window.onerror = function(msg, url, line, col, error) {
         page.appendChild(empty);
       }
       
-      var postsWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', zIndex: '1'}});
+      var postsWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', zIndex: '1'}});
       for (var i = 0; i < posts.length; i++) {
         (function(p) {
           var isMyPost = state.user && p.userId === state.user.uid;
@@ -5883,97 +5884,100 @@ window.onerror = function(msg, url, line, col, error) {
       currentlyPlayingAudio = null;
     }
     
-    audioObserver = new IntersectionObserver(function(entries) {
-      // Find the MOST VISIBLE post (highest intersection ratio)
-      var mostVisible = null;
-      var highestRatio = 0;
+    // Function to find and play the most visible postcard
+    var checkAndPlayAudio = function() {
+      var postcards = document.querySelectorAll('[data-postcard-with-audio]');
+      if (postcards.length === 0) return;
       
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting && entry.intersectionRatio > highestRatio) {
-          highestRatio = entry.intersectionRatio;
-          mostVisible = entry;
-        }
-      });
+      var windowHeight = window.innerHeight || document.documentElement.clientHeight;
+      var windowCenter = windowHeight / 2;
       
-      // Only play audio for the MOST visible post
-      entries.forEach(function(entry) {
-        var audio = entry.target.querySelector('audio');
-        if (!audio) return;
+      var bestCard = null;
+      var bestScore = -999999;
+      
+      // Find the card whose CENTER is closest to viewport center
+      for (var i = 0; i < postcards.length; i++) {
+        var card = postcards[i];
+        var rect = card.getBoundingClientRect();
         
-        // This is the most visible post - play it
-        if (entry === mostVisible && entry.intersectionRatio > 0.5) {
-          // Need at least 50% visible to play
-          if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
+        // Calculate card center
+        var cardCenter = rect.top + (rect.height / 2);
+        
+        // Check if card is at least partially visible
+        var isVisible = rect.bottom > 0 && rect.top < windowHeight;
+        if (!isVisible) continue;
+        
+        // Calculate how close card center is to viewport center
+        var distanceFromCenter = Math.abs(cardCenter - windowCenter);
+        
+        // Calculate visibility percentage
+        var visibleTop = Math.max(rect.top, 0);
+        var visibleBottom = Math.min(rect.bottom, windowHeight);
+        var visibleHeight = Math.max(0, visibleBottom - visibleTop);
+        var visibilityRatio = visibleHeight / rect.height;
+        
+        // Score: prefer cards near center AND highly visible
+        // Lower distance = better, higher visibility = better
+        var score = (visibilityRatio * 1000) - distanceFromCenter;
+        
+        if (score > bestScore && visibilityRatio > 0.3) {
+          bestScore = score;
+          bestCard = card;
+        }
+      }
+      
+      // Play audio for the best card
+      if (bestCard) {
+        var audio = bestCard.querySelector('audio');
+        if (audio && currentlyPlayingAudio !== audio) {
+          // Stop old audio
+          if (currentlyPlayingAudio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
           }
           
+          // Play new audio
+          console.log('[Audio] Playing audio for card:', bestCard.getAttribute('data-postcard-with-audio'));
           audio.play().catch(function(e) {
             // Silently fail if browser blocks autoplay
           });
           currentlyPlayingAudio = audio;
-        } else {
-          // Not the most visible, or not visible enough - stop this audio
-          if (currentlyPlayingAudio === audio) {
-            audio.pause();
-            audio.currentTime = 0;
-            currentlyPlayingAudio = null;
-          }
         }
-      });
+      } else {
+        // No card is visible enough, stop audio
+        if (currentlyPlayingAudio) {
+          currentlyPlayingAudio.pause();
+          currentlyPlayingAudio.currentTime = 0;
+          currentlyPlayingAudio = null;
+        }
+      }
+    };
+    
+    // Use IntersectionObserver just to trigger checks
+    audioObserver = new IntersectionObserver(function(entries) {
+      checkAndPlayAudio();
     }, {
-      threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], // Check visibility at many points
+      threshold: [0, 0.5, 1.0],
       rootMargin: '0px'
     });
     
-    // Observe all postcards with audio
+    // Observe all postcards
     var postcards = document.querySelectorAll('[data-postcard-with-audio]');
     postcards.forEach(function(card) {
       audioObserver.observe(card);
     });
     
-    // Try to play first visible post (will work after user interaction)
-    var playFirstVisible = function() {
-      if (currentlyPlayingAudio) return;
-      
-      var postcards = document.querySelectorAll('[data-postcard-with-audio]');
-      var mostVisibleCard = null;
-      var highestVisibility = 0;
-      
-      for (var i = 0; i < postcards.length; i++) {
-        var card = postcards[i];
-        var rect = card.getBoundingClientRect();
-        var windowHeight = window.innerHeight || document.documentElement.clientHeight;
-        
-        // Calculate what % of the card is visible
-        var visibleTop = Math.max(rect.top, 0);
-        var visibleBottom = Math.min(rect.bottom, windowHeight);
-        var visibleHeight = Math.max(0, visibleBottom - visibleTop);
-        var cardHeight = rect.height;
-        var visibilityRatio = cardHeight > 0 ? (visibleHeight / cardHeight) : 0;
-        
-        if (visibilityRatio > highestVisibility) {
-          highestVisibility = visibilityRatio;
-          mostVisibleCard = card;
-        }
-      }
-      
-      // Play the MOST visible card's audio
-      if (mostVisibleCard && highestVisibility > 0.5) {
-        var audio = mostVisibleCard.querySelector('audio');
-        if (audio) {
-          audio.play().catch(function() {
-            // Silently fail - will work after user interaction
-          });
-          currentlyPlayingAudio = audio;
-        }
-      }
-    };
+    // Also check on scroll
+    var scrollTimeout;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(checkAndPlayAudio, 50);
+    });
     
-    // Try multiple times
-    setTimeout(playFirstVisible, 50);
-    setTimeout(playFirstVisible, 150);
-    setTimeout(playFirstVisible, 300);
+    // Initial check
+    setTimeout(checkAndPlayAudio, 100);
+    setTimeout(checkAndPlayAudio, 300);
+    setTimeout(checkAndPlayAudio, 600);
   }
   
   // Call setupAudioObserver after each render
