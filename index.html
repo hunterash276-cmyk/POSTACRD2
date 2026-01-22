@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.5';
+var APP_VERSION = '2.8.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -296,7 +296,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!',
     '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!',
     '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!',
-    '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.'
+    '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.',
+    '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1884,94 +1885,92 @@ window.onerror = function(msg, url, line, col, error) {
 
   function searchItunes() {
     var query = state.itunesSearch.trim();
-    console.log('[iTunes] Search initiated with query:', query);
-    if (!query) {
-      console.log('[iTunes] Search aborted: empty query');
-      return;
-    }
+    if (!query) return;
+    
+    // Show loading state immediately
     setState({itunesSearching: true, itunesResults: []});
     
-    // iTunes API is case-insensitive, but we normalize for consistency
-    // "dont look back" and "DONT LOOK BACK" will give same results
-    console.log('[iTunes] Query is case-insensitive');
+    // iTunes API URL - request 50 results to filter for best 10
+    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=50';
     
-    // Build iTunes URL with more results for better matches
-    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=25';
+    // Use CORS proxy
+    var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(itunesUrl);
     
-    // Use proxy if configured
-    var url;
-    if (ITUNES_PROXY_URL) {
-      // allOrigins format: https://api.allorigins.win/raw?url=ENCODED_URL
-      url = ITUNES_PROXY_URL + encodeURIComponent(itunesUrl);
-      console.log('[iTunes] Using allOrigins proxy:', url);
-    } else {
-      url = itunesUrl;
-      console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
-    }
-    
-    // Add timeout with abort controller (15 seconds)
+    // 10 second timeout (faster than before)
     var controller = new AbortController();
     var timeoutId = setTimeout(function() {
       controller.abort();
-      console.log('[iTunes] Request timed out after 15 seconds');
-    }, 15000);
+    }, 10000);
     
-    fetch(url, { signal: controller.signal })
+    fetch(proxyUrl, { signal: controller.signal })
       .then(function(response) { 
         clearTimeout(timeoutId);
-        console.log('[iTunes] Response received, status:', response.status);
-        if (!response.ok) {
-          throw new Error('HTTP ' + response.status);
-        }
+        if (!response.ok) throw new Error('Search failed');
         return response.json(); 
       })
       .then(function(data) {
-        console.log('[iTunes] Data parsed successfully');
-        
-        // Handle both direct iTunes response and proxy response
-        var results = [];
-        if (data && data.results) {
-          results = data.results;
-        } else if (Array.isArray(data)) {
-          results = data;
-        }
-        
-        console.log('[iTunes] Results count:', results.length);
+        var results = data.results || [];
         
         if (results.length === 0) {
-          // No results found
-          alert('No songs found for "' + query + '". Try:\n\n• Adding more words (e.g. "dont look back in anger")\n• Including artist name\n• Checking spelling\n\nOr skip music if offline.');
           setState({itunesResults: [], itunesSearching: false});
-        } else {
-          setState({itunesResults: results, itunesSearching: false});
-          console.log('[iTunes] State updated with', results.length, 'results');
+          alert('No songs found. Try different search terms.');
+          return;
         }
+        
+        // RELEVANCE SCORING: Rank results by how well they match the query
+        var scoredResults = results.map(function(song) {
+          var score = 0;
+          var searchLower = query.toLowerCase();
+          var trackLower = (song.trackName || '').toLowerCase();
+          var artistLower = (song.artistName || '').toLowerCase();
+          
+          // Exact match = highest score
+          if (trackLower === searchLower) score += 1000;
+          if (artistLower === searchLower) score += 500;
+          
+          // Track starts with query = very high score
+          if (trackLower.indexOf(searchLower) === 0) score += 800;
+          
+          // Track contains query = high score
+          if (trackLower.indexOf(searchLower) > -1) score += 600;
+          
+          // Artist contains query = medium score
+          if (artistLower.indexOf(searchLower) > -1) score += 400;
+          
+          // Check individual words for partial matches
+          var words = searchLower.split(' ');
+          words.forEach(function(word) {
+            if (word.length > 2) {
+              if (trackLower.indexOf(word) > -1) score += 200;
+              if (artistLower.indexOf(word) > -1) score += 100;
+            }
+          });
+          
+          // Boost if has preview URL (we can play it)
+          if (song.previewUrl) score += 50;
+          
+          return { song: song, score: score };
+        });
+        
+        // Sort by score (highest first)
+        scoredResults.sort(function(a, b) { return b.score - a.score; });
+        
+        // Take top 10 ONLY
+        var top10 = scoredResults.slice(0, 10).map(function(item) { return item.song; });
+        
+        setState({itunesResults: top10, itunesSearching: false});
       })
       .catch(function(e) {
         clearTimeout(timeoutId);
-        console.error('[iTunes] Search error:', e);
         
-        // Provide helpful error message based on error type
-        var errorMsg = '🎵 iTunes Search Issue\n\n';
-        
+        var msg = 'Search failed. ';
         if (e.name === 'AbortError') {
-          errorMsg += 'Search timed out (took too long).\n\nTry:\n• Using more specific search terms\n• Checking your internet connection\n• Skipping music for now';
-          console.log('[iTunes] Timeout/abort error');
-        } else if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed'))) {
-          errorMsg += 'Could not connect to iTunes.\n\nTry:\n• Checking your internet\n• Trying again in a moment\n• Skipping music (offline mode)';
-          console.log('[iTunes] Network/CORS error detected');
-        } else if (e.message && e.message.includes('HTTP')) {
-          errorMsg += 'iTunes service unavailable (Error ' + e.message + ').\n\nTry:\n• Waiting a moment\n• Skipping music';
-          console.log('[iTunes] HTTP error:', e.message);
-        } else if (e.message && e.message.includes('JSON')) {
-          errorMsg += 'Invalid response from iTunes.\n\nThe proxy may be having issues. Try:\n• Searching again\n• Skipping music';
-          console.log('[iTunes] JSON parse error');
+          msg += 'Request took too long. Try again.';
         } else {
-          errorMsg += 'Search failed: ' + (e.message || 'Unknown error') + '\n\nYou can:\n• Try again\n• Skip adding music';
-          console.log('[iTunes] Unknown error:', e);
+          msg += 'Check your internet connection.';
         }
         
-        alert(errorMsg);
+        alert(msg);
         setState({itunesSearching: false, itunesResults: []});
       });
   }
