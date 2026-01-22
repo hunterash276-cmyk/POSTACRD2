@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.1.1';
+var APP_VERSION = '2.1.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -245,7 +245,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!',
     '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!',
     '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!',
-    '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!'
+    '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!',
+    '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!'
   };
 
   var state = {
@@ -2735,7 +2736,7 @@ window.onerror = function(msg, url, line, col, error) {
             showReactions: !isMyPost && !p.isBlurred,
             showReactionsReadOnly: isMyPost,
             showStamp: false,
-            enablePreview: true
+            enablePreview: !p.isBlurred  // Only enable audio if NOT blurred
           });
           
           // Apply blur if needed
@@ -2832,7 +2833,8 @@ window.onerror = function(msg, url, line, col, error) {
               showPrivate: isMyPost,
               showReactions: false,
               showReactionsReadOnly: isMyPost,
-              showStamp: false
+              showStamp: false,
+              enablePreview: !p.isBlurred  // Only enable audio if NOT blurred
             });
             
             // Blur older posts if haven't posted today
