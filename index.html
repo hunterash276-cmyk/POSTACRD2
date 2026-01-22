@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.1';
+var APP_VERSION = '2.8.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -292,7 +292,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.8': '✏️ EDIT DRAFT FIX (CRITICAL): ✅ Edit button NOW WORKS! Opens FULL upload flow (view: "post" not "feed"). Goes through all 4 steps. When you tap "Send" it UPLOADS and DELETES the draft! Added editingDraftId tracking. Clears editing state after upload. Console logging added. Can now actually edit and upload drafts!',
     '2.7.9': '🏆 BADGES EVERYWHERE (CRITICAL): ✅ CLIENT-SIDE badge logic! New isFoundingMember() function checks createdAt date. NO LOGIN NEEDED! Works even if friends haven\'t logged in. Badges show: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Creator + Founding badges visible to EVERYONE. All users created before Jan 24, 2026 get badges NOW!',
     '2.8.0': '✏️ DRAFT EDITING FIXED (CRITICAL): ✅ Edit bypasses "posted today" check! ✅ Preserves ORIGINAL draft date. ✅ Smart button: same day="Upload to Feed", past midnight="Upload to Calendar". ✅ If offline while editing, can save as draft again. ✅ Uploads with original date to calendar. ✅ Deletes draft after upload. WORKS EXACTLY AS DESIGNED!',
-    '2.8.1': '🏷️ BADGE TEXT: Changed all "FOUNDING" badges to "FOUNDER". Shows in: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Cleaner, shorter text!'
+    '2.8.1': '🏷️ BADGE TEXT: Changed all "FOUNDING" badges to "FOUNDER". Shows in: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Cleaner, shorter text!',
+    '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1646,11 +1647,21 @@ window.onerror = function(msg, url, line, col, error) {
     var n = state.np;
     if (!n.photo || !n.outfit || !n.songTitle || !n.songArtist || !n.loc) return;
     
+    // CRITICAL: Check GLOBAL lock first (survives re-renders)
+    if (uploadInProgress) {
+      console.error('[Submit] ❌ BLOCKED: Upload already in progress (global lock)');
+      return;
+    }
+    
     // Prevent double-submit with immediate flag and state check
     if (state.uploading) {
       console.log('[Submit] Already uploading, ignoring duplicate submit');
       return;
     }
+    
+    // Set GLOBAL lock immediately
+    uploadInProgress = true;
+    console.log('[Submit] 🔒 Global upload lock SET');
     
     // Check if offline
     if (!state.online || !navigator.onLine) {
@@ -1683,6 +1694,11 @@ window.onerror = function(msg, url, line, col, error) {
         };
         
         var saved = saveDraft(draftData);
+        
+        // Release GLOBAL lock
+        uploadInProgress = false;
+        console.log('[Submit] 🔓 Global upload lock RELEASED (draft saved)');
+        
         setState({uploading: false});
         
         if (saved) {
@@ -1707,6 +1723,11 @@ window.onerror = function(msg, url, line, col, error) {
         }
       }).catch(function(err) {
         console.error('[Offline] Failed to compress images:', err);
+        
+        // Release GLOBAL lock on error
+        uploadInProgress = false;
+        console.log('[Submit] 🔓 Global upload lock RELEASED (offline error)');
+        
         setState({uploading: false});
         alert('Failed to save draft. Please try again.');
       });
@@ -1739,6 +1760,10 @@ window.onerror = function(msg, url, line, col, error) {
     }).then(function() {
       console.log('[Submit] Post created successfully');
       
+      // Release GLOBAL lock
+      uploadInProgress = false;
+      console.log('[Submit] 🔓 Global upload lock RELEASED');
+      
       // If we were editing a draft, delete it now (since it's been uploaded)
       if (state.editingDraftId) {
         console.log('[Submit] Deleting edited draft:', state.editingDraftId);
@@ -1765,6 +1790,11 @@ window.onerror = function(msg, url, line, col, error) {
       nav('feed');
     }).catch(function(e) {
       console.error('[Submit] Error:', e);
+      
+      // Release GLOBAL lock on error
+      uploadInProgress = false;
+      console.log('[Submit] 🔓 Global upload lock RELEASED (error)');
+      
       setState({uploading: false});
       alert('Failed to upload post. Please try again.');
     });
@@ -5774,6 +5804,9 @@ window.onerror = function(msg, url, line, col, error) {
   // Setup IntersectionObserver for audio auto-play
   var audioObserver = null;
   var currentlyPlayingAudio = null;
+  
+  // GLOBAL UPLOAD LOCK - prevents duplicate submissions during re-renders
+  var uploadInProgress = false;
   var lastFocusState = true;
   var lastVisibilityState = 'visible';
   var monitoringActive = false;
