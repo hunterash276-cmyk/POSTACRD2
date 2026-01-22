@@ -1998,9 +1998,6 @@ window.onerror = function(msg, url, line, col, error) {
         alert('Search failed. Please check your internet and try again.');
       });
   }
-        setState({itunesSearching: false, itunesResults: []});
-      });
-  }
 
   function selectSong(song) {
     console.log('[iTunes] Song selected:', song.trackName, 'by', song.artistName);
