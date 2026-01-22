@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.6.0';
+var APP_VERSION = '2.6.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -257,7 +257,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.5.0': '🎉 MAJOR OFFLINE UPDATE: ⌨️ Friend search ACTUALLY works! Updates only list container, not full page render. Type smoothly! 📝 DRAFT SYSTEM: Save postcards offline → show in Mailbox. Today\'s = upload to feed. Past = calendar only. Upload/delete buttons. 🖼️ Profile pic caches for offline! 📡 Music search shows offline warning (orange banner). 78 functions (+4: loadSavedDrafts, saveDraft, deleteDraft, uploadDraft). Complete offline experience!',
     '2.5.1': '🎨 COLLAGE POLISH + OFFLINE FIX: 📅 Past collages show theme label (🎨 Theme: X). 📐 Photos preserve aspect ratio (portrait 3:4, landscape 4:3) instead of forced squares. ✨ Removed gaps between photos (gap: 0, flush together). 📡 OFFLINE: Music now optional! Can proceed past step 2 without music. Sets placeholder "No Music (Offline)". Draft system works perfectly offline! All features intact, 78 functions.',
     '2.5.2': '🔧 CRITICAL FIXES: 🖼️ Group photos update INSTANTLY (reloads group data after upload). 🔴 Next button turns RED when ready offline (checks state.online). 💾 Button says "Save Draft" offline only. ✅ Fixed draft saving (better validation, ensures array, clears working draft). 🚫 Upload prevented offline (clear error). 📅 Past midnight = calendar only (with confirmation). Professional messaging throughout. 78 functions.',
-    '2.6.0': '🚀 MASSIVE STORAGE OPTIMIZATION: ✅ FIXED DRAFTS! Compress images to 1200px @ 75% before localStorage (was hitting 5MB limit). 💰 FIREBASE SAVINGS: All uploads compressed (postcards: 1200px @ 70%, groups: 1200px @ 70%, avatars: 400px @ 80%). Reduces storage by 70-80%! Photos still look great. Draft saving works perfectly now. 79 functions (+1: compressImage). CRITICAL for cost reduction!'
+    '2.6.0': '🚀 MASSIVE STORAGE OPTIMIZATION: ✅ FIXED DRAFTS! Compress images to 1200px @ 75% before localStorage (was hitting 5MB limit). 💰 FIREBASE SAVINGS: All uploads compressed (postcards: 1200px @ 70%, groups: 1200px @ 70%, avatars: 400px @ 80%). Reduces storage by 70-80%! Photos still look great. Draft saving works perfectly now. 79 functions (+1: compressImage). CRITICAL for cost reduction!',
+    '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -610,6 +611,40 @@ window.onerror = function(msg, url, line, col, error) {
             });
           };
           generateAndSaveCode(1);
+        }
+        
+        // Founding Member Migration - mark existing users (one-time)
+        // Only users who don't have foundingMember field yet
+        if (data.foundingMember === undefined) {
+          var migrationDate = new Date('2026-01-23'); // Today's date
+          var userCreated = data.createdAt ? new Date(data.createdAt) : new Date(0);
+          var updateData = {};
+          
+          // Add email if missing (for existing users)
+          if (!data.email && state.user && state.user.email) {
+            updateData.email = state.user.email;
+          }
+          
+          // If account created before migration date, they're a founding member
+          if (userCreated < migrationDate) {
+            updateData.foundingMember = true;
+            updateData.foundingMemberSince = new Date().toISOString();
+            
+            db.collection('users').doc(uid).update(updateData).then(function() {
+              state.userData.foundingMember = true;
+              if (updateData.email) state.userData.email = updateData.email;
+              console.log('[Migration] User marked as founding member');
+            }).catch(function(err) {
+              console.error('[Migration] Failed to mark founding member:', err);
+            });
+          } else {
+            // New user, not a founding member
+            updateData.foundingMember = false;
+            
+            db.collection('users').doc(uid).update(updateData).catch(function(err) {
+              console.error('[Migration] Failed to mark non-founding member:', err);
+            });
+          }
         }
         
         loadPosts(uid);
@@ -1441,30 +1476,49 @@ window.onerror = function(msg, url, line, col, error) {
 
   // Compress image to reduce Firebase storage and localStorage usage
   function compressImage(dataUrl, maxWidth, quality) {
-    return new Promise(function(resolve) {
+    return new Promise(function(resolve, reject) {
       var img = new Image();
+      
+      img.onerror = function(err) {
+        console.error('[Compression] Image load failed:', err);
+        // Return original if compression fails
+        resolve(dataUrl);
+      };
+      
       img.onload = function() {
-        var canvas = document.createElement('canvas');
-        var ctx = canvas.getContext('2d');
-        
-        // Calculate dimensions maintaining aspect ratio
-        var width = img.width;
-        var height = img.height;
-        
-        if (width > maxWidth) {
-          height = (height / width) * maxWidth;
-          width = maxWidth;
+        try {
+          var canvas = document.createElement('canvas');
+          var ctx = canvas.getContext('2d');
+          
+          // Calculate dimensions maintaining aspect ratio
+          var width = img.width;
+          var height = img.height;
+          
+          if (width > maxWidth) {
+            height = (height / width) * maxWidth;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Return compressed image
+          var compressed = canvas.toDataURL('image/jpeg', quality);
+          console.log('[Compression] Success - Original:', Math.round(dataUrl.length/1024) + 'KB, Compressed:', Math.round(compressed.length/1024) + 'KB');
+          resolve(compressed);
+        } catch (err) {
+          console.error('[Compression] Canvas error:', err);
+          // Return original if compression fails
+          resolve(dataUrl);
         }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        // Draw and compress
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // Return compressed image
-        var compressed = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressed);
+      };
+      
+      img.src = dataUrl;
+    });
+  }
       };
       img.src = dataUrl;
     });
@@ -1495,8 +1549,8 @@ window.onerror = function(msg, url, line, col, error) {
       setState({uploading: true});
       
       Promise.all([
-        compressImage(n.photo, 1200, 0.75),
-        compressImage(n.outfit, 1200, 0.75)
+        compressImage(n.photo, 800, 0.6),  // More aggressive for localStorage
+        compressImage(n.outfit, 800, 0.6)   // 800px @ 60% quality
       ]).then(function(compressed) {
         var draftData = {
           photo: compressed[0],  // Compressed
@@ -2689,7 +2743,37 @@ window.onerror = function(msg, url, line, col, error) {
     
     var meta = el('div', {style: {flex: '1'}});
     var isMe = owner && state.user && owner.id === state.user.uid;
-    meta.appendChild(el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: t.text}}, isMe ? 'You' : (owner ? owner.username : 'User')));
+    var userNameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}});
+    userNameRow.appendChild(el('span', {style: {fontSize: '13px', fontWeight: '600', color: t.text}}, isMe ? 'You' : (owner ? owner.username : 'User')));
+    
+    // Add badge if applicable
+    if (owner && owner.email === 'ashthunter@icloud.com') {
+      // Creator badge - blue
+      userNameRow.appendChild(el('span', {style: {
+        padding: '2px 6px',
+        borderRadius: '4px',
+        background: '#2196F3',
+        color: '#fff',
+        fontSize: '9px',
+        fontWeight: '700',
+        letterSpacing: '0.3px'
+      }}, '⭐ CREATOR'));
+    } else if (owner && owner.foundingMember) {
+      // Founding member badge - subtle
+      userNameRow.appendChild(el('span', {style: {
+        padding: '2px 6px',
+        borderRadius: '4px',
+        background: 'rgba(255,255,255,0.1)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        color: t.text,
+        fontSize: '9px',
+        fontWeight: '700',
+        letterSpacing: '0.3px',
+        opacity: '0.7'
+      }}, '✨ FOUNDING'));
+    }
+    
+    meta.appendChild(userNameRow);
     
     // Format date and time
     var dateTimeStr = '📍 ' + post.location + ' · ' + post.date;
@@ -4871,6 +4955,41 @@ window.onerror = function(msg, url, line, col, error) {
         info.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff', marginBottom: '12px'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
       }
       info.appendChild(el('h2', {style: {margin: '0 0 4px', fontSize: '22px', fontWeight: '600', color: t.text}}, state.userData ? state.userData.username : 'User'));
+      
+      // Add badge if user has one
+      if (state.userData && state.user) {
+        var userEmail = state.user.email;
+        var badgeContainer = el('div', {style: {display: 'flex', gap: '6px', marginTop: '6px', marginBottom: '4px'}});
+        
+        if (userEmail === 'ashthunter@icloud.com') {
+          // Creator badge - blue
+          badgeContainer.appendChild(el('span', {style: {
+            padding: '4px 10px',
+            borderRadius: '6px',
+            background: '#2196F3',
+            color: '#fff',
+            fontSize: '11px',
+            fontWeight: '600',
+            letterSpacing: '0.3px'
+          }}, '⭐ CREATOR'));
+        } else if (state.userData.foundingMember) {
+          // Founding member badge - subtle white/gray
+          badgeContainer.appendChild(el('span', {style: {
+            padding: '4px 10px',
+            borderRadius: '6px',
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: t.text,
+            fontSize: '11px',
+            fontWeight: '600',
+            letterSpacing: '0.3px'
+          }}, '✨ FOUNDING MEMBER'));
+        }
+        
+        if (badgeContainer.children.length > 0) {
+          info.appendChild(badgeContainer);
+        }
+      }
       
       var stats = el('div', {style: {display: 'flex', gap: '24px', padding: '20px', borderRadius: '16px', border: '1px solid ' + t.border, width: '100%', background: t.card, marginTop: '20px', marginBottom: '20px'}});
       var stat1 = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'}});
