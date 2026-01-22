@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.9';
+var APP_VERSION = '2.8.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -290,7 +290,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.6': '🎵 AUDIO FIX (CRITICAL): ✅ FIXED wrong audio playing! IntersectionObserver now plays MOST VISIBLE post only (>50% visible). Calculates visibility ratio for each post. Prevents edge cases where 2 posts partially visible. Requires 50% visibility minimum. Multiple threshold checks (0-100%). Audio matches correct post now!',
     '2.7.7': '🏆 BADGE FIX (CRITICAL): ✅ ALL current users (created before Jan 24, 2026) get FOUNDING MEMBER badge! Migration runs EVERY login (not just once). Added DETAILED logging. Console shows: email, createdAt, shouldBeFounding, migration status. Friends MUST LOG IN to get badge (migration only runs on their login). Badge shows in feed + profile. Tell friends to refresh app!',
     '2.7.8': '✏️ EDIT DRAFT FIX (CRITICAL): ✅ Edit button NOW WORKS! Opens FULL upload flow (view: "post" not "feed"). Goes through all 4 steps. When you tap "Send" it UPLOADS and DELETES the draft! Added editingDraftId tracking. Clears editing state after upload. Console logging added. Can now actually edit and upload drafts!',
-    '2.7.9': '🏆 BADGES EVERYWHERE (CRITICAL): ✅ CLIENT-SIDE badge logic! New isFoundingMember() function checks createdAt date. NO LOGIN NEEDED! Works even if friends haven\'t logged in. Badges show: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Creator + Founding badges visible to EVERYONE. All users created before Jan 24, 2026 get badges NOW!'
+    '2.7.9': '🏆 BADGES EVERYWHERE (CRITICAL): ✅ CLIENT-SIDE badge logic! New isFoundingMember() function checks createdAt date. NO LOGIN NEEDED! Works even if friends haven\'t logged in. Badges show: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Creator + Founding badges visible to EVERYONE. All users created before Jan 24, 2026 get badges NOW!',
+    '2.8.0': '✏️ DRAFT EDITING FIXED (CRITICAL): ✅ Edit bypasses "posted today" check! ✅ Preserves ORIGINAL draft date. ✅ Smart button: same day="Upload to Feed", past midnight="Upload to Calendar". ✅ If offline while editing, can save as draft again. ✅ Uploads with original date to calendar. ✅ Deletes draft after upload. WORKS EXACTLY AS DESIGNED!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1732,7 +1733,8 @@ window.onerror = function(msg, url, line, col, error) {
       outfitY: n.outfitY,
       songFont: n.songFont,
       songColor: n.songColor,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      date: state.editingDraftDate || null  // Use draft's ORIGINAL date if editing
     }).then(function() {
       console.log('[Submit] Post created successfully');
       
@@ -1769,35 +1771,38 @@ window.onerror = function(msg, url, line, col, error) {
 
   function uploadPost(postData) {
     // CRITICAL: Check for duplicates before uploading
-    var today = new Date().toISOString().split('T')[0];
+    // Use provided date (for edited drafts) or today's date (for new posts)
+    var postDate = postData.date || new Date().toISOString().split('T')[0];
+    console.log('[Upload] Uploading post for date:', postDate);
+    
     var existingPost = null;
     
     // Check in loaded posts
     for (var i = 0; i < state.myPosts.length; i++) {
-      if (state.myPosts[i].date === today) {
+      if (state.myPosts[i].date === postDate) {
         existingPost = state.myPosts[i];
         break;
       }
     }
     
     if (existingPost) {
-      console.error('[Upload] DUPLICATE PREVENTED: Post already exists for', today);
-      return Promise.reject(new Error('You already posted today! Found existing post: ' + existingPost.id));
+      console.error('[Upload] DUPLICATE PREVENTED: Post already exists for', postDate);
+      return Promise.reject(new Error('You already posted for ' + postDate + '! Found existing post: ' + existingPost.id));
     }
     
     // Also check Firebase directly to be absolutely sure
     return db.collection('posts')
       .where('userId', '==', state.user.uid)
-      .where('date', '==', today)
+      .where('date', '==', postDate)
       .get()
       .then(function(snapshot) {
         if (!snapshot.empty) {
-          console.error('[Upload] DUPLICATE PREVENTED: Found existing post in Firebase for', today);
-          throw new Error('You already posted today!');
+          console.error('[Upload] DUPLICATE PREVENTED: Found existing post in Firebase for', postDate);
+          throw new Error('You already posted for ' + postDate + '!');
         }
         
         // No duplicate found, proceed with upload
-        console.log('[Upload] No duplicate found, proceeding with upload');
+        console.log('[Upload] No duplicate found, proceeding with upload for', postDate);
         var ts = postData.timestamp || Date.now();
         var photoUrl, outfitUrl;
         
@@ -1818,7 +1823,7 @@ window.onerror = function(msg, url, line, col, error) {
           outfitUrl = url;
           var post = {
             userId: state.user.uid,
-            date: new Date().toISOString().split('T')[0],
+            date: postDate,  // Use the provided date (original draft date or today)
             location: postData.loc,
             photo: photoUrl,
             outfitPhoto: outfitUrl,
@@ -3677,7 +3682,8 @@ window.onerror = function(msg, url, line, col, error) {
     // Post (Steps 1-4)
     if (state.view === 'post') {
       // If already have postcard today (draft OR posted), redirect to feed
-      if (state.hasPostcardToday) {
+      // EXCEPTION: Allow if editing a draft (editingDraftId is set)
+      if (state.hasPostcardToday && !state.editingDraftId) {
         var page = el('div', {style: {minHeight: '100vh', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center'}});
         page.appendChild(el('div', {style: {fontSize: '64px', marginBottom: '16px'}}, '✅'));
         page.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '22px', fontWeight: '600', color: t.text}}, "You've posted today!"));
@@ -4021,8 +4027,25 @@ window.onerror = function(msg, url, line, col, error) {
         var btns = el('div', {style: {display: 'flex', gap: '12px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 3}); }}, '← Edit'));
         
-        // Change button text based on online status
-        var buttonText = state.uploading ? 'Saving...' : (state.online ? 'Send ✈️' : 'Save Draft 💾');
+        // Button text logic:
+        // - If offline: "Save Draft 💾"
+        // - If editing draft and same day as draft date: "Upload to Feed 📤"
+        // - If editing draft and past midnight: "Upload to Calendar 📅"
+        // - If new postcard: "Send ✈️"
+        var buttonText;
+        if (state.uploading) {
+          buttonText = 'Saving...';
+        } else if (!state.online) {
+          buttonText = 'Save Draft 💾';
+        } else if (state.editingDraftDate) {
+          // Editing a draft - check if it's still the same day
+          var today = new Date().toISOString().split('T')[0];
+          var canUploadToFeed = state.editingDraftDate === today;
+          buttonText = canUploadToFeed ? '📤 Upload to Feed' : '📅 Upload to Calendar';
+        } else {
+          // New postcard
+          buttonText = 'Send ✈️';
+        }
         
         btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: state.uploading ? '0.5' : '1', pointerEvents: state.uploading ? 'none' : 'auto'}, onClick: function() { if (!state.uploading) submit(); }}, buttonText));
         content.appendChild(btns);
