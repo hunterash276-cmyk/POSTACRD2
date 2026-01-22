@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.6.2';
+var APP_VERSION = '2.6.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -259,7 +259,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.5.2': '🔧 CRITICAL FIXES: 🖼️ Group photos update INSTANTLY (reloads group data after upload). 🔴 Next button turns RED when ready offline (checks state.online). 💾 Button says "Save Draft" offline only. ✅ Fixed draft saving (better validation, ensures array, clears working draft). 🚫 Upload prevented offline (clear error). 📅 Past midnight = calendar only (with confirmation). Professional messaging throughout. 78 functions.',
     '2.6.0': '🚀 MASSIVE STORAGE OPTIMIZATION: ✅ FIXED DRAFTS! Compress images to 1200px @ 75% before localStorage (was hitting 5MB limit). 💰 FIREBASE SAVINGS: All uploads compressed (postcards: 1200px @ 70%, groups: 1200px @ 70%, avatars: 400px @ 80%). Reduces storage by 70-80%! Photos still look great. Draft saving works perfectly now. 79 functions (+1: compressImage). CRITICAL for cost reduction!',
     '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.',
-    '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!'
+    '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!',
+    '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -617,6 +618,7 @@ window.onerror = function(msg, url, line, col, error) {
         // Founding Member Migration - mark existing users (one-time)
         // Only users who don't have foundingMember field yet
         if (data.foundingMember === undefined) {
+          console.log('[Migration] Running founding member migration for user');
           var migrationDate = new Date('2026-01-23'); // Today's date
           var userCreated = data.createdAt ? new Date(data.createdAt) : new Date(0);
           var updateData = {};
@@ -631,21 +633,27 @@ window.onerror = function(msg, url, line, col, error) {
             updateData.foundingMember = true;
             updateData.foundingMemberSince = new Date().toISOString();
             
+            // Update state immediately
+            state.userData.foundingMember = true;
+            if (updateData.email) state.userData.email = updateData.email;
+            
             db.collection('users').doc(uid).update(updateData).then(function() {
-              state.userData.foundingMember = true;
-              if (updateData.email) state.userData.email = updateData.email;
-              console.log('[Migration] User marked as founding member');
+              console.log('[Migration] User marked as founding member and saved to Firebase');
+              render(); // Force re-render to show badge
             }).catch(function(err) {
               console.error('[Migration] Failed to mark founding member:', err);
             });
           } else {
             // New user, not a founding member
             updateData.foundingMember = false;
+            state.userData.foundingMember = false;
             
             db.collection('users').doc(uid).update(updateData).catch(function(err) {
               console.error('[Migration] Failed to mark non-founding member:', err);
             });
           }
+        } else {
+          console.log('[Migration] User already has foundingMember status:', data.foundingMember);
         }
         
         loadPosts(uid);
@@ -2756,29 +2764,31 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Add badge if applicable
     if (owner && owner.email === 'ashthunter@icloud.com') {
-      // Creator badge - blue
+      // Creator badge - blue, no emoji
       userNameRow.appendChild(el('span', {style: {
-        padding: '2px 6px',
-        borderRadius: '4px',
+        padding: '2px 5px',
+        borderRadius: '3px',
         background: '#2196F3',
         color: '#fff',
-        fontSize: '9px',
+        fontSize: '8px',
         fontWeight: '700',
-        letterSpacing: '0.3px'
-      }}, '⭐ CREATOR'));
+        letterSpacing: '0.5px',
+        textTransform: 'uppercase'
+      }}, 'CREATOR'));
     } else if (owner && owner.foundingMember) {
-      // Founding member badge - subtle
+      // Founding member badge - subtle, no emoji
       userNameRow.appendChild(el('span', {style: {
-        padding: '2px 6px',
-        borderRadius: '4px',
+        padding: '2px 5px',
+        borderRadius: '3px',
         background: 'rgba(255,255,255,0.1)',
         border: '1px solid rgba(255,255,255,0.15)',
         color: t.text,
-        fontSize: '9px',
+        fontSize: '8px',
         fontWeight: '700',
-        letterSpacing: '0.3px',
+        letterSpacing: '0.5px',
+        textTransform: 'uppercase',
         opacity: '0.7'
-      }}, '✨ FOUNDING'));
+      }}, 'FOUNDING'));
     }
     
     meta.appendChild(userNameRow);
@@ -4962,42 +4972,44 @@ window.onerror = function(msg, url, line, col, error) {
       } else {
         info.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff', marginBottom: '12px'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
       }
-      info.appendChild(el('h2', {style: {margin: '0 0 4px', fontSize: '22px', fontWeight: '600', color: t.text}}, state.userData ? state.userData.username : 'User'));
+      
+      // Username with badge inline
+      var nameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}});
+      nameRow.appendChild(el('h2', {style: {margin: '0', fontSize: '22px', fontWeight: '600', color: t.text}}, state.userData ? state.userData.username : 'User'));
       
       // Add badge if user has one
       if (state.userData && state.user) {
         var userEmail = state.user.email;
-        var badgeContainer = el('div', {style: {display: 'flex', gap: '6px', marginTop: '6px', marginBottom: '4px'}});
         
         if (userEmail === 'ashthunter@icloud.com') {
-          // Creator badge - blue
-          badgeContainer.appendChild(el('span', {style: {
-            padding: '4px 10px',
-            borderRadius: '6px',
+          // Creator badge - blue, no emoji
+          nameRow.appendChild(el('span', {style: {
+            padding: '3px 8px',
+            borderRadius: '4px',
             background: '#2196F3',
             color: '#fff',
-            fontSize: '11px',
-            fontWeight: '600',
-            letterSpacing: '0.3px'
-          }}, '⭐ CREATOR'));
+            fontSize: '10px',
+            fontWeight: '700',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          }}, 'CREATOR'));
         } else if (state.userData.foundingMember) {
-          // Founding member badge - subtle white/gray
-          badgeContainer.appendChild(el('span', {style: {
-            padding: '4px 10px',
-            borderRadius: '6px',
+          // Founding member badge - subtle white/gray, no emoji
+          nameRow.appendChild(el('span', {style: {
+            padding: '3px 8px',
+            borderRadius: '4px',
             background: 'rgba(255,255,255,0.1)',
             border: '1px solid rgba(255,255,255,0.2)',
             color: t.text,
-            fontSize: '11px',
-            fontWeight: '600',
-            letterSpacing: '0.3px'
-          }}, '✨ FOUNDING MEMBER'));
-        }
-        
-        if (badgeContainer.children.length > 0) {
-          info.appendChild(badgeContainer);
+            fontSize: '10px',
+            fontWeight: '700',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          }}, 'FOUNDING'));
         }
       }
+      
+      info.appendChild(nameRow);
       
       var stats = el('div', {style: {display: 'flex', gap: '24px', padding: '20px', borderRadius: '16px', border: '1px solid ' + t.border, width: '100%', background: t.card, marginTop: '20px', marginBottom: '20px'}});
       var stat1 = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'}});
