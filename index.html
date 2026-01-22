@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.9.3';
+var APP_VERSION = '3.0.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -58,46 +58,35 @@ var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
   var storedVersion = localStorage.getItem('postcard_version');
   var bannerDismissed = localStorage.getItem('postcard_banner_dismissed');
   
-  console.log('[Update] Current version:', APP_VERSION, 'Stored version:', storedVersion, 'Banner dismissed:', bannerDismissed);
+  console.log('[Update] Current version:', APP_VERSION, 'Stored version:', storedVersion);
   
-  // If version changed and banner not dismissed, show banner
-  if (storedVersion && storedVersion !== APP_VERSION && !bannerDismissed) {
-    console.log('[Update] Update available! Showing banner');
-    document.getElementById('updateBanner').style.display = 'block';
-    // Clear any caches we can
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (var i = 0; i < names.length; i++) {
-          caches.delete(names[i]);
-        }
-      });
-    }
-  } else {
-    // Save current version (always, even if banner was shown)
-    console.log('[Update] Saving version:', APP_VERSION);
-    localStorage.setItem('postcard_version', APP_VERSION);
-    // Clear dismissed flag for next update
-    localStorage.removeItem('postcard_banner_dismissed');
+  // Always clear caches on every load to prevent stale content
+  if ('caches' in window) {
+    caches.keys().then(function(names) {
+      for (var i = 0; i < names.length; i++) {
+        caches.delete(names[i]);
+      }
+      if (names.length > 0) console.log('[Update] Cleared', names.length, 'caches');
+    });
   }
   
-  // For iOS: check for updates when app becomes visible
-  document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') {
-      fetch(window.location.href.split('?')[0] + '?_=' + Date.now(), {
-        cache: 'no-store',
-        headers: {'Cache-Control': 'no-cache'}
-      })
-        .then(function(r) { return r.text(); })
-        .then(function(html) {
-          var match = html.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
-          if (match && match[1] !== APP_VERSION) {
-            console.log('[Update] New version detected:', match[1]);
-            document.getElementById('updateBanner').style.display = 'block';
-          }
-        })
-        .catch(function(e) { console.log('[Update] Check failed:', e); });
-    }
-  });
+  // Clear any service workers
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      registrations.forEach(function(reg) { reg.unregister(); });
+      if (registrations.length > 0) console.log('[Update] Unregistered', registrations.length, 'service workers');
+    });
+  }
+  
+  // If version changed locally, show banner (backup - Firebase check is primary)
+  if (storedVersion && storedVersion !== APP_VERSION && !bannerDismissed) {
+    console.log('[Update] Local version mismatch! Showing banner');
+    document.getElementById('updateBanner').style.display = 'block';
+  }
+  
+  // Always save current version
+  localStorage.setItem('postcard_version', APP_VERSION);
+  localStorage.removeItem('postcard_banner_dismissed');
 })();
 
 window.onerror = function(msg, url, line, col, error) {
@@ -170,6 +159,121 @@ window.onerror = function(msg, url, line, col, error) {
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(e) {
     console.error('Auth persistence error:', e);
   });
+
+  // CRITICAL: Firebase-based version checking
+  // This ALWAYS works because Firestore data is NOT cached by iOS PWA
+  (function checkFirebaseVersion() {
+    var VERSION_CHECK_KEY = 'postcard_last_version_check';
+    var lastCheck = localStorage.getItem(VERSION_CHECK_KEY);
+    var now = Date.now();
+    
+    // Only check every 5 minutes to avoid excessive reads
+    if (lastCheck && (now - parseInt(lastCheck)) < 300000) {
+      console.log('[Version] Skipping check - checked recently');
+      return;
+    }
+    
+    localStorage.setItem(VERSION_CHECK_KEY, now.toString());
+    
+    // Check Firestore for latest version
+    db.collection('appConfig').doc('version').get()
+      .then(function(doc) {
+        if (!doc.exists) {
+          // First time - create the document
+          console.log('[Version] Creating version document:', APP_VERSION);
+          return db.collection('appConfig').doc('version').set({
+            current: APP_VERSION,
+            minRequired: APP_VERSION,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        
+        var data = doc.data();
+        var serverVersion = data.current || APP_VERSION;
+        var minRequired = data.minRequired || '1.0.0';
+        
+        console.log('[Version] Server:', serverVersion, 'Local:', APP_VERSION, 'Min required:', minRequired);
+        
+        // Compare versions
+        function parseVersion(v) {
+          var parts = v.split('.').map(function(n) { return parseInt(n) || 0; });
+          return parts[0] * 10000 + parts[1] * 100 + parts[2];
+        }
+        
+        var localV = parseVersion(APP_VERSION);
+        var serverV = parseVersion(serverVersion);
+        var minV = parseVersion(minRequired);
+        
+        // If local version is older than minimum required, FORCE update
+        if (localV < minV) {
+          console.log('[Version] CRITICAL: Local version too old, forcing update');
+          showForceUpdateScreen(serverVersion);
+        }
+        // If local version is older than server, show optional update
+        else if (localV < serverV) {
+          console.log('[Version] Update available:', serverVersion);
+          showUpdateAvailable(serverVersion);
+        }
+      })
+      .catch(function(e) {
+        console.log('[Version] Check failed:', e);
+      });
+    
+    function showForceUpdateScreen(newVersion) {
+      var overlay = document.createElement('div');
+      overlay.id = 'forceUpdateOverlay';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;';
+      overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:320px;">' +
+        '<div style="font-size:48px;margin-bottom:16px;">📱</div>' +
+        '<h2 style="margin:0 0 12px;color:#2D2A26;">Update Required</h2>' +
+        '<p style="color:#666;margin:0 0 24px;line-height:1.5;">A critical update is available (v' + newVersion + '). Please refresh to continue using Postcard.</p>' +
+        '<button onclick="clearAllCachesAndReload()" style="background:#E07A5F;color:#fff;border:none;padding:16px 32px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;width:100%;">Update Now</button>' +
+        '<p style="color:#999;font-size:12px;margin-top:16px;">If update fails, delete the app from your home screen and re-add it.</p>' +
+        '</div>';
+      document.body.appendChild(overlay);
+    }
+    
+    function showUpdateAvailable(newVersion) {
+      var banner = document.getElementById('updateBanner');
+      if (banner) {
+        banner.innerHTML = '🎉 Update available (v' + newVersion + ')! Tap to refresh';
+        banner.style.display = 'block';
+      }
+    }
+  })();
+  
+  // Global function to clear all caches and force reload
+  window.clearAllCachesAndReload = function() {
+    console.log('[Update] Clearing all caches...');
+    
+    // Clear localStorage version keys to force fresh check
+    localStorage.removeItem('postcard_version');
+    localStorage.removeItem('postcard_app_version');
+    localStorage.removeItem('postcard_last_version_check');
+    localStorage.removeItem('postcard_banner_dismissed');
+    sessionStorage.clear();
+    
+    // Clear service workers
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        registrations.forEach(function(reg) { reg.unregister(); });
+      });
+    }
+    
+    // Clear all caches
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        return Promise.all(names.map(function(name) {
+          return caches.delete(name);
+        }));
+      }).then(function() {
+        // Force hard reload with cache busting
+        window.location.href = window.location.pathname + '?v=' + Date.now() + '&force=1';
+      });
+    } else {
+      window.location.href = window.location.pathname + '?v=' + Date.now() + '&force=1';
+    }
+  };
 
   var FONTS = [
     {n: 'Classic', v: '-apple-system,sans-serif'},
@@ -329,7 +433,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!',
     '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!',
     '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!',
-    '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!'
+    '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!',
+    '3.0.0': '🔄 CRITICAL UPDATE FIX: ✅ FIREBASE-BASED VERSION CHECKING! App now checks Firestore for latest version (not cached HTML). iOS PWA can no longer get stuck on old versions. If update required, shows blocking screen. Force reload clears ALL caches. NEVER need to delete/re-add PWA again!'
   };
 
   // Image cache to prevent re-downloading and flashing
