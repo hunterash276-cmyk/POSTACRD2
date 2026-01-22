@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.9.1';
+var APP_VERSION = '2.9.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -138,6 +138,33 @@ window.onerror = function(msg, url, line, col, error) {
   var db = firebase.firestore();
   var auth = firebase.auth();
   var storage = firebase.storage();
+  
+  // Push Notifications Setup
+  var messaging = null;
+  var VAPID_KEY = 'BAEePtLTG9oA2febDPeGUgjxS2Ue-UHxz8OnatRMEtq9zblCq9Z76bB2Mwa3d_0k-3ufwS5vdLMAIWA2yBnCXAc';
+  
+  try {
+    if (firebase.messaging.isSupported()) {
+      messaging = firebase.messaging();
+      console.log('[Notifications] Firebase Messaging initialized');
+      
+      // Handle foreground messages
+      messaging.onMessage(function(payload) {
+        console.log('[Notifications] Foreground message:', payload);
+        var title = payload.notification && payload.notification.title || 'New notification';
+        var body = payload.notification && payload.notification.body || '';
+        
+        // Show in-app notification
+        var notif = document.createElement('div');
+        notif.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:16px 24px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:10000;max-width:90%;';
+        notif.innerHTML = '<strong style="display:block;margin-bottom:4px;">' + title + '</strong>' + body;
+        document.body.appendChild(notif);
+        setTimeout(function() { notif.remove(); }, 5000);
+      });
+    }
+  } catch (e) {
+    console.log('[Notifications] Not supported:', e);
+  }
   
   // Set auth persistence to LOCAL so users stay logged in
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(e) {
@@ -1642,6 +1669,70 @@ window.onerror = function(msg, url, line, col, error) {
       };
       
       img.src = dataUrl;
+    });
+  }
+
+  function enableNotifications() {
+    if (!messaging) {
+      alert('Push notifications not supported in your browser');
+      return Promise.reject('Not supported');
+    }
+    
+    console.log('[Notifications] Requesting permission...');
+    
+    return Notification.requestPermission()
+      .then(function(permission) {
+        if (permission !== 'granted') {
+          throw new Error('Permission denied');
+        }
+        
+        console.log('[Notifications] Permission granted, getting token...');
+        return messaging.getToken({ vapidKey: VAPID_KEY });
+      })
+      .then(function(token) {
+        if (!token) throw new Error('No token');
+        
+        console.log('[Notifications] Token received, saving to Firestore...');
+        
+        return db.collection('users').doc(state.user.uid).update({
+          fcmToken: token,
+          notificationsEnabled: true
+        });
+      })
+      .then(function() {
+        console.log('[Notifications] Saved successfully');
+        if (state.userData) {
+          state.userData.notificationsEnabled = true;
+        }
+        alert('✅ Notifications enabled! You\'ll be notified when friends post.');
+        render();
+      })
+      .catch(function(e) {
+        console.error('[Notifications] Error:', e);
+        if (e.message === 'Permission denied') {
+          alert('❌ Notification permission denied. Please enable in browser settings.');
+        } else {
+          alert('Failed to enable notifications. Try again.');
+        }
+      });
+  }
+  
+  function disableNotifications() {
+    console.log('[Notifications] Disabling...');
+    
+    return db.collection('users').doc(state.user.uid).update({
+      notificationsEnabled: false,
+      fcmToken: firebase.firestore.FieldValue.delete()
+    }).then(function() {
+      console.log('[Notifications] Disabled');
+      if (state.userData) {
+        state.userData.notificationsEnabled = false;
+      }
+      alert('Notifications disabled');
+      render();
+    }).catch(function(e) {
+      console.error('[Notifications] Error disabling:', e);
+      alert('Failed to disable notifications');
     });
   }
 
@@ -5617,6 +5708,36 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       info.appendChild(cal);
+      
+      // Push Notifications Settings
+      if (messaging) {
+        var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
+        notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
+        notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when friends post'));
+        
+        var notifEnabled = state.userData && state.userData.notificationsEnabled || false;
+        
+        if (notifEnabled) {
+          var status = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+          status.appendChild(el('span', {style: {fontSize: '16px'}}, '✅'));
+          status.appendChild(el('span', {style: {fontSize: '13px', color: t.text}}, 'Enabled'));
+          notifSection.appendChild(status);
+          
+          notifSection.appendChild(el('span', {
+            className: 'tap',
+            style: {display: 'inline-block', padding: '10px 16px', background: t.border, color: t.text, borderRadius: '10px', fontSize: '13px', fontWeight: '600'},
+            onClick: disableNotifications
+          }, 'Disable'));
+        } else {
+          notifSection.appendChild(el('span', {
+            className: 'tap',
+            style: {display: 'inline-block', padding: '12px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: '600'},
+            onClick: enableNotifications
+          }, 'Enable Notifications'));
+        }
+        
+        info.appendChild(notifSection);
+      }
       
       page.appendChild(info);
       app.appendChild(page);
