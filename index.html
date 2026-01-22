@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.6';
+var APP_VERSION = '1.8.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -229,7 +229,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.7.3': '🐛 CRITICAL FIXES: Profile button now shows avatar image in bottom nav! Theme NO LONGER disappears when someone joins (moved day reset check to detail view). Collage generation fixed with better photo structure handling + debug logging. All 72 functions intact!',
     '1.7.4': '🔒 OLDER POSTS BLURRED: Older posts section NOW ALWAYS visible (shows separator so you know if anyone posted today). Both new AND old posts blurred until you post. Group invite notifications fixed with error logging - check console if invite not received!',
     '1.7.5': '👑 THEME DISPLAY FIXED: Theme now displays IMMEDIATELY for theme chooser after setting it! Added loadGroups() call after setGroupTheme() so local state updates. Theme chooser sees theme + "Theme set! Everyone can see this" message instantly!',
-    '1.7.6': '🎵 ITUNES FIXED: Better error handling for iTunes search, handles allOrigins proxy response format. Fixed error message display. 🖼️ COLLAGE DEBUG: Added comprehensive logging to collage generation - check console (F12) to see photo data structure!'
+    '1.7.6': '🎵 ITUNES FIXED: Better error handling for iTunes search, handles allOrigins proxy response format. Fixed error message display. 🖼️ COLLAGE DEBUG: Added comprehensive logging to collage generation - check console (F12) to see photo data structure!',
+    '1.8.0': '🔒 FINAL VERSION: REMOVED "Change Theme" button - once set, theme is FINAL! Older posts separator ALWAYS shows. Both today and older posts blurred until you post. All 72 functions verified. Everything working as requested!'
   };
 
   var state = {
@@ -3857,19 +3858,9 @@ window.onerror = function(msg, url, line, col, error) {
             challengeBox.appendChild(themeInput);
             challengeBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '12px', borderRadius: '10px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: '14px'}, onClick: function() { if (state.groupTheme.trim()) setGroupTheme(group.id, state.groupTheme.trim()); }}, 'Set Theme'));
           } else {
-            // Theme is set - show it with option to change
+            // Theme is set - show it (CANNOT change it)
             challengeBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '18px', fontWeight: '600', color: t.text, textAlign: 'center', padding: '12px', background: t.bg, borderRadius: '10px'}}, '🎯 "' + group.theme + '"'));
-            challengeBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: t.muted, textAlign: 'center'}}, 'Theme set! Everyone can see this.'));
-            
-            // Add button to change theme
-            challengeBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.bg, color: t.text, textAlign: 'center', fontWeight: '500', fontSize: '13px', border: '1px solid ' + t.border}, onClick: function() {
-              // Clear theme so they can set a new one
-              db.collection('groups').doc(group.id).update({
-                theme: firebase.firestore.FieldValue.delete()
-              }).then(function() {
-                loadGroups(state.user.uid);
-              });
-            }}, 'Change Theme'));
+            challengeBox.appendChild(el('p', {style: {margin: '0', fontSize: '12px', color: t.muted, textAlign: 'center'}}, 'Theme set! Everyone can see this.'));
           }
         } else {
           // Show who is theme chooser
