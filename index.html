@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.4.1';
+var APP_VERSION = '2.5.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -253,7 +253,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️',
     '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!',
     '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!',
-    '2.4.1': '🔧 POLISH FIXES: ⌨️ Friend search fixed! Added stopPropagation() to all keyboard events - no more triggering buttons behind. Type freely! 📸 Offline photos fixed! Draft loading in offline catch handler + cachedImage() skips preload for data URLs. Photos taken offline now show up perfectly when back online. Careful work!'
+    '2.4.1': '🔧 POLISH FIXES: ⌨️ Friend search fixed! Added stopPropagation() to all keyboard events - no more triggering buttons behind. Type freely! 📸 Offline photos fixed! Draft loading in offline catch handler + cachedImage() skips preload for data URLs. Photos taken offline now show up perfectly when back online. Careful work!',
+    '2.5.0': '🎉 MAJOR OFFLINE UPDATE: ⌨️ Friend search ACTUALLY works! Updates only list container, not full page render. Type smoothly! 📝 DRAFT SYSTEM: Save postcards offline → show in Mailbox. Today\'s = upload to feed. Past = calendar only. Upload/delete buttons. 🖼️ Profile pic caches for offline! 📡 Music search shows offline warning (orange banner). 78 functions (+4: loadSavedDrafts, saveDraft, deleteDraft, uploadDraft). Complete offline experience!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -323,6 +324,7 @@ window.onerror = function(msg, url, line, col, error) {
     deleteConfirm: null,  // Post to confirm deletion
     showAllFriends: false,  // Show collapsed or expanded friends list
     friendSearch: '',  // Search query for friends
+    savedDrafts: [],  // Offline drafts ready to upload
     // Groups feature
     groups: [],
     currentGroup: null,
@@ -415,6 +417,105 @@ window.onerror = function(msg, url, line, col, error) {
     }
   }
 
+  // Draft management for offline posts
+  function loadSavedDrafts() {
+    if (!state.user) return;
+    var draftsKey = 'postcard_saved_drafts_' + state.user.uid;
+    try {
+      var drafts = localStorage.getItem(draftsKey);
+      if (drafts) {
+        state.savedDrafts = JSON.parse(drafts);
+        console.log('[Drafts] Loaded ' + state.savedDrafts.length + ' saved drafts');
+      }
+    } catch (e) {
+      console.error('[Drafts] Failed to load drafts:', e);
+      state.savedDrafts = [];
+    }
+  }
+
+  function saveDraft(draftData) {
+    if (!state.user) return;
+    
+    var draft = {
+      id: Date.now().toString(),
+      date: new Date().toISOString().split('T')[0],
+      savedAt: new Date().toISOString(),
+      photo: draftData.photo,
+      outfit: draftData.outfit,
+      songTitle: draftData.songTitle,
+      songArtist: draftData.songArtist,
+      songArtwork: draftData.songArtwork,
+      songPreview: draftData.songPreview,
+      loc: draftData.loc,
+      quote: draftData.quote,
+      privateNote: draftData.privateNote,
+      photoX: draftData.photoX,
+      photoY: draftData.photoY,
+      outfitX: draftData.outfitX,
+      outfitY: draftData.outfitY,
+      songFont: draftData.songFont,
+      songColor: draftData.songColor
+    };
+    
+    state.savedDrafts.push(draft);
+    
+    var draftsKey = 'postcard_saved_drafts_' + state.user.uid;
+    try {
+      localStorage.setItem(draftsKey, JSON.stringify(state.savedDrafts));
+      console.log('[Drafts] Saved draft:', draft.id);
+      return draft;
+    } catch (e) {
+      console.error('[Drafts] Failed to save draft:', e);
+      return null;
+    }
+  }
+
+  function deleteDraft(draftId) {
+    if (!state.user) return;
+    
+    state.savedDrafts = state.savedDrafts.filter(function(d) { return d.id !== draftId; });
+    
+    var draftsKey = 'postcard_saved_drafts_' + state.user.uid;
+    try {
+      localStorage.setItem(draftsKey, JSON.stringify(state.savedDrafts));
+      console.log('[Drafts] Deleted draft:', draftId);
+    } catch (e) {
+      console.error('[Drafts] Failed to delete draft:', e);
+    }
+  }
+
+  function uploadDraft(draft) {
+    if (!state.online) {
+      alert('Cannot upload draft while offline. Please connect to internet.');
+      return;
+    }
+    
+    var today = new Date().toISOString().split('T')[0];
+    var canUploadToFeed = draft.date === today;
+    
+    if (!canUploadToFeed) {
+      alert('This draft is from ' + draft.date + '. It will be added to your calendar but not the feed (only today\'s posts appear in feed).');
+    }
+    
+    setState({uploading: true});
+    
+    uploadPost(draft).then(function() {
+      console.log('[Drafts] Successfully uploaded draft!');
+      deleteDraft(draft.id);
+      loadSavedDrafts();
+      setState({uploading: false});
+      alert('Draft uploaded successfully! 🎉');
+      
+      if (state.user) {
+        loadUserData(state.user.uid);
+      }
+    }).catch(function(err) {
+      console.error('[Drafts] Failed to upload draft:', err);
+      setState({uploading: false});
+      alert('Failed to upload draft. Please try again.');
+    });
+  }
+
   // Listen for online/offline events
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
@@ -434,6 +535,14 @@ window.onerror = function(msg, url, line, col, error) {
         var data = doc.data();
         state.userData = {id: uid};
         for (var k in data) state.userData[k] = data[k];
+        
+        // Preload profile picture for offline viewing
+        if (state.userData.avatar && !imageCache[state.userData.avatar]) {
+          var preloadImg = new Image();
+          preloadImg.src = state.userData.avatar;
+          imageCache[state.userData.avatar] = preloadImg;
+          console.log('[Cache] Preloaded profile picture');
+        }
         
         // Cache user data for offline access
         try {
@@ -496,6 +605,9 @@ window.onerror = function(msg, url, line, col, error) {
           }, 1000);
         }
         
+        // Load saved drafts
+        loadSavedDrafts();
+        
         // Check for update notification and trigger render if notification was added
         var notificationAdded = checkForUpdateNotification();
         
@@ -520,6 +632,14 @@ window.onerror = function(msg, url, line, col, error) {
           var cached = JSON.parse(cachedUser);
           state.userData = cached;
           console.log('[Offline] Loaded cached user data');
+          
+          // Preload cached profile picture
+          if (state.userData.avatar && !imageCache[state.userData.avatar]) {
+            var preloadImg = new Image();
+            preloadImg.src = state.userData.avatar;
+            imageCache[state.userData.avatar] = preloadImg;
+            console.log('[Offline] Preloaded cached profile picture');
+          }
         }
       } catch (e) {
         console.error('[Offline] Failed to load cached user:', e);
@@ -537,6 +657,9 @@ window.onerror = function(msg, url, line, col, error) {
       } catch (e) {
         console.error('[Offline] Failed to load draft:', e);
       }
+      
+      // Load saved drafts
+      loadSavedDrafts();
       
       setState({view: 'feed'});
     });
@@ -1298,10 +1421,9 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Check if offline
     if (!state.online || !navigator.onLine) {
-      console.log('[Offline] No connection - saving post for later');
+      console.log('[Offline] No connection - offering to save as draft');
       
-      // Save the complete post data to localStorage
-      var pendingPost = {
+      var draftData = {
         photo: n.photo,
         outfit: n.outfit,
         songTitle: n.songTitle,
@@ -1320,21 +1442,18 @@ window.onerror = function(msg, url, line, col, error) {
         timestamp: Date.now()
       };
       
-      try {
-        localStorage.setItem('postcard_pending_' + state.user.uid, JSON.stringify(pendingPost));
-        console.log('[Offline] Post saved to pending queue');
-        
-        alert('📱 No internet connection!\n\nYour post has been saved and will upload automatically when you\'re back online.');
+      var saved = saveDraft(draftData);
+      if (saved) {
+        alert('📱 No internet connection!\n\nYour postcard has been saved as a draft. You can upload it from the Mailbox when you\'re back online.');
         
         // Clear the form
         setState({
           step: 1,
           np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0}
         });
-        nav('feed');
-      } catch (e) {
-        console.error('[Offline] Failed to save pending post:', e);
-        alert('Failed to save post. Please try again.');
+        nav('notifications');
+      } else {
+        alert('Failed to save draft. Please try again.');
       }
       return;
     }
@@ -3252,6 +3371,14 @@ window.onerror = function(msg, url, line, col, error) {
         // Song Search Section
         var songSection = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '12px'}});
         
+        // Offline warning for music search
+        if (!state.online) {
+          var offlineWarning = el('div', {style: {padding: '12px 16px', borderRadius: '12px', background: '#ff9800', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px'}});
+          offlineWarning.appendChild(el('div', {style: {fontSize: '20px'}}, '📡'));
+          offlineWarning.appendChild(el('div', {style: {flex: '1', fontSize: '13px', lineHeight: '1.4'}}, 'Music search requires internet connection. Connect to WiFi or cellular data to search for songs.'));
+          songSection.appendChild(offlineWarning);
+        }
+        
         // Show selected song or search/manual interface
         if (state.np.songTitle && state.np.songArtist) {
           var selectedSong = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
@@ -3529,6 +3656,71 @@ window.onerror = function(msg, url, line, col, error) {
         frSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No pending friend requests'));
       }
       page.appendChild(frSection);
+      
+      // Saved Drafts Section
+      var draftsSection = el('div', {style: {marginBottom: '24px'}});
+      draftsSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📝 Saved Drafts'));
+      
+      if (state.savedDrafts && state.savedDrafts.length > 0) {
+        for (var i = 0; i < state.savedDrafts.length; i++) {
+          (function(draft) {
+            var today = new Date().toISOString().split('T')[0];
+            var canUpload = draft.date === today;
+            var draftDate = new Date(draft.date);
+            var dateStr = draftDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            var item = el('div', {style: {padding: '14px', borderRadius: '14px', background: canUpload ? '#e8f5e9' : t.card, border: '1px solid ' + (canUpload ? '#4caf50' : t.border), marginBottom: '8px'}});
+            
+            var header = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px'}});
+            header.appendChild(el('div', {style: {fontSize: '24px'}}, canUpload ? '✨' : '📅'));
+            
+            var info = el('div', {style: {flex: '1'}});
+            info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, canUpload ? 'Ready to Upload!' : 'Past Draft'));
+            info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'From ' + dateStr));
+            header.appendChild(info);
+            item.appendChild(header);
+            
+            // Show preview
+            var preview = el('div', {style: {display: 'flex', gap: '8px', marginBottom: '10px'}});
+            if (draft.outfit) {
+              preview.appendChild(el('img', {src: draft.outfit, style: {width: '60px', height: '80px', borderRadius: '8px', objectFit: 'cover'}}));
+            }
+            if (draft.photo) {
+              preview.appendChild(el('img', {src: draft.photo, style: {width: '60px', height: '80px', borderRadius: '8px', objectFit: 'cover'}}));
+            }
+            var details = el('div', {style: {flex: '1'}});
+            if (draft.loc) details.appendChild(el('p', {style: {margin: '0 0 4px', fontSize: '12px', color: t.text}}, '📍 ' + draft.loc));
+            if (draft.songTitle) details.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, '🎵 ' + draft.songTitle));
+            preview.appendChild(details);
+            item.appendChild(preview);
+            
+            if (canUpload) {
+              item.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: '#2e7d32'}}, '✓ Can upload to today\'s feed'));
+            } else {
+              item.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: t.muted}}, 'Will be added to your calendar only (not feed)'));
+            }
+            
+            var btns = el('div', {style: {display: 'flex', gap: '8px'}});
+            if (state.online) {
+              btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', textAlign: 'center'}, onClick: function() { uploadDraft(draft); }}, 'Upload'));
+            } else {
+              btns.appendChild(el('span', {style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.border, color: t.muted, fontSize: '13px', fontWeight: '600', textAlign: 'center'}}, 'Offline - Can\'t Upload'));
+            }
+            btns.appendChild(el('span', {className: 'tap', style: {padding: '10px 14px', borderRadius: '10px', background: t.border, color: t.muted, fontSize: '13px', fontWeight: '600'}, onClick: function() { 
+              if (confirm('Delete this draft?')) {
+                deleteDraft(draft.id);
+                render();
+              }
+            }}, '🗑️'));
+            item.appendChild(btns);
+            
+            draftsSection.appendChild(item);
+          })(state.savedDrafts[i]);
+        }
+      } else {
+        draftsSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No saved drafts'));
+      }
+      page.appendChild(draftsSection);
       
       // Weekly Recaps Section - Compact with button to view all
       var weeklySection = el('div', {style: {marginBottom: '24px'}});
@@ -4644,10 +4836,57 @@ window.onerror = function(msg, url, line, col, error) {
               boxSizing: 'border-box'
             }
           });
+          
+          // Container for friends list that we'll update
+          var friendsListContainer = el('div', {id: 'friendsListContainer'});
+          
+          // Function to render filtered friends
+          var renderFriendsList = function(searchQuery) {
+            friendsListContainer.innerHTML = '';
+            
+            var filteredFriends = state.friends.filter(function(f) {
+              if (!searchQuery) return true;
+              return f.username && f.username.toLowerCase().includes(searchQuery.toLowerCase());
+            });
+            
+            if (filteredFriends.length === 0) {
+              friendsListContainer.appendChild(el('p', {style: {margin: '12px 0', fontSize: '13px', color: t.muted, textAlign: 'center'}}, 'No friends found'));
+            } else {
+              for (var i = 0; i < filteredFriends.length; i++) {
+                (function(friend, idx) {
+                  var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: idx < filteredFriends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
+                  
+                  if (friend.avatar) {
+                    friendItem.appendChild(cachedImage(friend.avatar, {style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
+                  } else {
+                    friendItem.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+                  }
+                  
+                  var friendInfo = el('div', {style: {flex: '1'}});
+                  friendInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
+                  if (friend.birthday) {
+                    var bParts = friend.birthday.split('-');
+                    var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+                    friendInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})));
+                  }
+                  friendItem.appendChild(friendInfo);
+                  
+                  friendItem.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '→'));
+                  
+                  friendsListContainer.appendChild(friendItem);
+                })(filteredFriends[i], i);
+              }
+            }
+          };
+          
+          // Initial render
+          renderFriendsList(state.friendSearch);
+          
           searchInput.oninput = function(e) {
             e.stopPropagation();
             state.friendSearch = e.target.value;
-            render();
+            // Update only the list, not the entire page
+            renderFriendsList(state.friendSearch);
           };
           searchInput.onclick = function(e) {
             e.stopPropagation();
@@ -4663,42 +4902,7 @@ window.onerror = function(msg, url, line, col, error) {
           };
           searchWrap.appendChild(searchInput);
           friendsSection.appendChild(searchWrap);
-          
-          // Filter friends by search
-          var filteredFriends = state.friends.filter(function(f) {
-            if (!state.friendSearch) return true;
-            return f.username && f.username.toLowerCase().includes(state.friendSearch.toLowerCase());
-          });
-          
-          // Show filtered friends
-          if (filteredFriends.length === 0) {
-            friendsSection.appendChild(el('p', {style: {margin: '12px 0', fontSize: '13px', color: t.muted, textAlign: 'center'}}, 'No friends found'));
-          } else {
-            for (var i = 0; i < filteredFriends.length; i++) {
-              (function(friend, idx) {
-                var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: idx < filteredFriends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
-                
-                if (friend.avatar) {
-                  friendItem.appendChild(cachedImage(friend.avatar, {style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
-                } else {
-                  friendItem.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
-                }
-                
-                var friendInfo = el('div', {style: {flex: '1'}});
-                friendInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
-                if (friend.birthday) {
-                  var bParts = friend.birthday.split('-');
-                  var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
-                  friendInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})));
-                }
-                friendItem.appendChild(friendInfo);
-                
-                friendItem.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '→'));
-                
-                friendsSection.appendChild(friendItem);
-              })(filteredFriends[i], i);
-            }
-          }
+          friendsSection.appendChild(friendsListContainer);
           
           // Hide button
           var hideBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: t.bg, color: t.muted, fontWeight: '600', fontSize: '13px', marginTop: '12px', border: '1px solid ' + t.border}, onClick: function() { setState({showAllFriends: false, friendSearch: ''}); }}, '← Hide Friends List');
