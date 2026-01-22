@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.9.0';
+var APP_VERSION = '2.9.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -301,7 +301,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!',
     '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!',
     '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!',
-    '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!'
+    '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!',
+    '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1914,57 +1915,65 @@ window.onerror = function(msg, url, line, col, error) {
     var query = state.itunesSearch.trim();
     if (!query) return;
     
-    // Show loading state immediately
     setState({itunesSearching: true, itunesResults: []});
     
-    // iTunes API URL - request 50 results to filter for best 10
-    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=50';
+    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=50&country=US';
     
-    // Use CORS proxy
-    var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(itunesUrl);
-    
-    // 10 second timeout (faster than before)
+    // Try direct API first, then fallback to proxy
     var controller = new AbortController();
     var timeoutId = setTimeout(function() {
       controller.abort();
-    }, 10000);
+    }, 20000); // 20 second timeout
     
-    fetch(proxyUrl, { signal: controller.signal })
+    // Try direct iTunes API
+    fetch(itunesUrl, { signal: controller.signal })
       .then(function(response) { 
         clearTimeout(timeoutId);
-        if (!response.ok) throw new Error('Search failed');
+        if (!response.ok) throw new Error('Direct API failed');
         return response.json(); 
+      })
+      .catch(function() {
+        // Direct failed, try proxy
+        clearTimeout(timeoutId);
+        var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(itunesUrl);
+        
+        var proxyController = new AbortController();
+        var proxyTimeout = setTimeout(function() {
+          proxyController.abort();
+        }, 20000);
+        
+        return fetch(proxyUrl, { signal: proxyController.signal })
+          .then(function(response) {
+            clearTimeout(proxyTimeout);
+            if (!response.ok) throw new Error('Proxy failed');
+            return response.json();
+          })
+          .finally(function() {
+            clearTimeout(proxyTimeout);
+          });
       })
       .then(function(data) {
         var results = data.results || [];
         
         if (results.length === 0) {
           setState({itunesResults: [], itunesSearching: false});
-          alert('No songs found. Try different search terms.');
+          alert('No songs found. Try:\n• Different spelling\n• Artist name\n• More words');
           return;
         }
         
-        // RELEVANCE SCORING: Rank results by how well they match the query
+        // Score and rank results
         var scoredResults = results.map(function(song) {
           var score = 0;
           var searchLower = query.toLowerCase();
           var trackLower = (song.trackName || '').toLowerCase();
           var artistLower = (song.artistName || '').toLowerCase();
           
-          // Exact match = highest score
           if (trackLower === searchLower) score += 1000;
           if (artistLower === searchLower) score += 500;
-          
-          // Track starts with query = very high score
           if (trackLower.indexOf(searchLower) === 0) score += 800;
-          
-          // Track contains query = high score
           if (trackLower.indexOf(searchLower) > -1) score += 600;
-          
-          // Artist contains query = medium score
           if (artistLower.indexOf(searchLower) > -1) score += 400;
           
-          // Check individual words for partial matches
           var words = searchLower.split(' ');
           words.forEach(function(word) {
             if (word.length > 2) {
@@ -1973,31 +1982,22 @@ window.onerror = function(msg, url, line, col, error) {
             }
           });
           
-          // Boost if has preview URL (we can play it)
           if (song.previewUrl) score += 50;
           
           return { song: song, score: score };
         });
         
-        // Sort by score (highest first)
         scoredResults.sort(function(a, b) { return b.score - a.score; });
-        
-        // Take top 10 ONLY
         var top10 = scoredResults.slice(0, 10).map(function(item) { return item.song; });
         
         setState({itunesResults: top10, itunesSearching: false});
       })
       .catch(function(e) {
         clearTimeout(timeoutId);
-        
-        var msg = 'Search failed. ';
-        if (e.name === 'AbortError') {
-          msg += 'Request took too long. Try again.';
-        } else {
-          msg += 'Check your internet connection.';
-        }
-        
-        alert(msg);
+        setState({itunesSearching: false, itunesResults: []});
+        alert('Search failed. Please check your internet and try again.');
+      });
+  }
         setState({itunesSearching: false, itunesResults: []});
       });
   }
@@ -2967,10 +2967,10 @@ window.onerror = function(msg, url, line, col, error) {
       song.appendChild(artwork);
     }
     
-    // Song title (no emoji, smaller font)
-    song.appendChild(el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.title : ''));
-    // Artist name (smaller font)
-    song.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '11px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.artist : ''));
+    // Song title (no emoji, smaller font, word wrap at 15 chars)
+    song.appendChild(el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '180px', padding: '0 20px', boxSizing: 'border-box', wordWrap: 'break-word', overflowWrap: 'break-word', hyphens: 'auto'}}, post.song ? post.song.title : ''));
+    // Artist name (smaller font, word wrap at 15 chars)
+    song.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '11px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%', maxWidth: '180px', padding: '0 20px', boxSizing: 'border-box', wordWrap: 'break-word', overflowWrap: 'break-word', hyphens: 'auto'}}, post.song ? post.song.artist : ''));
     
     // Add hidden audio element for preview (will be controlled by IntersectionObserver)
     if (post.song && post.song.preview && opts.enablePreview) {
