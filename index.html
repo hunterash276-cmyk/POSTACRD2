@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.2';
+var APP_VERSION = '2.7.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -263,7 +263,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!',
     '2.7.0': '📱 PWA CACHE FIX (CRITICAL): ✅ SOLVES "needs web server" error! Aggressive cache busting: clears ALL caches + service workers on version change. Auto-reload with ?v= query param. Uses sessionStorage to track reload state. No more deleting from homescreen! Just refresh page once and new version loads. TESTED & WORKS!',
     '2.7.1': '🏆 BADGE MIGRATION FIX: ✅ FIXES missing founding member badges! Migration now re-runs for users with foundingMember=false. Changed cutoff to 2026-01-24 (tomorrow) so ALL current users get badges. Added detailed console logging. Re-runs migration if user should be founding but isn\'t. Users just need to refresh once!',
-    '2.7.2': '✏️ DRAFT EDITING + CALENDAR: ✅ Edit drafts later! New "✏️ Edit" button loads draft into camera to add music when you have service. ⚠️ Shows "No music added" warning. 📅 Smart upload button: "Upload to Feed" (same day) or "Upload to Calendar" (past midnight). Editing preserves original date. Updates existing draft instead of creating new one!'
+    '2.7.2': '✏️ DRAFT EDITING + CALENDAR: ✅ Edit drafts later! New "✏️ Edit" button loads draft into camera to add music when you have service. ⚠️ Shows "No music added" warning. 📅 Smart upload button: "Upload to Feed" (same day) or "Upload to Calendar" (past midnight). Editing preserves original date. Updates existing draft instead of creating new one!',
+    '2.7.3': '🔧 MAJOR FIXES: ✅ Drafts now COUNT as posting (can\'t make 2nd postcard same day). ✅ Edit button goes to FULL upload page (step 1) not just music. ✅ iTunes search: 15sec timeout, better errors, handles "dont look back" searches. ✅ AbortController for timeouts. ✅ More helpful error messages. All careful fixes!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -890,6 +891,18 @@ window.onerror = function(msg, url, line, col, error) {
         for (var i = 0; i < posts.length; i++) {
           if (posts[i].date === today) hasPosted = true;
         }
+        
+        // Also check if they have a draft for today (drafts count as "posted")
+        if (state.savedDrafts && state.savedDrafts.length > 0) {
+          for (var i = 0; i < state.savedDrafts.length; i++) {
+            if (state.savedDrafts[i].date === today) {
+              hasPosted = true;
+              console.log('[Drafts] Found draft for today - counting as posted');
+              break;
+            }
+          }
+        }
+        
         state.myPosts = posts;
         state.posted = hasPosted;
         
@@ -1767,12 +1780,14 @@ window.onerror = function(msg, url, line, col, error) {
       console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
     }
     
-    // Add timeout to detect slow/failing requests
+    // Add timeout with abort controller (15 seconds)
+    var controller = new AbortController();
     var timeoutId = setTimeout(function() {
-      console.log('[iTunes] Request taking too long, may be failing');
-    }, 5000);
+      controller.abort();
+      console.log('[iTunes] Request timed out after 15 seconds');
+    }, 15000);
     
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(function(response) { 
         clearTimeout(timeoutId);
         console.log('[iTunes] Response received, status:', response.status);
@@ -1782,17 +1797,26 @@ window.onerror = function(msg, url, line, col, error) {
         return response.json(); 
       })
       .then(function(data) {
-        console.log('[iTunes] Data parsed:', data);
-        var results = data.results || [];
+        console.log('[iTunes] Data parsed successfully');
+        
+        // Handle both direct iTunes response and proxy response
+        var results = [];
+        if (data && data.results) {
+          results = data.results;
+        } else if (Array.isArray(data)) {
+          results = data;
+        }
+        
         console.log('[iTunes] Results count:', results.length);
         
         if (results.length === 0) {
           // No results found
-          alert('No songs found for "' + query + '". Try:\n\n• Checking spelling\n• Using artist name\n• Trying different search terms\n\nOr skip music if offline.');
+          alert('No songs found for "' + query + '". Try:\n\n• Adding more words (e.g. "dont look back in anger")\n• Including artist name\n• Checking spelling\n\nOr skip music if offline.');
+          setState({itunesResults: [], itunesSearching: false});
+        } else {
+          setState({itunesResults: results, itunesSearching: false});
+          console.log('[iTunes] State updated with', results.length, 'results');
         }
-        
-        setState({itunesResults: results, itunesSearching: false});
-        console.log('[iTunes] State updated with results');
       })
       .catch(function(e) {
         clearTimeout(timeoutId);
@@ -1800,13 +1824,22 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Provide helpful error message based on error type
         var errorMsg = '🎵 iTunes Search Issue\n\n';
-        if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed'))) {
+        
+        if (e.name === 'AbortError') {
+          errorMsg += 'Search timed out (took too long).\n\nTry:\n• Using more specific search terms\n• Checking your internet connection\n• Skipping music for now';
+          console.log('[iTunes] Timeout/abort error');
+        } else if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed'))) {
           errorMsg += 'Could not connect to iTunes.\n\nTry:\n• Checking your internet\n• Trying again in a moment\n• Skipping music (offline mode)';
           console.log('[iTunes] Network/CORS error detected');
         } else if (e.message && e.message.includes('HTTP')) {
-          errorMsg += 'iTunes service unavailable.\n\nTry:\n• Waiting a moment\n• Skipping music';
+          errorMsg += 'iTunes service unavailable (Error ' + e.message + ').\n\nTry:\n• Waiting a moment\n• Skipping music';
+          console.log('[iTunes] HTTP error:', e.message);
+        } else if (e.message && e.message.includes('JSON')) {
+          errorMsg += 'Invalid response from iTunes.\n\nThe proxy may be having issues. Try:\n• Searching again\n• Skipping music';
+          console.log('[iTunes] JSON parse error');
         } else {
-          errorMsg += 'Search failed.\n\nYou can skip adding music or try again.';
+          errorMsg += 'Search failed: ' + (e.message || 'Unknown error') + '\n\nYou can:\n• Try again\n• Skip adding music';
+          console.log('[iTunes] Unknown error:', e);
         }
         
         alert(errorMsg);
@@ -4000,7 +4033,7 @@ window.onerror = function(msg, url, line, col, error) {
             // Buttons
             var btns = el('div', {style: {display: 'flex', gap: '8px'}});
             
-            // Edit button - always available
+            // Edit button - loads draft and goes to upload page (step 1)
             btns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '10px', borderRadius: '10px', background: t.accent, color: '#fff', fontSize: '13px', fontWeight: '600', textAlign: 'center'}, onClick: function() { 
               // Load draft into new post state
               state.np = {
@@ -4025,8 +4058,8 @@ window.onerror = function(msg, url, line, col, error) {
               state.editingDraftId = draft.id;
               state.editingDraftDate = draft.date;
               
-              // Go to step 3 (music selection) so they can add/change music
-              setState({step: 3, view: 'feed'});
+              // Go to step 1 (upload page) so they can see everything
+              setState({step: 1, view: 'feed'});
             }}, '✏️ Edit'));
             
             // Upload button - text changes based on date
