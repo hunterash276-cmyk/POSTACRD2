@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.6.1';
+var APP_VERSION = '2.6.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -258,7 +258,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.5.1': '🎨 COLLAGE POLISH + OFFLINE FIX: 📅 Past collages show theme label (🎨 Theme: X). 📐 Photos preserve aspect ratio (portrait 3:4, landscape 4:3) instead of forced squares. ✨ Removed gaps between photos (gap: 0, flush together). 📡 OFFLINE: Music now optional! Can proceed past step 2 without music. Sets placeholder "No Music (Offline)". Draft system works perfectly offline! All features intact, 78 functions.',
     '2.5.2': '🔧 CRITICAL FIXES: 🖼️ Group photos update INSTANTLY (reloads group data after upload). 🔴 Next button turns RED when ready offline (checks state.online). 💾 Button says "Save Draft" offline only. ✅ Fixed draft saving (better validation, ensures array, clears working draft). 🚫 Upload prevented offline (clear error). 📅 Past midnight = calendar only (with confirmation). Professional messaging throughout. 78 functions.',
     '2.6.0': '🚀 MASSIVE STORAGE OPTIMIZATION: ✅ FIXED DRAFTS! Compress images to 1200px @ 75% before localStorage (was hitting 5MB limit). 💰 FIREBASE SAVINGS: All uploads compressed (postcards: 1200px @ 70%, groups: 1200px @ 70%, avatars: 400px @ 80%). Reduces storage by 70-80%! Photos still look great. Draft saving works perfectly now. 79 functions (+1: compressImage). CRITICAL for cost reduction!',
-    '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.'
+    '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.',
+    '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1696,8 +1697,8 @@ window.onerror = function(msg, url, line, col, error) {
     }
     setState({itunesSearching: true, itunesResults: []});
     
-    // Build iTunes URL
-    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=10';
+    // Build iTunes URL with more results for better matches
+    var itunesUrl = 'https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=25';
     
     // Use proxy if configured
     var url;
@@ -1710,8 +1711,14 @@ window.onerror = function(msg, url, line, col, error) {
       console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
     }
     
+    // Add timeout to detect slow/failing requests
+    var timeoutId = setTimeout(function() {
+      console.log('[iTunes] Request taking too long, may be failing');
+    }, 5000);
+    
     fetch(url)
       .then(function(response) { 
+        clearTimeout(timeoutId);
         console.log('[iTunes] Response received, status:', response.status);
         if (!response.ok) {
           throw new Error('HTTP ' + response.status);
@@ -1722,23 +1729,28 @@ window.onerror = function(msg, url, line, col, error) {
         console.log('[iTunes] Data parsed:', data);
         var results = data.results || [];
         console.log('[iTunes] Results count:', results.length);
+        
+        if (results.length === 0) {
+          // No results found
+          alert('No songs found for "' + query + '". Try:\n\n• Checking spelling\n• Using artist name\n• Trying different search terms\n\nOr skip music if offline.');
+        }
+        
         setState({itunesResults: results, itunesSearching: false});
         console.log('[iTunes] State updated with results');
       })
       .catch(function(e) {
+        clearTimeout(timeoutId);
         console.error('[iTunes] Search error:', e);
         
         // Provide helpful error message based on error type
-        var errorMsg = 'iTunes search is not available';
+        var errorMsg = '🎵 iTunes Search Issue\n\n';
         if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed'))) {
-          if (ITUNES_PROXY_URL) {
-            errorMsg = 'Could not reach iTunes. Try again or skip this step.';
-          } else {
-            errorMsg = 'iTunes API is blocked. Try again or skip this step.';
-          }
+          errorMsg += 'Could not connect to iTunes.\n\nTry:\n• Checking your internet\n• Trying again in a moment\n• Skipping music (offline mode)';
           console.log('[iTunes] Network/CORS error detected');
+        } else if (e.message && e.message.includes('HTTP')) {
+          errorMsg += 'iTunes service unavailable.\n\nTry:\n• Waiting a moment\n• Skipping music';
         } else {
-          errorMsg = 'iTunes search failed. You can skip adding music or try again.';
+          errorMsg += 'Search failed.\n\nYou can skip adding music or try again.';
         }
         
         alert(errorMsg);
