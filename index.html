@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.1.0';
+var APP_VERSION = '2.1.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -244,7 +244,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!',
     '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!',
     '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!',
-    '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!'
+    '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!',
+    '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!'
   };
 
   var state = {
@@ -1606,8 +1607,28 @@ window.onerror = function(msg, url, line, col, error) {
           });
         }).then(function() {
           console.log('[Group] Invite notification sent successfully');
-          alert('Invitation sent!');
-          loadGroups(state.user.uid);
+          // Reload this specific group to get fresh data
+          return db.collection('groups').doc(groupId).get();
+        }).then(function(doc) {
+          if (doc.exists) {
+            var updatedGroup = doc.data();
+            updatedGroup.id = doc.id;
+            
+            // Update in state.groups array
+            for (var i = 0; i < state.groups.length; i++) {
+              if (state.groups[i].id === groupId) {
+                state.groups[i] = updatedGroup;
+                break;
+              }
+            }
+            
+            // Set as current group
+            state.currentGroup = updatedGroup;
+            
+            // Force immediate UI update - stay on members view
+            setState({groupView: 'members'});
+            alert('Invitation sent!');
+          }
         }).catch(function(e) {
           console.error('[Group] Error sending invite:', e);
           alert('Failed to send invitation: ' + e.message);
@@ -1640,8 +1661,29 @@ window.onerror = function(msg, url, line, col, error) {
         db.collection('groups').doc(groupId).update({
           pendingInvites: pending
         }).then(function() {
-          alert('Invite cancelled!');
-          loadGroups(state.user.uid);
+          console.log('[Group] Invite cancelled, reloading group');
+          // Reload this specific group to get fresh data
+          return db.collection('groups').doc(groupId).get();
+        }).then(function(doc) {
+          if (doc.exists) {
+            var updatedGroup = doc.data();
+            updatedGroup.id = doc.id;
+            
+            // Update in state.groups array
+            for (var i = 0; i < state.groups.length; i++) {
+              if (state.groups[i].id === groupId) {
+                state.groups[i] = updatedGroup;
+                break;
+              }
+            }
+            
+            // Set as current group
+            state.currentGroup = updatedGroup;
+            
+            // Force immediate UI update - stay on members view
+            setState({groupView: 'members'});
+            alert('Invite cancelled!');
+          }
         }).catch(function(e) {
           console.error('[Group] Error cancelling invite:', e);
           alert('Failed to cancel invite');
