@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.2';
+var APP_VERSION = '3.0.3';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -428,7 +428,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!',
     '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again!',
     '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!',
-    '3.0.2': '🔧 BUG FIXES: ✅ Duplicate posts fixed - no more ghost posts appearing after upload. ✅ Reactions no longer restart the song - music keeps playing when you react to posts!'
+    '3.0.2': '🔧 BUG FIXES: ✅ Duplicate posts fixed - no more ghost posts appearing after upload. ✅ Reactions no longer restart the song - music keeps playing when you react to posts!',
+    '3.0.3': '✏️ EDIT SCREEN FIXES: ✅ Song display now shows album artwork + text wrapped at 15 chars (matches final postcard). ✅ Up/down arrows fixed - now move images in the correct direction. ✅ Edit hint is now more prominent so users notice it.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -4211,9 +4212,38 @@ window.onerror = function(msg, url, line, col, error) {
         
         var font = FONTS[state.np.songFont].v;
         var color = COLORS[state.np.songColor];
-        var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95)', padding: '10px 16px', borderRadius: '8px', background: state.activeEdit === 'song' ? 'rgba(255,255,255,.2)' : 'transparent', border: state.activeEdit === 'song' ? '2px dashed ' + t.accent : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}, onClick: function() { setState({activeEdit: 'song'}); }});
-        song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, '🎵 ' + state.np.songTitle));
-        song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, state.np.songArtist));
+        
+        // Helper to wrap text at ~15 characters per line
+        function wrapText(text, maxChars) {
+          if (!text || text.length <= maxChars) return text;
+          var words = text.split(' ');
+          var lines = [];
+          var currentLine = '';
+          for (var w = 0; w < words.length; w++) {
+            var word = words[w];
+            if (currentLine.length + word.length + 1 <= maxChars) {
+              currentLine += (currentLine ? ' ' : '') + word;
+            } else {
+              if (currentLine) lines.push(currentLine);
+              currentLine = word;
+            }
+          }
+          if (currentLine) lines.push(currentLine);
+          return lines.join('\n');
+        }
+        
+        var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95)', padding: '10px 16px', borderRadius: '8px', background: state.activeEdit === 'song' ? 'rgba(255,255,255,.2)' : 'transparent', border: state.activeEdit === 'song' ? '2px dashed ' + t.accent : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px'}, onClick: function() { setState({activeEdit: 'song'}); }});
+        
+        // Show album artwork if available
+        if (state.np.songArtwork) {
+          song.appendChild(el('img', {src: state.np.songArtwork, style: {width: '45px', height: '45px', borderRadius: '6px', objectFit: 'cover', boxShadow: '0 2px 12px rgba(0,0,0,.7)', border: '2px solid rgba(255,255,255,.9)'}}));
+        }
+        
+        var titleEl = el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', whiteSpace: 'pre-line', lineHeight: '1.3', maxWidth: '180px'}}, wrapText(state.np.songTitle, 15));
+        song.appendChild(titleEl);
+        
+        var artistEl = el('p', {style: {margin: '0', fontSize: '11px', color: color, fontFamily: font, textAlign: 'center', whiteSpace: 'pre-line', lineHeight: '1.3', maxWidth: '180px', opacity: '0.9'}}, wrapText(state.np.songArtist, 15));
+        song.appendChild(artistEl);
         
         imgArea.appendChild(left);
         imgArea.appendChild(el('div', {style: {width: '3px', background: t.card}}));
@@ -4243,8 +4273,8 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Controls
         if (!state.activeEdit) {
-          var hint = el('div', {style: {padding: '20px', background: t.card, borderRadius: '16px', border: '2px dashed ' + t.border, textAlign: 'center'}});
-          hint.appendChild(el('p', {style: {margin: '0', color: t.muted, fontSize: '14px'}}, '👆 Tap an image or song text to edit'));
+          var hint = el('div', {style: {padding: '16px 20px', background: t.accent + '15', borderRadius: '14px', border: '1px solid ' + t.accent + '40', textAlign: 'center'}});
+          hint.appendChild(el('p', {style: {margin: '0', color: t.accent, fontSize: '15px', fontWeight: '600'}}, '👆 Tap an image or song to edit'));
           content.appendChild(hint);
         } else if (state.activeEdit === 'song') {
           var ctrl = el('div', {style: {background: t.card, borderRadius: '16px', padding: '20px', border: '2px solid ' + t.accent}});
@@ -4284,13 +4314,13 @@ window.onerror = function(msg, url, line, col, error) {
           
           var dpad = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', maxWidth: '200px', margin: '0 auto'}});
           dpad.appendChild(el('div'));
-          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'Y'] = state.np[prefix + 'Y'] - 10; setNp(u); }}, '↑'));
+          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'Y'] = state.np[prefix + 'Y'] + 10; setNp(u); }}, '↑'));
           dpad.appendChild(el('div'));
-          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'X'] = state.np[prefix + 'X'] - 10; setNp(u); }}, '←'));
+          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'X'] = state.np[prefix + 'X'] + 10; setNp(u); }}, '←'));
           dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.accent, borderRadius: '12px', textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { var u = {}; u[prefix + 'X'] = 0; u[prefix + 'Y'] = 0; setNp(u); }}, 'Reset'));
-          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'X'] = state.np[prefix + 'X'] + 10; setNp(u); }}, '→'));
+          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'X'] = state.np[prefix + 'X'] - 10; setNp(u); }}, '→'));
           dpad.appendChild(el('div'));
-          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'Y'] = state.np[prefix + 'Y'] + 10; setNp(u); }}, '↓'));
+          dpad.appendChild(el('span', {className: 'tap', style: {padding: '18px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '22px'}, onClick: function() { var u = {}; u[prefix + 'Y'] = state.np[prefix + 'Y'] - 10; setNp(u); }}, '↓'));
           dpad.appendChild(el('div'));
           ctrl.appendChild(dpad);
           content.appendChild(ctrl);
