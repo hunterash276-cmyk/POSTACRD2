@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.3';
+var APP_VERSION = '2.8.4';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -294,7 +294,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.0': '✏️ DRAFT EDITING FIXED (CRITICAL): ✅ Edit bypasses "posted today" check! ✅ Preserves ORIGINAL draft date. ✅ Smart button: same day="Upload to Feed", past midnight="Upload to Calendar". ✅ If offline while editing, can save as draft again. ✅ Uploads with original date to calendar. ✅ Deletes draft after upload. WORKS EXACTLY AS DESIGNED!',
     '2.8.1': '🏷️ BADGE TEXT: Changed all "FOUNDING" badges to "FOUNDER". Shows in: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Cleaner, shorter text!',
     '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!',
-    '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!'
+    '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!',
+    '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3611,13 +3612,13 @@ window.onerror = function(msg, url, line, col, error) {
       olderPosts = olderPosts.slice(0, 10);
       
       // ALWAYS show separator (so they can see if anyone posted today)
-      var separator = el('div', {style: {margin: '24px 20px', padding: '16px', borderRadius: '12px', background: t.card, border: '1px solid ' + t.border, textAlign: 'center'}});
-      separator.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, "✨ That's it for today! Here are some older postcards ✨"));
+      var separator = el('div', {style: {margin: '24px 20px', padding: '24px', borderRadius: '16px', background: t.accent, border: '2px solid ' + t.accent, textAlign: 'center'}});
+      separator.appendChild(el('p', {style: {margin: '0', fontSize: '16px', fontWeight: '700', color: '#fff'}}, "✨ That's it for today! Here are some older postcards ✨"));
       page.appendChild(separator);
       
       if (olderPosts.length > 0) {
-        // Older posts
-        var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', opacity: '0.7', position: 'relative', zIndex: '1'}});
+        // Older posts (removed opacity - keep them looking normal)
+        var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', zIndex: '1'}});
         for (var i = 0; i < olderPosts.length; i++) {
           (function(p) {
             var isMyPost = state.user && p.userId === state.user.uid;
