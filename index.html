@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.6';
+var APP_VERSION = '2.7.7';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -267,7 +267,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.3': '🔧 MAJOR FIXES: ✅ Drafts now COUNT as posting (can\'t make 2nd postcard same day). ✅ Edit button goes to FULL upload page (step 1) not just music. ✅ iTunes search: 15sec timeout, better errors, handles "dont look back" searches. ✅ AbortController for timeouts. ✅ More helpful error messages. All careful fixes!',
     '2.7.4': '🚫 DUPLICATE FIX (CRITICAL): ✅ FINALLY FIXED duplicates! uploadPost now checks Firebase BEFORE uploading. Checks state.myPosts AND queries Firebase for today\'s date. Rejects with error if duplicate found. Will NOT waste storage/money on duplicates anymore! 🔤 iTunes search confirmed case-insensitive (always was). "dont look back" = "DONT LOOK BACK".',
     '2.7.5': '🔓 DRAFT FIX (CRITICAL): ✅ FIXED! Draft now ONLY blocks camera (can\'t make 2nd postcard) BUT friends\' posts STAY BLURRED until you UPLOAD the draft! Two states: posted (unblurs) vs hasPostcardToday (blocks camera). Draft = can\'t use camera BUT still see blurred posts. Upload draft = posts unblur! Exactly as requested!',
-    '2.7.6': '🎵 AUDIO FIX (CRITICAL): ✅ FIXED wrong audio playing! IntersectionObserver now plays MOST VISIBLE post only (>50% visible). Calculates visibility ratio for each post. Prevents edge cases where 2 posts partially visible. Requires 50% visibility minimum. Multiple threshold checks (0-100%). Audio matches correct post now!'
+    '2.7.6': '🎵 AUDIO FIX (CRITICAL): ✅ FIXED wrong audio playing! IntersectionObserver now plays MOST VISIBLE post only (>50% visible). Calculates visibility ratio for each post. Prevents edge cases where 2 posts partially visible. Requires 50% visibility minimum. Multiple threshold checks (0-100%). Audio matches correct post now!',
+    '2.7.7': '🏆 BADGE FIX (CRITICAL): ✅ ALL current users (created before Jan 24, 2026) get FOUNDING MEMBER badge! Migration runs EVERY login (not just once). Added DETAILED logging. Console shows: email, createdAt, shouldBeFounding, migration status. Friends MUST LOG IN to get badge (migration only runs on their login). Badge shows in feed + profile. Tell friends to refresh app!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -651,10 +652,19 @@ window.onerror = function(msg, url, line, col, error) {
         }
         
         // Founding Member Migration - mark existing users (one-time)
-        // Only users who don't have foundingMember field yet, OR users who have it set to false but should be true
-        var migrationDate = new Date('2026-01-24T00:00:00Z'); // Tomorrow - all current users get badge
+        // CRITICAL: ALL users created before Jan 24, 2026 00:00:00 UTC get founding member badge
+        var migrationDate = new Date('2026-01-24T00:00:00Z');
         var userCreated = data.createdAt ? new Date(data.createdAt) : new Date(0);
         var shouldBeFounding = userCreated < migrationDate;
+        
+        console.log('=== BADGE MIGRATION CHECK ===');
+        console.log('User email:', state.user ? state.user.email : 'unknown');
+        console.log('User createdAt:', data.createdAt);
+        console.log('User created date:', userCreated.toISOString());
+        console.log('Migration cutoff:', migrationDate.toISOString());
+        console.log('Should be founding?', shouldBeFounding);
+        console.log('Current foundingMember value:', data.foundingMember);
+        console.log('Needs migration?', (data.foundingMember === undefined) || (data.foundingMember === false && shouldBeFounding));
         
         // Re-run migration if:
         // 1. foundingMember is undefined (never migrated)
@@ -663,18 +673,14 @@ window.onerror = function(msg, url, line, col, error) {
                              (data.foundingMember === false && shouldBeFounding);
         
         if (needsMigration) {
-          console.log('[Migration] Running founding member migration for user');
-          console.log('[Migration] User createdAt:', data.createdAt);
-          console.log('[Migration] Migration cutoff:', migrationDate.toISOString());
-          console.log('[Migration] User created:', userCreated.toISOString());
-          console.log('[Migration] Should be founding?', shouldBeFounding);
-          console.log('[Migration] Current foundingMember status:', data.foundingMember);
+          console.log('[Migration] 🚀 RUNNING MIGRATION');
           
           var updateData = {};
           
           // Add email if missing (for existing users)
           if (!data.email && state.user && state.user.email) {
             updateData.email = state.user.email;
+            console.log('[Migration] Adding email:', state.user.email);
           }
           
           // If account created before migration date, they're a founding member
@@ -686,28 +692,35 @@ window.onerror = function(msg, url, line, col, error) {
             state.userData.foundingMember = true;
             if (updateData.email) state.userData.email = updateData.email;
             
-            console.log('[Migration] ✅ Marking user as FOUNDING MEMBER');
+            console.log('[Migration] ✅ MARKING AS FOUNDING MEMBER');
+            console.log('[Migration] Updating Firebase with:', updateData);
             
             db.collection('users').doc(uid).update(updateData).then(function() {
-              console.log('[Migration] ✅ User marked as founding member and saved to Firebase');
+              console.log('[Migration] ✅✅✅ SUCCESS! User is now FOUNDING MEMBER in Firebase');
+              console.log('[Migration] Badge should now appear on profile and in feed');
               render(); // Force re-render to show badge
             }).catch(function(err) {
-              console.error('[Migration] ❌ Failed to mark founding member:', err);
+              console.error('[Migration] ❌❌❌ FAILED to save:', err);
             });
           } else {
             // New user, not a founding member
             updateData.foundingMember = false;
             state.userData.foundingMember = false;
             
-            console.log('[Migration] Marking user as NEW USER (not founding member)');
+            console.log('[Migration] Marking as NEW USER (no badge)');
             
             db.collection('users').doc(uid).update(updateData).catch(function(err) {
-              console.error('[Migration] Failed to mark non-founding member:', err);
+              console.error('[Migration] Failed to mark non-founding:', err);
             });
           }
         } else {
-          console.log('[Migration] User already has foundingMember status:', data.foundingMember);
+          console.log('[Migration] ✓ Already has correct badge status');
+          console.log('[Migration] foundingMember =', data.foundingMember);
+          
+          // Make sure state has the value too
+          state.userData.foundingMember = data.foundingMember;
         }
+        console.log('=== END BADGE MIGRATION ===');
         
         loadPosts(uid);
         loadFriends(uid);
@@ -2889,9 +2902,15 @@ window.onerror = function(msg, url, line, col, error) {
     var userNameRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}});
     userNameRow.appendChild(el('span', {style: {fontSize: '13px', fontWeight: '600', color: t.text}}, isMe ? 'You' : (owner ? owner.username : 'User')));
     
+    // Debug: Log owner data to see what we have
+    if (owner) {
+      console.log('[Badge Debug] Owner:', owner.username, 'Email:', owner.email, 'foundingMember:', owner.foundingMember);
+    }
+    
     // Add badge if applicable
     if (owner && owner.email === 'ashthunter@icloud.com') {
       // Creator badge - blue, no emoji
+      console.log('[Badge] Showing CREATOR badge for', owner.username);
       userNameRow.appendChild(el('span', {style: {
         padding: '2px 5px',
         borderRadius: '3px',
@@ -2904,6 +2923,7 @@ window.onerror = function(msg, url, line, col, error) {
       }}, 'CREATOR'));
     } else if (owner && owner.foundingMember) {
       // Founding member badge - subtle, no emoji
+      console.log('[Badge] Showing FOUNDING badge for', owner.username);
       userNameRow.appendChild(el('span', {style: {
         padding: '2px 5px',
         borderRadius: '3px',
@@ -2916,6 +2936,8 @@ window.onerror = function(msg, url, line, col, error) {
         textTransform: 'uppercase',
         opacity: '0.7'
       }}, 'FOUNDING'));
+    } else if (owner) {
+      console.log('[Badge] NO badge for', owner.username, '- foundingMember:', owner.foundingMember);
     }
     
     meta.appendChild(userNameRow);
