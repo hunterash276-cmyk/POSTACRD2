@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.1';
+var APP_VERSION = '3.0.2';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -427,7 +427,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!',
     '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!',
     '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again!',
-    '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!'
+    '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!',
+    '3.0.2': '🔧 BUG FIXES: ✅ Duplicate posts fixed - no more ghost posts appearing after upload. ✅ Reactions no longer restart the song - music keeps playing when you react to posts!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2082,7 +2083,8 @@ window.onerror = function(msg, url, line, col, error) {
           };
           return db.collection('posts').add(post).then(function(ref) {
             post.id = ref.id;
-            state.myPosts.unshift(post);
+            // Don't add to state.myPosts here - the Firebase snapshot listener will handle it
+            // This prevents the duplicate post bug
             console.log('[Upload] Post successfully created:', post.id);
             
             // Release date lock after successful upload
@@ -2966,8 +2968,7 @@ window.onerror = function(msg, url, line, col, error) {
             var postTime = post.createdAt ? new Date(post.createdAt).getTime() : new Date(post.date).getTime();
             var hoursSincePost = (Date.now() - postTime) / (1000 * 60 * 60);
             if (hoursSincePost >= 24) {
-              render(); // Re-render to show closed message
-              return;
+              return; // Don't re-render, just ignore
             }
             
             // Initialize reactions object if needed
@@ -2977,17 +2978,28 @@ window.onerror = function(msg, url, line, col, error) {
             
             // Only set if not already reacted (locked in)
             if (post.reactions[uid]) {
-              render(); // Just re-render to hide buttons
-              return;
+              return; // Already reacted, just ignore
             }
             
             // Set locally first
             post.reactions[uid] = emoji;
             
-            // Re-render immediately to show locked state
-            render();
+            // Update DOM directly instead of calling render() - this prevents audio restart
+            // Find the reaction wrapper for this post and replace it
+            var postElement = document.querySelector('[data-post-id="' + postId + '"]');
+            if (postElement) {
+              var reactWrap = postElement.querySelector('.react-buttons');
+              if (reactWrap) {
+                // Replace reaction buttons with "You reacted" chip
+                reactWrap.innerHTML = '';
+                var myChip = document.createElement('span');
+                myChip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:14px;background:' + t.accent + '22;border:2px solid ' + t.accent + ';color:' + t.text;
+                myChip.innerHTML = '<span style="font-size:18px">' + emoji + '</span><span style="font-weight:500">You reacted</span>';
+                reactWrap.appendChild(myChip);
+              }
+            }
             
-            // Then update Firestore
+            // Update Firestore
             db.collection('posts').doc(postId).update({reactions: post.reactions}).catch(function(e) {
               console.error('Error setting reaction:', e);
             });
@@ -3123,6 +3135,9 @@ window.onerror = function(msg, url, line, col, error) {
     var hasAudioPreview = post.song && post.song.preview && opts.enablePreview;
     
     var wrap = el('div', {style: {position: 'relative'}});
+    if (post.id) {
+      wrap.setAttribute('data-post-id', post.id);
+    }
     if (hasAudioPreview) {
       wrap.setAttribute('data-postcard-with-audio', 'true');
     }
@@ -3266,7 +3281,7 @@ window.onerror = function(msg, url, line, col, error) {
     // Show reaction picker only if: showing reactions, hasn't reacted yet, not my post, and within 24hrs
     var hasAlreadyReacted = myReaction !== null && myReaction !== undefined;
     if (opts.showReactions && post.id && !hasAlreadyReacted && canStillReact) {
-      var reactWrap = el('div', {style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
+      var reactWrap = el('div', {className: 'react-buttons', style: {marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}});
       
       for (var i = 0; i < reactionEmojis.length; i++) {
         (function(emoji) {
@@ -3287,8 +3302,7 @@ window.onerror = function(msg, url, line, col, error) {
               // Double check we haven't reacted yet
               var currentReactions = post.reactions || {};
               if (currentReactions[state.user.uid]) {
-                render(); // Just re-render to update UI
-                return;
+                return; // Already reacted, ignore
               }
               setReaction(post.id, owner.id, emoji);
             }
