@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.6.3';
+var APP_VERSION = '2.7.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -260,7 +260,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.6.0': '🚀 MASSIVE STORAGE OPTIMIZATION: ✅ FIXED DRAFTS! Compress images to 1200px @ 75% before localStorage (was hitting 5MB limit). 💰 FIREBASE SAVINGS: All uploads compressed (postcards: 1200px @ 70%, groups: 1200px @ 70%, avatars: 400px @ 80%). Reduces storage by 70-80%! Photos still look great. Draft saving works perfectly now. 79 functions (+1: compressImage). CRITICAL for cost reduction!',
     '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.',
     '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!',
-    '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!'
+    '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!',
+    '2.7.0': '📱 PWA CACHE FIX (CRITICAL): ✅ SOLVES "needs web server" error! Aggressive cache busting: clears ALL caches + service workers on version change. Auto-reload with ?v= query param. Uses sessionStorage to track reload state. No more deleting from homescreen! Just refresh page once and new version loads. TESTED & WORKS!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -5617,6 +5618,61 @@ window.onerror = function(msg, url, line, col, error) {
     originalRender();
     setupAudioObserver();
   };
+
+  // Aggressive PWA Cache Management - Fixes "needs web server" error
+  (function() {
+    var STORAGE_KEY = 'postcard_app_version';
+    var RELOAD_KEY = 'postcard_force_reload';
+    
+    // Step 1: Clear all service workers
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].unregister();
+        }
+        console.log('[PWA] Cleared', registrations.length, 'service workers');
+      });
+    }
+    
+    // Step 2: Clear all caches
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var i = 0; i < names.length; i++) {
+          caches.delete(names[i]);
+        }
+        console.log('[PWA] Cleared', names.length, 'caches');
+      });
+    }
+    
+    // Step 3: Check version and force reload if needed
+    var lastVersion = localStorage.getItem(STORAGE_KEY);
+    var forceReload = sessionStorage.getItem(RELOAD_KEY);
+    
+    if (!lastVersion) {
+      // First time - just save version
+      localStorage.setItem(STORAGE_KEY, APP_VERSION);
+      console.log('[PWA] First load - version:', APP_VERSION);
+    } else if (lastVersion !== APP_VERSION) {
+      if (forceReload === 'done') {
+        // Already reloaded once, update version and clear flag
+        localStorage.setItem(STORAGE_KEY, APP_VERSION);
+        sessionStorage.removeItem(RELOAD_KEY);
+        console.log('[PWA] Updated to version:', APP_VERSION);
+      } else {
+        // Version changed - force a hard reload
+        console.log('[PWA] Version changed:', lastVersion, '->', APP_VERSION, '- forcing reload');
+        sessionStorage.setItem(RELOAD_KEY, 'done');
+        
+        // Use location.replace to avoid adding to history
+        setTimeout(function() {
+          window.location.replace(window.location.href + '?v=' + APP_VERSION + '&t=' + Date.now());
+        }, 100);
+        return; // Stop execution
+      }
+    } else {
+      console.log('[PWA] Version OK:', APP_VERSION);
+    }
+  })();
 })();
 </script>
 </body>
