@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.0.1';
+var APP_VERSION = '2.1.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -243,7 +243,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.9.0': '🔄 COMPLETE REWRITE: Rewrote generateGroupCollage to use html2canvas + DOM instead of canvas API. This avoids CORS "operation is insecure" errors. Creates DOM grid, captures with html2canvas, uploads to Firebase. ONLY touched this ONE function - everything else untouched!',
     '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!',
     '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!',
-    '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!'
+    '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!',
+    '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!'
   };
 
   var state = {
@@ -315,6 +316,13 @@ window.onerror = function(msg, url, line, col, error) {
     for (var key in updates) {
       state.np[key] = updates[key];
     }
+    // Save to localStorage immediately so it persists even if user leaves app
+    try {
+      localStorage.setItem('postcard_draft_' + state.user.uid, JSON.stringify(state.np));
+      console.log('[Draft] Postcard draft saved to localStorage');
+    } catch (e) {
+      console.error('[Draft] Failed to save draft:', e);
+    }
     render();
   }
 
@@ -373,6 +381,19 @@ window.onerror = function(msg, url, line, col, error) {
         loadFriendRequests(uid);
         loadGroups(uid);
         loadGroupNotifications(uid);
+        
+        // Load draft postcard from localStorage if exists
+        try {
+          var draftKey = 'postcard_draft_' + uid;
+          var savedDraft = localStorage.getItem(draftKey);
+          if (savedDraft) {
+            var draft = JSON.parse(savedDraft);
+            console.log('[Draft] Loaded postcard draft from localStorage:', draft);
+            state.np = draft;
+          }
+        } catch (e) {
+          console.error('[Draft] Failed to load draft:', e);
+        }
         
         // Check for update notification and trigger render if notification was added
         var notificationAdded = checkForUpdateNotification();
@@ -1175,6 +1196,15 @@ window.onerror = function(msg, url, line, col, error) {
         post.id = ref.id;
         state.myPosts.unshift(post);
         console.log('[Submit] Post created successfully:', ref.id);
+        
+        // Clear draft from localStorage after successful post
+        try {
+          localStorage.removeItem('postcard_draft_' + state.user.uid);
+          console.log('[Draft] Cleared postcard draft from localStorage');
+        } catch (e) {
+          console.error('[Draft] Failed to clear draft:', e);
+        }
+        
         setState({
           posted: true,
           uploading: false,
