@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.0.0';
+var APP_VERSION = '2.0.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -242,7 +242,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.9': '🛡️ CRASH PREVENTION: Added try-catch around canvas operations. Added safety checks for empty image arrays. Added detailed logging at every step. Collage generation wont crash the app anymore - will show error alerts instead!',
     '1.9.0': '🔄 COMPLETE REWRITE: Rewrote generateGroupCollage to use html2canvas + DOM instead of canvas API. This avoids CORS "operation is insecure" errors. Creates DOM grid, captures with html2canvas, uploads to Firebase. ONLY touched this ONE function - everything else untouched!',
     '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!',
-    '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!'
+    '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!',
+    '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!'
   };
 
   var state = {
@@ -1541,8 +1542,12 @@ window.onerror = function(msg, url, line, col, error) {
   
   // Add member to group (creator only)
   function addMemberToGroup(groupId, friendId) {
+    console.log('[Group] addMemberToGroup called:', {groupId: groupId, friendId: friendId});
     db.collection('groups').doc(groupId).get().then(function(doc) {
-      if (!doc.exists) return;
+      if (!doc.exists) {
+        console.error('[Group] Group does not exist');
+        return;
+      }
       var group = doc.data();
       
       if (group.createdBy !== state.user.uid) {
@@ -1551,11 +1556,17 @@ window.onerror = function(msg, url, line, col, error) {
       }
       
       var pending = group.pendingInvites || [];
+      console.log('[Group] Current pending invites:', pending);
+      console.log('[Group] Current members:', group.members);
+      
       if (pending.indexOf(friendId) === -1 && group.members.indexOf(friendId) === -1) {
         pending.push(friendId);
+        console.log('[Group] Adding to pending invites, new list:', pending);
+        
         db.collection('groups').doc(groupId).update({
           pendingInvites: pending
         }).then(function() {
+          console.log('[Group] Pending invites updated in Firestore');
           console.log('[Group] Sending invite notification to user:', friendId);
           return addGroupNotification(friendId, 'group_invite', {
             groupId: groupId,
@@ -1566,12 +1577,45 @@ window.onerror = function(msg, url, line, col, error) {
         }).then(function() {
           console.log('[Group] Invite notification sent successfully');
           alert('Invitation sent!');
+          loadGroups(state.user.uid);
         }).catch(function(e) {
           console.error('[Group] Error sending invite:', e);
-          alert('Failed to send invitation');
+          alert('Failed to send invitation: ' + e.message);
         });
       } else {
+        console.log('[Group] Person already member or invited');
         alert('This person is already a member or has been invited');
+      }
+    }).catch(function(e) {
+      console.error('[Group] Error in addMemberToGroup:', e);
+      alert('Error: ' + e.message);
+    });
+  }
+  
+  // Cancel pending group invite (creator only)
+  function cancelGroupInvite(groupId, userId) {
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var group = doc.data();
+      
+      if (group.createdBy !== state.user.uid) {
+        alert('Only the group creator can cancel invites');
+        return;
+      }
+      
+      var pending = group.pendingInvites || [];
+      var index = pending.indexOf(userId);
+      if (index > -1) {
+        pending.splice(index, 1);
+        db.collection('groups').doc(groupId).update({
+          pendingInvites: pending
+        }).then(function() {
+          alert('Invite cancelled!');
+          loadGroups(state.user.uid);
+        }).catch(function(e) {
+          console.error('[Group] Error cancelling invite:', e);
+          alert('Failed to cancel invite');
+        });
       }
     });
   }
@@ -3922,7 +3966,17 @@ window.onerror = function(msg, url, line, col, error) {
               inviteItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: '#ffcc80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'}}, '⏳'));
               var nameSpan = el('span', {style: {flex: '1', fontSize: '14px', fontWeight: '500', color: t.text}}, 'Loading...');
               inviteItem.appendChild(nameSpan);
-              inviteItem.appendChild(el('span', {style: {fontSize: '11px', color: t.muted}}, 'Pending'));
+              
+              // Creator only: add cancel button
+              if (isCreator) {
+                inviteItem.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '6px', background: '#ffebee', color: '#c62828', fontSize: '11px', fontWeight: '600'}, onClick: function() {
+                  if (confirm('Cancel this invitation?')) {
+                    cancelGroupInvite(group.id, inviteId);
+                  }
+                }}, 'Cancel'));
+              } else {
+                inviteItem.appendChild(el('span', {style: {fontSize: '11px', color: t.muted}}, 'Pending'));
+              }
               
               // Get member info and update display
               getMemberInfo(inviteId, function(info) {
