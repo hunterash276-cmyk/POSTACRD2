@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.3.1';
+var APP_VERSION = '2.4.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -251,7 +251,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!',
     '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!',
     '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️',
-    '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!'
+    '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!',
+    '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -313,6 +314,8 @@ window.onerror = function(msg, url, line, col, error) {
     notifications: loadedNotifications,
     weeklyLookbackPosts: null,
     deleteConfirm: null,  // Post to confirm deletion
+    showAllFriends: false,  // Show collapsed or expanded friends list
+    friendSearch: '',  // Search query for friends
     // Groups feature
     groups: [],
     currentGroup: null,
@@ -425,6 +428,14 @@ window.onerror = function(msg, url, line, col, error) {
         state.userData = {id: uid};
         for (var k in data) state.userData[k] = data[k];
         
+        // Cache user data for offline access
+        try {
+          localStorage.setItem('postcard_user_' + uid, JSON.stringify(state.userData));
+          console.log('[Cache] User data cached for offline access');
+        } catch (e) {
+          console.error('[Cache] Failed to cache user data:', e);
+        }
+        
         // Generate friend code for existing users who don't have one
         if (!data.friendCode) {
           var generateAndSaveCode = function(attempt) {
@@ -489,6 +500,25 @@ window.onerror = function(msg, url, line, col, error) {
           setTimeout(function() { render(); }, 100);
         }
       }
+    }).catch(function(err) {
+      console.error('[Offline] Failed to load user data:', err);
+      
+      // Still show the app even if offline - use cached data
+      state.userData = {id: uid, username: 'User', avatar: null};
+      
+      // Try to load cached data from localStorage
+      try {
+        var cachedUser = localStorage.getItem('postcard_user_' + uid);
+        if (cachedUser) {
+          var cached = JSON.parse(cachedUser);
+          state.userData = cached;
+          console.log('[Offline] Loaded cached user data');
+        }
+      } catch (e) {
+        console.error('[Offline] Failed to load cached user:', e);
+      }
+      
+      setState({view: 'feed'});
     });
   }
   
@@ -2380,12 +2410,6 @@ window.onerror = function(msg, url, line, col, error) {
     imgArea.appendChild(divider);
     imgArea.appendChild(right);
     imgArea.appendChild(song);
-    
-    // Stamp - only show if not in feed
-    if (opts.showStamp) {
-      var stamp = el('div', {style: {position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: t.accent, color: '#fff', padding: '5px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: '700'}}, '📮 POSTCARD');
-      imgArea.appendChild(stamp);
-    }
     
     // Bottom
     var bottom = el('div', {style: {padding: '14px', borderTop: '1px solid ' + t.border}});
@@ -4578,30 +4602,76 @@ window.onerror = function(msg, url, line, col, error) {
         var friendsSection = el('div', {style: {width: '100%', marginBottom: '20px', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card}});
         friendsSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: t.text}}, '👥 Friends (' + state.friends.length + ')'));
         
-        for (var i = 0; i < state.friends.length; i++) {
-          (function(friend) {
-            var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: i < state.friends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
-            
-            if (friend.avatar) {
-              friendItem.appendChild(el('img', {src: friend.avatar, style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
-            } else {
-              friendItem.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+        // Show "View All Friends" button if collapsed
+        if (!state.showAllFriends) {
+          var viewAllBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', background: t.bg, color: t.text, fontWeight: '600', fontSize: '14px', border: '1px solid ' + t.border}, onClick: function() { setState({showAllFriends: true}); }}, 'View All Friends →');
+          friendsSection.appendChild(viewAllBtn);
+        } else {
+          // Search bar
+          var searchWrap = el('div', {style: {marginBottom: '12px'}});
+          var searchInput = el('input', {
+            placeholder: 'Search friends...',
+            value: state.friendSearch,
+            style: {
+              width: '100%',
+              padding: '12px',
+              borderRadius: '10px',
+              border: '1px solid ' + t.border,
+              background: t.bg,
+              fontSize: '14px',
+              color: t.text,
+              outline: 'none',
+              boxSizing: 'border-box'
             }
-            
-            var friendInfo = el('div', {style: {flex: '1'}});
-            friendInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
-            if (friend.birthday) {
-              var bParts = friend.birthday.split('-');
-              var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
-              friendInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})));
+          });
+          searchInput.oninput = function(e) {
+            state.friendSearch = e.target.value;
+            render();
+          };
+          searchWrap.appendChild(searchInput);
+          friendsSection.appendChild(searchWrap);
+          
+          // Filter friends by search
+          var filteredFriends = state.friends.filter(function(f) {
+            if (!state.friendSearch) return true;
+            return f.username && f.username.toLowerCase().includes(state.friendSearch.toLowerCase());
+          });
+          
+          // Show filtered friends
+          if (filteredFriends.length === 0) {
+            friendsSection.appendChild(el('p', {style: {margin: '12px 0', fontSize: '13px', color: t.muted, textAlign: 'center'}}, 'No friends found'));
+          } else {
+            for (var i = 0; i < filteredFriends.length; i++) {
+              (function(friend, idx) {
+                var friendItem = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', background: t.bg, marginBottom: idx < filteredFriends.length - 1 ? '8px' : '0'}, onClick: function() { setState({friendProfile: friend, friendCalDate: new Date(), view: 'friendProfile'}); }});
+                
+                if (friend.avatar) {
+                  friendItem.appendChild(cachedImage(friend.avatar, {style: {width: '44px', height: '44px', borderRadius: '14px', objectFit: 'cover'}}));
+                } else {
+                  friendItem.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '14px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
+                }
+                
+                var friendInfo = el('div', {style: {flex: '1'}});
+                friendInfo.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: t.text}}, friend.username || 'Friend'));
+                if (friend.birthday) {
+                  var bParts = friend.birthday.split('-');
+                  var bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+                  friendInfo.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, '🎂 ' + bDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})));
+                }
+                friendItem.appendChild(friendInfo);
+                
+                friendItem.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '→'));
+                
+                friendsSection.appendChild(friendItem);
+              })(filteredFriends[i], i);
             }
-            friendItem.appendChild(friendInfo);
-            
-            friendItem.appendChild(el('span', {style: {fontSize: '18px', color: t.muted}}, '→'));
-            
-            friendsSection.appendChild(friendItem);
-          })(state.friends[i]);
+          }
+          
+          // Hide button
+          var hideBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: t.bg, color: t.muted, fontWeight: '600', fontSize: '13px', marginTop: '12px', border: '1px solid ' + t.border}, onClick: function() { setState({showAllFriends: false, friendSearch: ''}); }}, '← Hide Friends List');
+          friendsSection.appendChild(hideBtn);
         }
+        
         info.appendChild(friendsSection);
       }
       
@@ -4770,7 +4840,14 @@ window.onerror = function(msg, url, line, col, error) {
           if (post) {
             cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
             cell.appendChild(el('span', {style: {fontSize: '8px'}}, '📮'));
-            cell.onclick = function() { setState({friendDayPost: post, view: 'friendDayDetail'}); };
+            cell.onclick = function() {
+              // Check if user has posted today
+              if (!state.posted) {
+                alert('📮 Post a postcard today to view your friends\' postcards!');
+                return;
+              }
+              setState({friendDayPost: post, view: 'friendDayDetail'});
+            };
           } else {
             cell.appendChild(el('span', {style: {fontSize: '12px'}}, d));
           }
