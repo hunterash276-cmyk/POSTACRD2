@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.0';
+var APP_VERSION = '2.7.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -261,7 +261,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.6.1': '✨ BADGES + DRAFT FIX: 🏆 Founding Member badges! All existing users get "✨ FOUNDING MEMBER" badge (subtle white). ashthunter@icloud.com gets "⭐ CREATOR" (blue). Shows on profile + feed. Migration auto-runs once. 💾 Draft compression SUPER aggressive (800px @ 60%) for localStorage. Added error handling (returns original if fails). Better logging. Drafts WORK offline! 79 functions.',
     '2.6.2': '🔧 HOTFIX: Fixed duplicate function closing in compressImage (syntax error). 🎵 iTunes search improvements: 25 results (was 10), timeout detection, better error messages. Alerts if no results ("try different search"). ALL iTunes songs available - proxy may be slow sometimes. Fixed!',
     '2.6.3': '🏷️ BADGE POLISH: ✅ Removed emojis (⭐✨) from all badges - clean look. ✅ Badges now inline with username (not below). ✅ FIXED MIGRATION! Updates state immediately + force render. Existing users get badges NOW. Profile: "Username CREATOR/FOUNDING", Feed: smaller badges. Migration logs to console. All fixed!',
-    '2.7.0': '📱 PWA CACHE FIX (CRITICAL): ✅ SOLVES "needs web server" error! Aggressive cache busting: clears ALL caches + service workers on version change. Auto-reload with ?v= query param. Uses sessionStorage to track reload state. No more deleting from homescreen! Just refresh page once and new version loads. TESTED & WORKS!'
+    '2.7.0': '📱 PWA CACHE FIX (CRITICAL): ✅ SOLVES "needs web server" error! Aggressive cache busting: clears ALL caches + service workers on version change. Auto-reload with ?v= query param. Uses sessionStorage to track reload state. No more deleting from homescreen! Just refresh page once and new version loads. TESTED & WORKS!',
+    '2.7.1': '🏆 BADGE MIGRATION FIX: ✅ FIXES missing founding member badges! Migration now re-runs for users with foundingMember=false. Changed cutoff to 2026-01-24 (tomorrow) so ALL current users get badges. Added detailed console logging. Re-runs migration if user should be founding but isn\'t. Users just need to refresh once!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -617,11 +618,25 @@ window.onerror = function(msg, url, line, col, error) {
         }
         
         // Founding Member Migration - mark existing users (one-time)
-        // Only users who don't have foundingMember field yet
-        if (data.foundingMember === undefined) {
+        // Only users who don't have foundingMember field yet, OR users who have it set to false but should be true
+        var migrationDate = new Date('2026-01-24T00:00:00Z'); // Tomorrow - all current users get badge
+        var userCreated = data.createdAt ? new Date(data.createdAt) : new Date(0);
+        var shouldBeFounding = userCreated < migrationDate;
+        
+        // Re-run migration if:
+        // 1. foundingMember is undefined (never migrated)
+        // 2. foundingMember is false BUT they should be founding (wrong migration)
+        var needsMigration = (data.foundingMember === undefined) || 
+                             (data.foundingMember === false && shouldBeFounding);
+        
+        if (needsMigration) {
           console.log('[Migration] Running founding member migration for user');
-          var migrationDate = new Date('2026-01-23'); // Today's date
-          var userCreated = data.createdAt ? new Date(data.createdAt) : new Date(0);
+          console.log('[Migration] User createdAt:', data.createdAt);
+          console.log('[Migration] Migration cutoff:', migrationDate.toISOString());
+          console.log('[Migration] User created:', userCreated.toISOString());
+          console.log('[Migration] Should be founding?', shouldBeFounding);
+          console.log('[Migration] Current foundingMember status:', data.foundingMember);
+          
           var updateData = {};
           
           // Add email if missing (for existing users)
@@ -630,7 +645,7 @@ window.onerror = function(msg, url, line, col, error) {
           }
           
           // If account created before migration date, they're a founding member
-          if (userCreated < migrationDate) {
+          if (shouldBeFounding) {
             updateData.foundingMember = true;
             updateData.foundingMemberSince = new Date().toISOString();
             
@@ -638,16 +653,20 @@ window.onerror = function(msg, url, line, col, error) {
             state.userData.foundingMember = true;
             if (updateData.email) state.userData.email = updateData.email;
             
+            console.log('[Migration] ✅ Marking user as FOUNDING MEMBER');
+            
             db.collection('users').doc(uid).update(updateData).then(function() {
-              console.log('[Migration] User marked as founding member and saved to Firebase');
+              console.log('[Migration] ✅ User marked as founding member and saved to Firebase');
               render(); // Force re-render to show badge
             }).catch(function(err) {
-              console.error('[Migration] Failed to mark founding member:', err);
+              console.error('[Migration] ❌ Failed to mark founding member:', err);
             });
           } else {
             // New user, not a founding member
             updateData.foundingMember = false;
             state.userData.foundingMember = false;
+            
+            console.log('[Migration] Marking user as NEW USER (not founding member)');
             
             db.collection('users').doc(uid).update(updateData).catch(function(err) {
               console.error('[Migration] Failed to mark non-founding member:', err);
