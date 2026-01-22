@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.6';
+var APP_VERSION = '2.8.7';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -297,7 +297,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!',
     '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!',
     '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.',
-    '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!'
+    '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!',
+    '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3618,7 +3619,7 @@ window.onerror = function(msg, url, line, col, error) {
       
       if (olderPosts.length > 0) {
         // Older posts (removed opacity - keep them looking normal)
-        var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', zIndex: '1'}});
+        var olderWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', zIndex: '1'}});
         for (var i = 0; i < olderPosts.length; i++) {
           (function(p) {
             var isMyPost = state.user && p.userId === state.user.uid;
@@ -5743,7 +5744,7 @@ window.onerror = function(msg, url, line, col, error) {
       var page = el('div', {style: {minHeight: '100vh', padding: '16px'}});
       page.appendChild(el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '12px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10'}, onClick: function() { setState({view: 'friendProfile', friendDayPost: null}); }}, '✕'));
       var wrap = el('div', {style: {paddingTop: '40px'}});
-      wrap.appendChild(postcardEl(state.friendDayPost, state.friendProfile, {showPrivate: false, isOwner: false, showMenu: false, showStamp: true}));
+      wrap.appendChild(postcardEl(state.friendDayPost, state.friendProfile, {showPrivate: false, isOwner: false, showMenu: false, showStamp: true, enablePreview: true}));
       page.appendChild(wrap);
       app.appendChild(page);
       return;
@@ -5757,7 +5758,7 @@ window.onerror = function(msg, url, line, col, error) {
       var owner = {};
       for (var k in state.userData) owner[k] = state.userData[k];
       owner.id = state.user ? state.user.uid : null;
-      wrap.appendChild(postcardEl(state.dayPost, owner, {showPrivate: true, isOwner: true, showMenu: true, showStamp: true}));
+      wrap.appendChild(postcardEl(state.dayPost, owner, {showPrivate: true, isOwner: true, showMenu: true, showStamp: true, enablePreview: true}));
       
       // Show reactions list below postcard (only on user's own calendar)
       var reactions = state.dayPost.reactions || {};
