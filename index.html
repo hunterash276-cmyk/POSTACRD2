@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.5.1';
+var APP_VERSION = '2.5.2';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -255,7 +255,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!',
     '2.4.1': '🔧 POLISH FIXES: ⌨️ Friend search fixed! Added stopPropagation() to all keyboard events - no more triggering buttons behind. Type freely! 📸 Offline photos fixed! Draft loading in offline catch handler + cachedImage() skips preload for data URLs. Photos taken offline now show up perfectly when back online. Careful work!',
     '2.5.0': '🎉 MAJOR OFFLINE UPDATE: ⌨️ Friend search ACTUALLY works! Updates only list container, not full page render. Type smoothly! 📝 DRAFT SYSTEM: Save postcards offline → show in Mailbox. Today\'s = upload to feed. Past = calendar only. Upload/delete buttons. 🖼️ Profile pic caches for offline! 📡 Music search shows offline warning (orange banner). 78 functions (+4: loadSavedDrafts, saveDraft, deleteDraft, uploadDraft). Complete offline experience!',
-    '2.5.1': '🎨 COLLAGE POLISH + OFFLINE FIX: 📅 Past collages show theme label (🎨 Theme: X). 📐 Photos preserve aspect ratio (portrait 3:4, landscape 4:3) instead of forced squares. ✨ Removed gaps between photos (gap: 0, flush together). 📡 OFFLINE: Music now optional! Can proceed past step 2 without music. Sets placeholder "No Music (Offline)". Draft system works perfectly offline! All features intact, 78 functions.'
+    '2.5.1': '🎨 COLLAGE POLISH + OFFLINE FIX: 📅 Past collages show theme label (🎨 Theme: X). 📐 Photos preserve aspect ratio (portrait 3:4, landscape 4:3) instead of forced squares. ✨ Removed gaps between photos (gap: 0, flush together). 📡 OFFLINE: Music now optional! Can proceed past step 2 without music. Sets placeholder "No Music (Offline)". Draft system works perfectly offline! All features intact, 78 functions.',
+    '2.5.2': '🔧 CRITICAL FIXES: 🖼️ Group photos update INSTANTLY (reloads group data after upload). 🔴 Next button turns RED when ready offline (checks state.online). 💾 Button says "Save Draft" offline only. ✅ Fixed draft saving (better validation, ensures array, clears working draft). 🚫 Upload prevented offline (clear error). 📅 Past midnight = calendar only (with confirmation). Professional messaging throughout. 78 functions.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -435,7 +436,20 @@ window.onerror = function(msg, url, line, col, error) {
   }
 
   function saveDraft(draftData) {
-    if (!state.user) return;
+    if (!state.user) {
+      console.error('[Drafts] No user logged in');
+      return null;
+    }
+    
+    if (!draftData.photo || !draftData.outfit) {
+      console.error('[Drafts] Missing required photo data');
+      return null;
+    }
+    
+    // Ensure savedDrafts is an array
+    if (!state.savedDrafts) {
+      state.savedDrafts = [];
+    }
     
     var draft = {
       id: Date.now().toString(),
@@ -443,19 +457,19 @@ window.onerror = function(msg, url, line, col, error) {
       savedAt: new Date().toISOString(),
       photo: draftData.photo,
       outfit: draftData.outfit,
-      songTitle: draftData.songTitle,
-      songArtist: draftData.songArtist,
-      songArtwork: draftData.songArtwork,
-      songPreview: draftData.songPreview,
-      loc: draftData.loc,
-      quote: draftData.quote,
-      privateNote: draftData.privateNote,
-      photoX: draftData.photoX,
-      photoY: draftData.photoY,
-      outfitX: draftData.outfitX,
-      outfitY: draftData.outfitY,
-      songFont: draftData.songFont,
-      songColor: draftData.songColor
+      songTitle: draftData.songTitle || 'No Music',
+      songArtist: draftData.songArtist || '(Offline)',
+      songArtwork: draftData.songArtwork || '',
+      songPreview: draftData.songPreview || '',
+      loc: draftData.loc || '',
+      quote: draftData.quote || '',
+      privateNote: draftData.privateNote || '',
+      photoX: draftData.photoX || 0,
+      photoY: draftData.photoY || 0,
+      outfitX: draftData.outfitX || 0,
+      outfitY: draftData.outfitY || 0,
+      songFont: draftData.songFont || 0,
+      songColor: draftData.songColor || 0
     };
     
     state.savedDrafts.push(draft);
@@ -467,6 +481,8 @@ window.onerror = function(msg, url, line, col, error) {
       return draft;
     } catch (e) {
       console.error('[Drafts] Failed to save draft:', e);
+      // Remove from array if save failed
+      state.savedDrafts.pop();
       return null;
     }
   }
@@ -486,16 +502,26 @@ window.onerror = function(msg, url, line, col, error) {
   }
 
   function uploadDraft(draft) {
-    if (!state.online) {
-      alert('Cannot upload draft while offline. Please connect to internet.');
+    // Check if offline - stay in drafts
+    if (!state.online || !navigator.onLine) {
+      alert('📡 No Internet Connection\n\nCannot upload draft while offline. Please connect to WiFi or cellular data first.');
       return;
     }
     
     var today = new Date().toISOString().split('T')[0];
     var canUploadToFeed = draft.date === today;
     
+    // Explain what will happen based on date
     if (!canUploadToFeed) {
-      alert('This draft is from ' + draft.date + '. It will be added to your calendar but not the feed (only today\'s posts appear in feed).');
+      var confirmMsg = '📅 Past Draft\n\nThis draft is from ' + draft.date + ' (not today).\n\nIt will be added to your personal calendar only - NOT the friends feed.\n\nContinue?';
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+    } else {
+      var confirmMsg = '✨ Upload Today\'s Draft?\n\nThis draft will be posted to your friends feed and calendar.\n\nContinue?';
+      if (!confirm(confirmMsg)) {
+        return;
+      }
     }
     
     setState({uploading: true});
@@ -505,7 +531,12 @@ window.onerror = function(msg, url, line, col, error) {
       deleteDraft(draft.id);
       loadSavedDrafts();
       setState({uploading: false});
-      alert('Draft uploaded successfully! 🎉');
+      
+      if (canUploadToFeed) {
+        alert('✅ Posted to Feed!\n\nYour postcard is now live for friends to see.');
+      } else {
+        alert('✅ Added to Calendar!\n\nYour postcard from ' + draft.date + ' has been saved to your calendar.');
+      }
       
       if (state.user) {
         loadUserData(state.user.uid);
@@ -1445,7 +1476,15 @@ window.onerror = function(msg, url, line, col, error) {
       
       var saved = saveDraft(draftData);
       if (saved) {
-        alert('📱 No internet connection!\n\nYour postcard has been saved as a draft. You can upload it from the Mailbox when you\'re back online.');
+        // Clear the working draft since it's now saved
+        try {
+          localStorage.removeItem('postcard_draft_' + state.user.uid);
+          console.log('[Draft] Cleared working draft after saving');
+        } catch (e) {
+          console.error('[Draft] Failed to clear working draft:', e);
+        }
+        
+        alert('💾 Draft Saved!\n\nYour postcard has been saved. You can upload it from the Mailbox when you\'re back online.');
         
         // Clear the form
         setState({
@@ -2288,6 +2327,28 @@ window.onerror = function(msg, url, line, col, error) {
       };
       return db.collection('groups').doc(groupId).update(updateData);
     }).then(function() {
+      console.log('[Group] Photo uploaded successfully');
+      
+      // Reload the group to get fresh data with our photo
+      return db.collection('groups').doc(groupId).get();
+    }).then(function(doc) {
+      if (doc.exists) {
+        var updatedGroup = doc.data();
+        updatedGroup.id = doc.id;
+        
+        // Update in groups array
+        for (var i = 0; i < state.groups.length; i++) {
+          if (state.groups[i].id === groupId) {
+            state.groups[i] = updatedGroup;
+            break;
+          }
+        }
+        
+        // Update current group
+        state.currentGroup = updatedGroup;
+        console.log('[Group] Group data reloaded with new photo');
+      }
+      
       setState({groupPhoto: null, groupPhotoOrientation: null, groupView: 'detail'});
     }).catch(function(e) {
       console.error(e);
@@ -3447,7 +3508,8 @@ window.onerror = function(msg, url, line, col, error) {
               // Update button state without full re-render
               var nextBtn = document.getElementById('step2NextBtn');
               if (nextBtn) {
-                var canGo = state.np.songTitle && state.np.songArtist && state.np.loc;
+                // Offline: only location needed. Online: location + music needed.
+                var canGo = state.np.loc && (state.online ? (state.np.songTitle && state.np.songArtist) : true);
                 nextBtn.style.opacity = canGo ? '1' : '0.4';
                 nextBtn.style.background = canGo ? t.accent : t.border;
               }
@@ -3611,7 +3673,11 @@ window.onerror = function(msg, url, line, col, error) {
         
         var btns = el('div', {style: {display: 'flex', gap: '12px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 3}); }}, '← Edit'));
-        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: state.uploading ? '0.5' : '1', pointerEvents: state.uploading ? 'none' : 'auto'}, onClick: function() { if (!state.uploading) submit(); }}, state.uploading ? 'Sending...' : 'Send ✈️'));
+        
+        // Change button text based on online status
+        var buttonText = state.uploading ? 'Saving...' : (state.online ? 'Send ✈️' : 'Save Draft 💾');
+        
+        btns.appendChild(el('span', {className: 'tap', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: state.uploading ? '0.5' : '1', pointerEvents: state.uploading ? 'none' : 'auto'}, onClick: function() { if (!state.uploading) submit(); }}, buttonText));
         content.appendChild(btns);
         
         page.appendChild(content);
