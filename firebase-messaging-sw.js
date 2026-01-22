@@ -1,10 +1,9 @@
 // firebase-messaging-sw.js
-// STEP 1: Save this file as "firebase-messaging-sw.js" in the SAME folder as your index.html
+// Place this file in the SAME folder as your index.html
 
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
-// Your Firebase config (SAME as in index.html)
 firebase.initializeApp({
   apiKey: "AIzaSyCVCSTiYb0oj-qiWrQA6PNJw3L1LcQcN2k",
   authDomain: "postcard-d055d.firebaseapp.com",
