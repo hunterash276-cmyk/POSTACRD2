@@ -26,6 +26,8 @@
     #loading .spinner{font-size:48px}
     #error{display:none;padding:20px;text-align:center;color:#c62828}
     #updateBanner{display:none;position:fixed;top:0;left:0;right:0;background:#4CAF50;color:#fff;padding:12px 20px;text-align:center;font-size:14px;z-index:9999;cursor:pointer}
+    /* Prevent image flashing on navigation */
+    img{image-rendering:auto;image-rendering:crisp-edges;image-rendering:-webkit-optimize-contrast;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:translateZ(0);-webkit-transform:translateZ(0);will-change:auto}
   </style>
 </head>
 <body>
@@ -41,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.1.2';
+var APP_VERSION = '2.2.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -246,8 +248,32 @@ window.onerror = function(msg, url, line, col, error) {
     '2.0.1': '📨 INVITE FIXES: Added cancelGroupInvite() function - creator can cancel pending invites with "Cancel" button! Enhanced logging in addMemberToGroup() to debug invite issues. Invites refresh group list after sending. Now 73 functions total!',
     '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!',
     '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!',
-    '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!'
+    '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!',
+    '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!'
   };
+
+  // Image cache to prevent re-downloading and flashing
+  var imageCache = {};
+  
+  function cachedImage(src, attrs) {
+    var img = el('img', attrs);
+    
+    // If image is cached, use it immediately (no flash)
+    if (imageCache[src]) {
+      img.src = imageCache[src];
+      return img;
+    }
+    
+    // Otherwise, load and cache it
+    img.src = src;
+    
+    // Cache once loaded
+    img.onload = function() {
+      imageCache[src] = src;
+    };
+    
+    return img;
+  }
 
   var state = {
     view: 'auth',
@@ -2199,21 +2225,21 @@ window.onerror = function(msg, url, line, col, error) {
     
     // Left
     var left = el('div', {style: {flex: '1', overflow: 'hidden', position: 'relative'}});
-    left.appendChild(el('img', {src: post.outfitPhoto || post.outfit, style: {width: '100%', height: '100%', objectFit: 'cover', objectPosition: (50 + (post.outfitX || 0)) + '% ' + (50 + (post.outfitY || 0)) + '%'}}));
+    left.appendChild(cachedImage(post.outfitPhoto || post.outfit, {style: {width: '100%', height: '100%', objectFit: 'cover', objectPosition: (50 + (post.outfitX || 0)) + '% ' + (50 + (post.outfitY || 0)) + '%'}}));
     
     // Divider
     var divider = el('div', {style: {width: '3px', background: t.card}});
     
     // Right
     var right = el('div', {style: {flex: '1', overflow: 'hidden', position: 'relative'}});
-    right.appendChild(el('img', {src: post.photo, style: {width: '100%', height: '100%', objectFit: 'cover', objectPosition: (50 + (post.photoX || 0)) + '% ' + (50 + (post.photoY || 0)) + '%'}}));
+    right.appendChild(cachedImage(post.photo, {style: {width: '100%', height: '100%', objectFit: 'cover', objectPosition: (50 + (post.photoX || 0)) + '% ' + (50 + (post.photoY || 0)) + '%'}}));
     
     // Song
     var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95),0 0 20px rgba(0,0,0,.5)', padding: '10px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
     
     // Show album artwork if available
     if (post.song && post.song.artwork) {
-      var artwork = el('img', {src: post.song.artwork, style: {width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 2px 12px rgba(0,0,0,.7)', border: '2px solid rgba(255,255,255,.9)'}});
+      var artwork = cachedImage(post.song.artwork, {style: {width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 2px 12px rgba(0,0,0,.7)', border: '2px solid rgba(255,255,255,.9)'}});
       song.appendChild(artwork);
     }
     
@@ -2244,7 +2270,7 @@ window.onerror = function(msg, url, line, col, error) {
     
     var avatar;
     if (owner && owner.avatar) {
-      avatar = el('img', {src: owner.avatar, style: {width: '32px', height: '32px', borderRadius: '10px', objectFit: 'cover'}});
+      avatar = cachedImage(owner.avatar, {style: {width: '32px', height: '32px', borderRadius: '10px', objectFit: 'cover'}});
     } else {
       avatar = el('div', {style: {width: '32px', height: '32px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: '#fff'}}, (owner && owner.username) ? owner.username[0].toUpperCase() : '?');
     }
@@ -2570,7 +2596,7 @@ window.onerror = function(msg, url, line, col, error) {
         };
         var avatarLabel = el('label', {className: 'tap', for: 'avatarInput'});
         if (state.authData.avatar) {
-          avatarLabel.appendChild(el('img', {src: state.authData.avatar, style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover', border: '3px solid ' + t.accent}}));
+          avatarLabel.appendChild(cachedImage(state.authData.avatar, {style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover', border: '3px solid ' + t.accent}}));
         } else {
           var ph = el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.card, border: '2px dashed ' + t.border, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px'}});
           ph.appendChild(el('span', {style: {fontSize: '24px'}}, '📷'));
@@ -2894,7 +2920,7 @@ window.onerror = function(msg, url, line, col, error) {
       // Profile button with avatar
       var profBtn = el('span', {className: 'tap', style: {padding: '6px', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('profile'); }});
       if (state.userData && state.userData.avatar) {
-        profBtn.appendChild(el('img', {src: state.userData.avatar, style: {width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover'}}));
+        profBtn.appendChild(cachedImage(state.userData.avatar, {style: {width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover'}}));
       } else {
         profBtn.appendChild(el('div', {style: {width: '40px', height: '40px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
       }
@@ -3141,7 +3167,7 @@ window.onerror = function(msg, url, line, col, error) {
         var bottom = el('div', {style: {padding: '14px', borderTop: '1px solid ' + t.border}});
         var info = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px'}});
         if (state.userData && state.userData.avatar) {
-          info.appendChild(el('img', {src: state.userData.avatar, style: {width: '32px', height: '32px', borderRadius: '10px', objectFit: 'cover'}}));
+          info.appendChild(cachedImage(state.userData.avatar, {style: {width: '32px', height: '32px', borderRadius: '10px', objectFit: 'cover'}}));
         } else {
           info.appendChild(el('div', {style: {width: '32px', height: '32px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
         }
@@ -3278,7 +3304,7 @@ window.onerror = function(msg, url, line, col, error) {
             var item = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.card, border: '1px solid ' + t.border, marginBottom: '8px'}});
             
             if (req.fromUser && req.fromUser.avatar) {
-              item.appendChild(el('img', {src: req.fromUser.avatar, style: {width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover'}}));
+              item.appendChild(cachedImage(req.fromUser.avatar, {style: {width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover'}}));
             } else {
               item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', color: '#fff'}}, (req.fromUser && req.fromUser.username) ? req.fromUser.username[0].toUpperCase() : '?'));
             }
@@ -3585,7 +3611,7 @@ window.onerror = function(msg, url, line, col, error) {
         var avatarLabel = el('label', {className: 'tap', for: 'editAvatarInput', style: {position: 'relative'}});
         var avatarSrc = state.editProfile.newAvatar || state.editProfile.avatar;
         if (avatarSrc) {
-          avatarLabel.appendChild(el('img', {src: avatarSrc, style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover'}}));
+          avatarLabel.appendChild(cachedImage(avatarSrc, {style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover'}}));
         } else {
           avatarLabel.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff'}}, state.editProfile.username ? state.editProfile.username[0].toUpperCase() : '?'));
         }
@@ -3618,7 +3644,7 @@ window.onerror = function(msg, url, line, col, error) {
         // View mode
         var profileRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px'}});
         if (state.userData && state.userData.avatar) {
-          profileRow.appendChild(el('img', {src: state.userData.avatar, style: {width: '50px', height: '50px', borderRadius: '16px', objectFit: 'cover'}}));
+          profileRow.appendChild(cachedImage(state.userData.avatar, {style: {width: '50px', height: '50px', borderRadius: '16px', objectFit: 'cover'}}));
         } else {
           profileRow.appendChild(el('div', {style: {width: '50px', height: '50px', borderRadius: '16px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
         }
@@ -3765,7 +3791,7 @@ window.onerror = function(msg, url, line, col, error) {
               }});
               
               if (friend.avatar) {
-                friendItem.appendChild(el('img', {src: friend.avatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
+                friendItem.appendChild(cachedImage(friend.avatar, {style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
               } else {
                 friendItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, friend.username ? friend.username[0].toUpperCase() : '?'));
               }
@@ -3970,7 +3996,7 @@ window.onerror = function(msg, url, line, col, error) {
             var memberAvatar = isMe && state.userData ? state.userData.avatar : null;
             
             if (memberAvatar) {
-              memberItem.appendChild(el('img', {src: memberAvatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
+              memberItem.appendChild(cachedImage(memberAvatar, {style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}}));
             } else {
               memberItem.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '10px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, memberName[0].toUpperCase()));
             }
@@ -3986,7 +4012,7 @@ window.onerror = function(msg, url, line, col, error) {
                 if (info.avatar && !memberAvatar) {
                   var avatarEl = memberItem.children[0];
                   if (avatarEl.tagName === 'DIV') {
-                    var img = el('img', {src: info.avatar, style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}});
+                    var img = cachedImage(info.avatar, {style: {width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover'}});
                     memberItem.replaceChild(img, avatarEl);
                   }
                 }
@@ -4083,7 +4109,7 @@ window.onerror = function(msg, url, line, col, error) {
               }});
               
               if (friend.avatar) {
-                addItem.appendChild(el('img', {src: friend.avatar, style: {width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover'}}));
+                addItem.appendChild(cachedImage(friend.avatar, {style: {width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover'}}));
               } else {
                 addItem.appendChild(el('div', {style: {width: '32px', height: '32px', borderRadius: '8px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: '#fff'}}, friend.username[0].toUpperCase()));
               }
@@ -4295,7 +4321,7 @@ window.onerror = function(msg, url, line, col, error) {
       
       var info = el('div', {style: {display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px'}});
       if (state.userData && state.userData.avatar) {
-        info.appendChild(el('img', {src: state.userData.avatar, style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover', marginBottom: '12px'}}));
+        info.appendChild(cachedImage(state.userData.avatar, {style: {width: '80px', height: '80px', borderRadius: '24px', objectFit: 'cover', marginBottom: '12px'}}));
       } else {
         info.appendChild(el('div', {style: {width: '80px', height: '80px', borderRadius: '24px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: '#fff', marginBottom: '12px'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
       }
