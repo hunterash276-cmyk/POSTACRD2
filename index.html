@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.1.0';
+var APP_VERSION = '3.1.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -447,7 +447,8 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.7': '🎨 CUSTOM BADGE COLORS: ✅ You can now set badge colors in Firebase! Add a customBadgeColor field (e.g. #FF5722, #9C27B0, #4CAF50) to any user and the badge background will use that color.',
     '3.0.8': '📜 SCROLL POSITION FIX: ✅ Friend profiles now start at the top (back arrow visible). ✅ When going back from a friend profile, you return to exactly where you were scrolled in the friends list.',
     '3.0.9': '🎨 PRE-FILLED BADGE COLORS: ✅ customBadgeColor field is now auto-written to Firebase alongside customBadge. CREATOR gets #2196F3 (blue), FOUNDER gets #888888 (gray). Just change the hex code in Firebase to any color you want!',
-    '3.1.0': '🔄 LIVE UPDATE DETECTION: ✅ App now checks Firebase for updates every 2 minutes while running. When you upload a new version and update Firebase, users will see an update popup automatically - no need to restart the app!'
+    '3.1.0': '🔄 LIVE UPDATE DETECTION: ✅ App now checks Firebase for updates every 2 minutes while running. When you upload a new version and update Firebase, users will see an update popup automatically - no need to restart the app!',
+    '3.1.1': '🏷️ INSTANT BADGE UPDATES: ✅ Badge changes now update instantly for everyone! When you change customBadge or customBadgeColor in Firebase, all users see the change in real-time without refreshing.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1173,20 +1174,32 @@ window.onerror = function(msg, url, line, col, error) {
         return;
       }
       
-      // Clear old post listeners
+      // Clear old listeners
       friendPostsUnsubscribes.forEach(function(unsub) { unsub(); });
       friendPostsUnsubscribes = [];
       
+      // Create a map to track friends by ID
+      var friendsMap = {};
       var friendsData = [];
-      var completed = 0;
       
       ids.forEach(function(fid) {
-        db.collection('users').doc(fid).get().then(function(fDoc) {
+        // Use onSnapshot for friend user data - this makes badges update in real-time!
+        var unsubFriendUser = db.collection('users').doc(fid).onSnapshot(function(fDoc) {
           if (fDoc.exists) {
-            var f = {id: fid};
             var fdata = fDoc.data();
+            var isNew = !friendsMap[fid];
+            
+            // Create or update friend object
+            if (!friendsMap[fid]) {
+              friendsMap[fid] = {id: fid, posts: []};
+              friendsData.push(friendsMap[fid]);
+            }
+            
+            var f = friendsMap[fid];
+            
+            // Update all fields from Firebase (including customBadge, customBadgeColor)
             for (var k in fdata) f[k] = fdata[k];
-            f.posts = [];
+            f.id = fid; // Make sure ID stays set
             
             // Auto-write customBadge and customBadgeColor if missing
             if (!fdata.customBadge || !fdata.customBadgeColor) {
@@ -1194,7 +1207,6 @@ window.onerror = function(msg, url, line, col, error) {
               var badgeColor = fdata.customBadgeColor || null;
               var needsUpdate = false;
               
-              // Determine badge if missing
               if (!badge) {
                 if (fdata.email === 'ashthunter@icloud.com') {
                   badge = 'CREATOR';
@@ -1203,54 +1215,34 @@ window.onerror = function(msg, url, line, col, error) {
                 }
               }
               
-              // Determine color if missing (based on badge type)
               if (badge && !badgeColor) {
                 if (badge === 'CREATOR') {
-                  badgeColor = '#2196F3'; // Blue
+                  badgeColor = '#2196F3';
                 } else if (badge === 'FOUNDER') {
-                  badgeColor = '#888888'; // Gray
+                  badgeColor = '#888888';
                 } else {
-                  badgeColor = '#E07A5F'; // Accent color for custom badges
+                  badgeColor = '#E07A5F';
                 }
                 needsUpdate = true;
               }
               
-              // Also update if badge was missing
               if (!fdata.customBadge && badge) {
                 needsUpdate = true;
               }
               
               if (needsUpdate && badge) {
                 console.log('[Badge] Auto-setting for', fdata.username || fid, '→', badge, badgeColor);
-                db.collection('users').doc(fid).update({ customBadge: badge, customBadgeColor: badgeColor }).then(function() {
-                  console.log('[Badge] ✅ Saved customBadge + customBadgeColor for', fdata.username || fid);
-                  f.customBadge = badge;
-                  f.customBadgeColor = badgeColor;
-                }).catch(function(err) {
-                  console.error('[Badge] Failed to save customBadge:', err);
+                db.collection('users').doc(fid).update({ customBadge: badge, customBadgeColor: badgeColor }).catch(function(err) {
+                  console.error('[Badge] Failed to save:', err);
                 });
               }
             }
             
-            // Set up real-time listener for this friend's posts (no orderBy to avoid index requirement)
-            var unsubFriendPosts = db.collection('posts')
-              .where('userId', '==', fid)
-              .onSnapshot(function(pSnap) {
-                f.posts = [];
-                pSnap.forEach(function(d) {
-                  var p = {id: d.id};
-                  var pdata = d.data();
-                  for (var k in pdata) p[k] = pdata[k];
-                  f.posts.push(p);
-                });
-                // Sort by date descending
-                f.posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
-                // Update state with new posts
-                setState({friends: state.friends.slice()});
-              }, function(error) {
-                console.error('Friend posts listener error:', error);
-                // Fallback fetch
-                db.collection('posts').where('userId', '==', fid).get().then(function(pSnap) {
+            // Set up posts listener only once per friend
+            if (isNew) {
+              var unsubFriendPosts = db.collection('posts')
+                .where('userId', '==', fid)
+                .onSnapshot(function(pSnap) {
                   f.posts = [];
                   pSnap.forEach(function(d) {
                     var p = {id: d.id};
@@ -1260,23 +1252,21 @@ window.onerror = function(msg, url, line, col, error) {
                   });
                   f.posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
                   setState({friends: state.friends.slice()});
+                }, function(error) {
+                  console.error('Friend posts listener error:', error);
                 });
-              });
-            
-            friendPostsUnsubscribes.push(unsubFriendPosts);
-            friendsData.push(f);
-            completed++;
-            
-            if (completed === ids.length) {
-              setState({friends: friendsData});
+              
+              friendPostsUnsubscribes.push(unsubFriendPosts);
             }
-          } else {
-            completed++;
-            if (completed === ids.length) {
-              setState({friends: friendsData});
-            }
+            
+            // Update state
+            setState({friends: friendsData.slice()});
           }
+        }, function(error) {
+          console.error('Friend user listener error:', error);
         });
+        
+        friendPostsUnsubscribes.push(unsubFriendUser);
       });
     }, function(error) {
       console.error('Friends listener error:', error);
