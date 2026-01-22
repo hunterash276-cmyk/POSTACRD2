@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.3';
+var APP_VERSION = '3.0.4';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -429,7 +429,8 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again!',
     '3.0.1': '🎵 MUSIC SEARCH FIXED: ✅ Typing works properly now (no more losing focus). ✅ Uses 3 fallback proxy servers - if one fails, tries the next. ✅ Clean Search button. Reliable song search!',
     '3.0.2': '🔧 BUG FIXES: ✅ Duplicate posts fixed - no more ghost posts appearing after upload. ✅ Reactions no longer restart the song - music keeps playing when you react to posts!',
-    '3.0.3': '✏️ EDIT SCREEN FIXES: ✅ Song display now shows album artwork + text wrapped at 15 chars (matches final postcard). ✅ Up/down arrows fixed - now move images in the correct direction. ✅ Edit hint is now more prominent so users notice it.'
+    '3.0.3': '✏️ EDIT SCREEN FIXES: ✅ Song display now shows album artwork + text wrapped at 15 chars (matches final postcard). ✅ Up/down arrows fixed - now move images in the correct direction. ✅ Edit hint is now more prominent so users notice it.',
+    '3.0.4': '🔔 UPDATE NOTIFICATIONS FIXED: ✅ Now shows a prominent popup modal when there is a new update - impossible to miss! The modal shows version number and what changed.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1442,6 +1443,9 @@ window.onerror = function(msg, url, line, col, error) {
       if (!alreadyHasNotif) {
         console.log('[Update Check] Creating notification for version', APP_VERSION);
         
+        // Show prominent update modal
+        showUpdateModal(APP_VERSION, UPDATE_NOTES[APP_VERSION]);
+        
         // Create the notification
         var notif = {
           id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -1481,6 +1485,27 @@ window.onerror = function(msg, url, line, col, error) {
     }
     
     return false;
+  }
+  
+  function showUpdateModal(version, notes) {
+    // Remove any existing modal
+    var existing = document.getElementById('updateModal');
+    if (existing) existing.remove();
+    
+    var modal = document.createElement('div');
+    modal.id = 'updateModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
+    
+    box.innerHTML = '<div style="font-size:40px;margin-bottom:12px;">🎉</div>' +
+      '<h2 style="margin:0 0 8px;color:#2D2A26;font-size:20px;">Updated to v' + version + '</h2>' +
+      '<p style="margin:0 0 20px;color:#666;font-size:14px;line-height:1.5;">' + notes + '</p>' +
+      '<button onclick="document.getElementById(\'updateModal\').remove();" style="background:#E07A5F;color:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;width:100%;">Got it!</button>';
+    
+    modal.appendChild(box);
+    document.body.appendChild(modal);
   }
 
   // Generate a unique 8-character friend code (case-sensitive: uppercase, lowercase, numbers)
