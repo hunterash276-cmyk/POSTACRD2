@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.8';
+var APP_VERSION = '2.8.9';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -299,7 +299,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.',
     '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!',
     '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!',
-    '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!'
+    '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!',
+    '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -1812,6 +1813,16 @@ window.onerror = function(msg, url, line, col, error) {
     var postDate = postData.date || new Date().toISOString().split('T')[0];
     console.log('[Upload] Uploading post for date:', postDate);
     
+    // CRITICAL: Check if this date is already being uploaded RIGHT NOW
+    if (uploadingDates[postDate]) {
+      console.error('[Upload] ❌ BLOCKED: Already uploading post for', postDate);
+      return Promise.reject(new Error('Upload already in progress for ' + postDate));
+    }
+    
+    // Mark this date as being uploaded
+    uploadingDates[postDate] = true;
+    console.log('[Upload] 🔒 Marked date as uploading:', postDate);
+    
     var existingPost = null;
     
     // Check in loaded posts
@@ -1824,6 +1835,7 @@ window.onerror = function(msg, url, line, col, error) {
     
     if (existingPost) {
       console.error('[Upload] DUPLICATE PREVENTED: Post already exists for', postDate);
+      delete uploadingDates[postDate]; // Release date lock
       return Promise.reject(new Error('You already posted for ' + postDate + '! Found existing post: ' + existingPost.id));
     }
     
@@ -1835,6 +1847,7 @@ window.onerror = function(msg, url, line, col, error) {
       .then(function(snapshot) {
         if (!snapshot.empty) {
           console.error('[Upload] DUPLICATE PREVENTED: Found existing post in Firebase for', postDate);
+          delete uploadingDates[postDate]; // Release date lock
           throw new Error('You already posted for ' + postDate + '!');
         }
         
@@ -1879,9 +1892,20 @@ window.onerror = function(msg, url, line, col, error) {
             post.id = ref.id;
             state.myPosts.unshift(post);
             console.log('[Upload] Post successfully created:', post.id);
+            
+            // Release date lock after successful upload
+            delete uploadingDates[postDate];
+            console.log('[Upload] 🔓 Released date lock for:', postDate);
+            
             return post;
           });
         });
+      })
+      .catch(function(error) {
+        // Release date lock on any error
+        delete uploadingDates[postDate];
+        console.log('[Upload] 🔓 Released date lock for:', postDate, '(error)');
+        throw error;
       });
   }
 
@@ -5813,6 +5837,9 @@ window.onerror = function(msg, url, line, col, error) {
   
   // GLOBAL UPLOAD LOCK - prevents duplicate submissions during re-renders
   var uploadInProgress = false;
+  
+  // Track which dates are currently being uploaded (prevents duplicate posts for same date)
+  var uploadingDates = {};
   var lastFocusState = true;
   var lastVisibilityState = 'visible';
   var monitoringActive = false;
