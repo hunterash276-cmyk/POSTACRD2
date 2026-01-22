@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.0';
+var APP_VERSION = '1.7.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -223,7 +223,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.6.0': '🔊 AUTOPLAY FIX: Added "Tap to enable audio" prompt on first load (bypasses browser autoplay policy). Audio automatically enabled when you click ANY tab. After one tap, audio plays instantly forever! SOLVES THE REAL ISSUE!',
     '1.6.1': '🔊 BUTTON FIXED: Enable audio button now has 200ms delay for DOM, comprehensive logging, uses display:none instead of remove(). Added tap class. Console shows exactly what happens. BUTTON ACTUALLY WORKS NOW!',
     '1.6.2': '🔊 SIMPLIFIED: Button just enables flag + triggers tiny scroll to wake IntersectionObserver. IntersectionObserver checks audioEnabled before playing. Much simpler, more reliable. SHOULD ACTUALLY WORK!',
-    '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!'
+    '1.7.0': '🎵 BUTTON REMOVED: Deleted annoying audio button completely. Audio tries to play automatically, works after ANY user interaction (click tab, scroll, etc). Natural browser behavior. Group members NOT duplicated. Clean!',
+    '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!'
   };
 
   var state = {
@@ -2425,6 +2426,32 @@ window.onerror = function(msg, url, line, col, error) {
     var app = document.getElementById('app');
     app.innerHTML = '';
     
+    // Splash screen - show once on first load to enable audio
+    if (!window.audioUnlocked && state.user) {
+      var splash = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: t.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: '10000', padding: '40px'}});
+      
+      splash.appendChild(el('div', {style: {fontSize: '80px', marginBottom: '24px', animation: 'bounce 1s ease infinite'}}, '✈️'));
+      splash.appendChild(el('h1', {style: {margin: '0 0 12px', fontSize: '32px', fontWeight: '700', color: t.text}}, 'postcard'));
+      splash.appendChild(el('p', {style: {margin: '0 0 40px', fontSize: '16px', color: t.muted, textAlign: 'center'}}, 'Share your day with friends'));
+      
+      var continueBtn = el('div', {className: 'tap', style: {
+        padding: '18px 48px',
+        borderRadius: '16px',
+        background: t.accent,
+        color: '#fff',
+        fontSize: '18px',
+        fontWeight: '600',
+        boxShadow: '0 4px 20px rgba(0,0,0,.15)'
+      }, onClick: function() {
+        window.audioUnlocked = true;
+        setState({}); // Trigger re-render
+      }}, 'Continue');
+      
+      splash.appendChild(continueBtn);
+      app.appendChild(splash);
+      return; // Don't render anything else
+    }
+    
     // Saving overlay
     if (state.saving) {
       var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '1000'}});
@@ -2600,13 +2627,7 @@ window.onerror = function(msg, url, line, col, error) {
       btns.appendChild(mailBtn);
       
       btns.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { nav('settings'); }}, '⚙️'));
-      var profBtn = el('span', {className: 'tap', style: {padding: '8px', position: 'relative'}, onClick: function() { nav('profile'); }});
-      if (state.userData && state.userData.avatar) {
-        profBtn.appendChild(el('img', {src: state.userData.avatar, style: {width: '36px', height: '36px', borderRadius: '12px', objectFit: 'cover'}}));
-      } else {
-        profBtn.appendChild(el('div', {style: {width: '36px', height: '36px', borderRadius: '12px', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600', color: '#fff'}}, (state.userData && state.userData.username) ? state.userData.username[0].toUpperCase() : '?'));
-      }
-      btns.appendChild(profBtn);
+      // Removed profile button from header - it's in bottom nav
       
       header.appendChild(logoWrap);
       header.appendChild(btns);
