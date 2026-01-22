@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.2.0';
+var APP_VERSION = '2.3.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -249,7 +249,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.1.0': '💾 DRAFT SAVING: Photos now save immediately to localStorage when taken! Even if you close the app, your outfit/photo will be there when you come back. Draft clears only after successful post. setNp() saves, loadUserData() loads, submit clears. Perfect!',
     '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!',
     '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!',
-    '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!'
+    '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!',
+    '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -308,6 +309,7 @@ window.onerror = function(msg, url, line, col, error) {
     savedImage: null,
     uploading: false,
     editProfile: {username: '', avatar: null, newAvatar: null},
+    online: navigator.onLine,  // Track online status
     editingProfile: false,
     savingProfile: false,
     birthdayPopup: null,
@@ -360,6 +362,55 @@ window.onerror = function(msg, url, line, col, error) {
     }
     render();
   }
+
+  // Offline mode handling
+  function handleOnline() {
+    console.log('[Offline] Back online!');
+    setState({online: true});
+    
+    // Try to sync any pending posts
+    syncPendingPost();
+  }
+
+  function handleOffline() {
+    console.log('[Offline] Connection lost - offline mode active');
+    setState({online: false});
+  }
+
+  function syncPendingPost() {
+    // Check if there's a pending post to upload
+    if (!state.user) return;
+    
+    var pendingKey = 'postcard_pending_' + state.user.uid;
+    var pending = localStorage.getItem(pendingKey);
+    
+    if (pending) {
+      console.log('[Offline] Found pending post, attempting to sync...');
+      try {
+        var postData = JSON.parse(pending);
+        
+        // Upload the post
+        uploadPost(postData).then(function() {
+          console.log('[Offline] Successfully synced pending post!');
+          localStorage.removeItem(pendingKey);
+          alert('Your post has been uploaded! 🎉');
+          
+          // Reload to show the new post
+          if (state.user) {
+            loadUserData(state.user.uid);
+          }
+        }).catch(function(err) {
+          console.error('[Offline] Failed to sync pending post:', err);
+        });
+      } catch (e) {
+        console.error('[Offline] Error parsing pending post:', e);
+      }
+    }
+  }
+
+  // Listen for online/offline events
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
 
   auth.onAuthStateChanged(function(u) {
     if (u) {
@@ -421,6 +472,13 @@ window.onerror = function(msg, url, line, col, error) {
           }
         } catch (e) {
           console.error('[Draft] Failed to load draft:', e);
+        }
+        
+        // Check for pending posts and try to sync if online
+        if (state.online && navigator.onLine) {
+          setTimeout(function() {
+            syncPendingPost();
+          }, 1000);
         }
         
         // Check for update notification and trigger render if notification was added
@@ -1191,59 +1249,127 @@ window.onerror = function(msg, url, line, col, error) {
       return;
     }
     
+    // Check if offline
+    if (!state.online || !navigator.onLine) {
+      console.log('[Offline] No connection - saving post for later');
+      
+      // Save the complete post data to localStorage
+      var pendingPost = {
+        photo: n.photo,
+        outfit: n.outfit,
+        songTitle: n.songTitle,
+        songArtist: n.songArtist,
+        songArtwork: n.songArtwork || '',
+        songPreview: n.songPreview || '',
+        loc: n.loc,
+        quote: n.quote,
+        privateNote: n.privateNote,
+        photoX: n.photoX,
+        photoY: n.photoY,
+        outfitX: n.outfitX,
+        outfitY: n.outfitY,
+        songFont: n.songFont,
+        songColor: n.songColor,
+        timestamp: Date.now()
+      };
+      
+      try {
+        localStorage.setItem('postcard_pending_' + state.user.uid, JSON.stringify(pendingPost));
+        console.log('[Offline] Post saved to pending queue');
+        
+        alert('📱 No internet connection!\n\nYour post has been saved and will upload automatically when you\'re back online.');
+        
+        // Clear the form
+        setState({
+          step: 1,
+          np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0}
+        });
+        nav('feed');
+      } catch (e) {
+        console.error('[Offline] Failed to save pending post:', e);
+        alert('Failed to save post. Please try again.');
+      }
+      return;
+    }
+    
     // Set flag immediately before setState to prevent race condition
     state.uploading = true;
     setState({uploading: true});
     
     console.log('[Submit] Starting post submission');
-    var ts = Date.now();
+    uploadPost({
+      photo: n.photo,
+      outfit: n.outfit,
+      songTitle: n.songTitle,
+      songArtist: n.songArtist,
+      songArtwork: n.songArtwork,
+      songPreview: n.songPreview,
+      loc: n.loc,
+      quote: n.quote,
+      privateNote: n.privateNote,
+      photoX: n.photoX,
+      photoY: n.photoY,
+      outfitX: n.outfitX,
+      outfitY: n.outfitY,
+      songFont: n.songFont,
+      songColor: n.songColor,
+      timestamp: Date.now()
+    }).then(function() {
+      console.log('[Submit] Post created successfully');
+      
+      // Clear draft from localStorage after successful post
+      try {
+        localStorage.removeItem('postcard_draft_' + state.user.uid);
+        console.log('[Draft] Cleared postcard draft from localStorage');
+      } catch (e) {
+        console.error('[Draft] Failed to clear draft:', e);
+      }
+      
+      setState({
+        posted: true,
+        uploading: false,
+        step: 1,
+        np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0}
+      });
+      nav('feed');
+    }).catch(function(e) {
+      console.error('[Submit] Error:', e);
+      setState({uploading: false});
+      alert('Failed to upload post. Please try again.');
+    });
+  }
+
+  function uploadPost(postData) {
+    var ts = postData.timestamp || Date.now();
     var photoUrl, outfitUrl;
-    uploadImage(n.photo, 'posts/' + state.user.uid + '/' + ts + '_photo').then(function(url) {
+    
+    return uploadImage(postData.photo, 'posts/' + state.user.uid + '/' + ts + '_photo').then(function(url) {
       photoUrl = url;
-      return uploadImage(n.outfit, 'posts/' + state.user.uid + '/' + ts + '_outfit');
+      return uploadImage(postData.outfit, 'posts/' + state.user.uid + '/' + ts + '_outfit');
     }).then(function(url) {
       outfitUrl = url;
       var post = {
         userId: state.user.uid,
         date: new Date().toISOString().split('T')[0],
-        location: n.loc,
+        location: postData.loc,
         photo: photoUrl,
         outfitPhoto: outfitUrl,
-        photoX: n.photoX,
-        photoY: n.photoY,
-        outfitX: n.outfitX,
-        outfitY: n.outfitY,
-        song: {title: n.songTitle, artist: n.songArtist, artwork: n.songArtwork || '', preview: n.songPreview || ''},
-        songFont: n.songFont,
-        songColor: n.songColor,
-        quote: n.quote,
-        privateNote: n.privateNote,
+        photoX: postData.photoX,
+        photoY: postData.photoY,
+        outfitX: postData.outfitX,
+        outfitY: postData.outfitY,
+        song: {title: postData.songTitle, artist: postData.songArtist, artwork: postData.songArtwork || '', preview: postData.songPreview || ''},
+        songFont: postData.songFont,
+        songColor: postData.songColor,
+        quote: postData.quote,
+        privateNote: postData.privateNote,
         createdAt: new Date().toISOString()
       };
       return db.collection('posts').add(post).then(function(ref) {
         post.id = ref.id;
         state.myPosts.unshift(post);
-        console.log('[Submit] Post created successfully:', ref.id);
-        
-        // Clear draft from localStorage after successful post
-        try {
-          localStorage.removeItem('postcard_draft_' + state.user.uid);
-          console.log('[Draft] Cleared postcard draft from localStorage');
-        } catch (e) {
-          console.error('[Draft] Failed to clear draft:', e);
-        }
-        
-        setState({
-          posted: true,
-          uploading: false,
-          step: 1,
-          np: {photo: null, outfit: null, songTitle: '', songArtist: '', songArtwork: '', songPreview: '', loc: '', quote: '', privateNote: '', outfitX: 0, outfitY: 0, photoX: 0, photoY: 0, songFont: 0, songColor: 0}
-        });
-        nav('feed');
+        return post;
       });
-    }).catch(function(e) {
-      console.error('[Submit] Error:', e);
-      setState({uploading: false});
     });
   }
 
@@ -2693,6 +2819,33 @@ window.onerror = function(msg, url, line, col, error) {
       header.appendChild(logoWrap);
       header.appendChild(btns);
       page.appendChild(header);
+      
+      // Offline mode banner
+      if (!state.online) {
+        var offlineBanner = el('div', {style: {margin: '0 20px 16px', padding: '16px', borderRadius: '16px', background: '#ff9800', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px'}});
+        offlineBanner.appendChild(el('div', {style: {fontSize: '24px'}}, '📡'));
+        var offlineText = el('div', {style: {flex: '1'}});
+        offlineText.appendChild(el('div', {style: {fontSize: '14px', fontWeight: '600', marginBottom: '2px'}}, 'Offline Mode'));
+        offlineText.appendChild(el('div', {style: {fontSize: '12px', opacity: '0.9'}}, 'You can still take photos. They\'ll upload when back online.'));
+        offlineBanner.appendChild(offlineText);
+        page.appendChild(offlineBanner);
+      }
+      
+      // Check for pending posts (show reminder)
+      if (state.user && localStorage.getItem('postcard_pending_' + state.user.uid)) {
+        var pendingBanner = el('div', {style: {margin: '0 20px 16px', padding: '16px', borderRadius: '16px', background: '#4caf50', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px'}});
+        pendingBanner.appendChild(el('div', {style: {fontSize: '24px'}}, '⏳'));
+        var pendingText = el('div', {style: {flex: '1'}});
+        pendingText.appendChild(el('div', {style: {fontSize: '14px', fontWeight: '600', marginBottom: '2px'}}, 'Post Ready to Upload'));
+        pendingText.appendChild(el('div', {style: {fontSize: '12px', opacity: '0.9'}}, state.online ? 'Uploading now...' : 'Will upload when back online'));
+        pendingBanner.appendChild(pendingText);
+        page.appendChild(pendingBanner);
+        
+        // If online, try to sync now
+        if (state.online) {
+          setTimeout(syncPendingPost, 500);
+        }
+      }
       
       // Show CTA to encourage posting (different message if already posted)
       if (!state.posted) {
