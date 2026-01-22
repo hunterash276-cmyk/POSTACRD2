@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.9';
+var APP_VERSION = '3.1.0';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -154,19 +154,8 @@ window.onerror = function(msg, url, line, col, error) {
 
   // CRITICAL: Firebase-based version checking
   // This ALWAYS works because Firestore data is NOT cached by iOS PWA
-  (function checkFirebaseVersion() {
-    var VERSION_CHECK_KEY = 'postcard_last_version_check';
-    var lastCheck = localStorage.getItem(VERSION_CHECK_KEY);
-    var now = Date.now();
-    
-    // Only check every 5 minutes to avoid excessive reads
-    if (lastCheck && (now - parseInt(lastCheck)) < 300000) {
-      console.log('[Version] Skipping check - checked recently');
-      return;
-    }
-    
-    localStorage.setItem(VERSION_CHECK_KEY, now.toString());
-    
+  // Firebase version check - runs on load AND every 2 minutes
+  function checkFirebaseVersion() {
     // Check Firestore for latest version
     db.collection('appConfig').doc('version').get()
       .then(function(doc) {
@@ -201,10 +190,10 @@ window.onerror = function(msg, url, line, col, error) {
           console.log('[Version] CRITICAL: Local version too old, forcing update');
           showForceUpdateScreen(serverVersion);
         }
-        // If local version is older than server, show optional update
+        // If local version is older than server, show update modal
         else if (localV < serverV) {
           console.log('[Version] Update available:', serverVersion);
-          showUpdateAvailable(serverVersion);
+          showLiveUpdateModal(serverVersion);
         }
       })
       .catch(function(e) {
@@ -212,6 +201,9 @@ window.onerror = function(msg, url, line, col, error) {
       });
     
     function showForceUpdateScreen(newVersion) {
+      // Don't show if already showing
+      if (document.getElementById('forceUpdateOverlay')) return;
+      
       var overlay = document.createElement('div');
       overlay.id = 'forceUpdateOverlay';
       overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;';
@@ -225,14 +217,33 @@ window.onerror = function(msg, url, line, col, error) {
       document.body.appendChild(overlay);
     }
     
-    function showUpdateAvailable(newVersion) {
-      var banner = document.getElementById('updateBanner');
-      if (banner) {
-        banner.innerHTML = '🎉 Update available (v' + newVersion + ')! Tap to refresh';
-        banner.style.display = 'block';
-      }
+    function showLiveUpdateModal(newVersion) {
+      // Don't show if already showing
+      if (document.getElementById('liveUpdateModal')) return;
+      
+      var modal = document.createElement('div');
+      modal.id = 'liveUpdateModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      
+      var box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
+      
+      box.innerHTML = '<div style="font-size:40px;margin-bottom:12px;">🚀</div>' +
+        '<h2 style="margin:0 0 8px;color:#2D2A26;font-size:20px;">New Update Available!</h2>' +
+        '<p style="color:#666;margin:0 0 20px;font-size:14px;line-height:1.5;">Version ' + newVersion + ' is ready. Tap below to update now.</p>' +
+        '<button onclick="clearAllCachesAndReload()" style="background:#E07A5F;color:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-bottom:10px;">Update Now</button>' +
+        '<button onclick="document.getElementById(\'liveUpdateModal\').remove();" style="background:transparent;color:#666;border:none;padding:10px;font-size:13px;cursor:pointer;width:100%;">Maybe Later</button>';
+      
+      modal.appendChild(box);
+      document.body.appendChild(modal);
     }
-  })();
+  }
+  
+  // Run version check on load
+  checkFirebaseVersion();
+  
+  // Check for updates every 2 minutes while app is running
+  setInterval(checkFirebaseVersion, 120000);
   
   // Global function to clear all caches and force reload
   window.clearAllCachesAndReload = function() {
@@ -435,7 +446,8 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.6': '🏷️ AUTO-BADGE: ✅ Badges are now written to Firebase automatically when loading friends - no login required! Just open the app and all your friends get their customBadge field set. You can then edit them in Firebase Console.',
     '3.0.7': '🎨 CUSTOM BADGE COLORS: ✅ You can now set badge colors in Firebase! Add a customBadgeColor field (e.g. #FF5722, #9C27B0, #4CAF50) to any user and the badge background will use that color.',
     '3.0.8': '📜 SCROLL POSITION FIX: ✅ Friend profiles now start at the top (back arrow visible). ✅ When going back from a friend profile, you return to exactly where you were scrolled in the friends list.',
-    '3.0.9': '🎨 PRE-FILLED BADGE COLORS: ✅ customBadgeColor field is now auto-written to Firebase alongside customBadge. CREATOR gets #2196F3 (blue), FOUNDER gets #888888 (gray). Just change the hex code in Firebase to any color you want!'
+    '3.0.9': '🎨 PRE-FILLED BADGE COLORS: ✅ customBadgeColor field is now auto-written to Firebase alongside customBadge. CREATOR gets #2196F3 (blue), FOUNDER gets #888888 (gray). Just change the hex code in Firebase to any color you want!',
+    '3.1.0': '🔄 LIVE UPDATE DETECTION: ✅ App now checks Firebase for updates every 2 minutes while running. When you upload a new version and update Firebase, users will see an update popup automatically - no need to restart the app!'
   };
 
   // Image cache to prevent re-downloading and flashing
