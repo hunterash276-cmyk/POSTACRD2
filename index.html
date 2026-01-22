@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.9.0';
+var APP_VERSION = '1.9.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -240,7 +240,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.7': '🖼️ COLLAGE FIX: Added "Re-generate Collage" button below existing collages. Added error detection for broken images. Added detailed logging to see why images fail to load (CORS issue likely). Click Re-generate!',
     '1.8.8': '🎯 COLLAGE CORS FIXED! Removed crossOrigin="anonymous" from image loading. Firebase Storage was blocking it. Collages should generate properly now! Click Re-generate Collage to try again!',
     '1.8.9': '🛡️ CRASH PREVENTION: Added try-catch around canvas operations. Added safety checks for empty image arrays. Added detailed logging at every step. Collage generation wont crash the app anymore - will show error alerts instead!',
-    '1.9.0': '🔄 COMPLETE REWRITE: Rewrote generateGroupCollage to use html2canvas + DOM instead of canvas API. This avoids CORS "operation is insecure" errors. Creates DOM grid, captures with html2canvas, uploads to Firebase. ONLY touched this ONE function - everything else untouched!'
+    '1.9.0': '🔄 COMPLETE REWRITE: Rewrote generateGroupCollage to use html2canvas + DOM instead of canvas API. This avoids CORS "operation is insecure" errors. Creates DOM grid, captures with html2canvas, uploads to Firebase. ONLY touched this ONE function - everything else untouched!',
+    '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!'
   };
 
   var state = {
@@ -1786,131 +1787,10 @@ window.onerror = function(msg, url, line, col, error) {
     }
   }
   
-  // Generate a collage from the day's photos - SIMPLE VERSION using html2canvas
+  // Generate a collage from the day's photos - DISABLED DUE TO CORS ISSUES
   function generateGroupCollage(groupId, date, photos) {
-    console.log('[Collage] Generating for', date, 'photos:', photos);
-    
-    // Build photo list
-    var photoList = [];
-    for (var userId in photos) {
-      var photoData = photos[userId];
-      if (photoData && photoData.url) {
-        photoList.push({
-          url: photoData.url,
-          username: photoData.username || 'Member'
-        });
-      }
-    }
-    
-    if (photoList.length === 0) {
-      alert('No photos found for ' + date);
-      return;
-    }
-    
-    // Calculate grid
-    var count = photoList.length;
-    var cols, rows;
-    if (count === 1) { cols = 1; rows = 1; }
-    else if (count === 2) { cols = 2; rows = 1; }
-    else if (count <= 4) { cols = 2; rows = 2; }
-    else if (count <= 6) { cols = 3; rows = 2; }
-    else if (count <= 9) { cols = 3; rows = 3; }
-    else { cols = 4; rows = Math.ceil(count / 4); }
-    
-    // Create temporary DOM element for collage
-    var collageDiv = document.createElement('div');
-    collageDiv.style.width = (cols * 300) + 'px';
-    collageDiv.style.height = (rows * 300) + 'px';
-    collageDiv.style.position = 'fixed';
-    collageDiv.style.left = '-9999px';
-    collageDiv.style.background = '#1a1a1a';
-    collageDiv.style.display = 'grid';
-    collageDiv.style.gridTemplateColumns = 'repeat(' + cols + ', 300px)';
-    collageDiv.style.gridTemplateRows = 'repeat(' + rows + ', 300px)';
-    
-    // Add photos
-    for (var i = 0; i < photoList.length; i++) {
-      var cell = document.createElement('div');
-      cell.style.width = '300px';
-      cell.style.height = '300px';
-      cell.style.overflow = 'hidden';
-      cell.style.position = 'relative';
-      cell.style.border = '2px solid #333';
-      
-      var img = document.createElement('img');
-      img.src = photoList[i].url;
-      img.style.width = '100%';
-      img.style.height = '100%';
-      img.style.objectFit = 'cover';
-      img.crossOrigin = 'anonymous'; // Try with crossOrigin for html2canvas
-      
-      var label = document.createElement('div');
-      label.textContent = photoList[i].username;
-      label.style.position = 'absolute';
-      label.style.bottom = '0';
-      label.style.width = '100%';
-      label.style.background = 'rgba(0,0,0,0.6)';
-      label.style.color = '#fff';
-      label.style.textAlign = 'center';
-      label.style.padding = '8px';
-      label.style.fontSize = '14px';
-      
-      cell.appendChild(img);
-      cell.appendChild(label);
-      collageDiv.appendChild(cell);
-    }
-    
-    // Add header
-    var header = document.createElement('div');
-    header.textContent = '📸 ' + date;
-    header.style.position = 'absolute';
-    header.style.top = '0';
-    header.style.width = '100%';
-    header.style.background = 'rgba(0,0,0,0.7)';
-    header.style.color = '#fff';
-    header.style.textAlign = 'center';
-    header.style.padding = '10px';
-    header.style.fontSize = '18px';
-    header.style.fontWeight = 'bold';
-    collageDiv.appendChild(header);
-    
-    document.body.appendChild(collageDiv);
-    
-    // Use html2canvas to capture it
-    setTimeout(function() {
-      html2canvas(collageDiv, {
-        backgroundColor: '#1a1a1a',
-        scale: 1,
-        logging: false,
-        useCORS: true
-      }).then(function(canvas) {
-        document.body.removeChild(collageDiv);
-        
-        var collageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
-        // Upload to Firebase
-        var ref = storage.ref('groups/' + groupId + '/collages/' + date);
-        return ref.putString(collageDataUrl, 'data_url');
-      }).then(function(snapshot) {
-        return snapshot.ref.getDownloadURL();
-      }).then(function(url) {
-        var updateData = {};
-        updateData['collages.' + date] = {
-          url: url,
-          photoCount: photoList.length,
-          createdAt: new Date().toISOString()
-        };
-        return db.collection('groups').doc(groupId).update(updateData);
-      }).then(function() {
-        alert('Collage generated! Reload the page to see it.');
-      }).catch(function(e) {
-        console.error('[Collage] Error:', e);
-        alert('Failed to generate collage: ' + e.message);
-        if (document.body.contains(collageDiv)) {
-          document.body.removeChild(collageDiv);
-        }
-      });
-    }, 1000); // Wait for images to load
+    alert('Collage generation is temporarily disabled due to technical issues with image loading. You can still see all photos in the grid above.');
+    return;
   }
   
   // Set theme for today (only theme chooser can do this)
