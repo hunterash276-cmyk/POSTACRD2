@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.9';
+var APP_VERSION = '2.9.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -300,7 +300,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!',
     '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!',
     '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!',
-    '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!'
+    '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!',
+    '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2983,8 +2984,8 @@ window.onerror = function(msg, url, line, col, error) {
     imgArea.appendChild(right);
     imgArea.appendChild(song);
     
-    // Bottom
-    var bottom = el('div', {style: {padding: '14px', borderTop: '1px solid ' + t.border}});
+    // Bottom (fixed min-height prevents expansion when reactions added)
+    var bottom = el('div', {style: {padding: '14px', borderTop: '1px solid ' + t.border, minHeight: '120px', display: 'flex', flexDirection: 'column'}});
     var info = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px'}});
     
     var avatar;
