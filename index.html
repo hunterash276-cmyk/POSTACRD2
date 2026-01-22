@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.3.0';
+var APP_VERSION = '2.3.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -250,7 +250,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.1.1': '⚡ INSTANT UI UPDATES: Invite/cancel buttons now update INSTANTLY! No more waiting/swiping. When you invite → immediately moves to pending. When you cancel → immediately back to invite list. Reloads specific group (not all groups) and forces setState. Sharp & responsive!',
     '2.1.2': '🔇 BLURRED = SILENT: Blurred postcards NO LONGER play music! Changed enablePreview to !p.isBlurred for both today\'s posts and older posts. No audio attribute added to blurred cards. Music only plays when you can see the postcard clearly!',
     '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!',
-    '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️'
+    '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️',
+    '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -259,25 +260,21 @@ window.onerror = function(msg, url, line, col, error) {
   function cachedImage(src, attrs) {
     var img = el('img', attrs);
     
-    // If image is cached, use it immediately (no flash)
-    if (imageCache[src]) {
-      img.src = imageCache[src];
-      return img;
+    // Preload the image if not already cached
+    if (!imageCache[src]) {
+      var preloadImg = new Image();
+      preloadImg.src = src;
+      imageCache[src] = preloadImg;
     }
     
-    // Otherwise, load and cache it
+    // Set src immediately (browser will use cached version)
     img.src = src;
-    
-    // Cache once loaded
-    img.onload = function() {
-      imageCache[src] = src;
-    };
     
     return img;
   }
 
   var state = {
-    view: 'auth',
+    view: 'loading',  // Start with loading, auth check will set correct view
     dark: savedDarkMode === 'true',
     user: null,
     userData: null,
@@ -2690,6 +2687,15 @@ window.onerror = function(msg, url, line, col, error) {
       
       overlay.appendChild(box);
       app.appendChild(overlay);
+    }
+    
+    // Loading screen (while checking auth)
+    if (state.view === 'loading') {
+      var loading = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: t.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}});
+      loading.appendChild(el('div', {style: {fontSize: '60px', marginBottom: '16px', animation: 'bounce 1s ease infinite'}}, '📮'));
+      loading.appendChild(el('h1', {style: {margin: '0', fontSize: '28px', fontWeight: '700', color: t.text}}, 'postcard'));
+      app.appendChild(loading);
+      return;
     }
     
     // Auth
