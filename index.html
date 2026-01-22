@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.0.6';
+var APP_VERSION = '3.0.7';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -432,7 +432,8 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.3': '✏️ EDIT SCREEN FIXES: ✅ Song display now shows album artwork + text wrapped at 15 chars (matches final postcard). ✅ Up/down arrows fixed - now move images in the correct direction. ✅ Edit hint is now more prominent so users notice it.',
     '3.0.4': '🔔 UPDATE NOTIFICATIONS FIXED: ✅ Now shows a prominent popup modal when there is a new update - impossible to miss! The modal shows version number and what changed.',
     '3.0.5': '🏷️ CUSTOM BADGES: ✅ Badge system now uses customBadge field in Firebase! When users log in, their badge (CREATOR/FOUNDER) is saved to Firebase. You can now change anyone\'s badge directly in Firebase Console → Firestore → users → [user] → customBadge. Set it to anything you want!',
-    '3.0.6': '🏷️ AUTO-BADGE: ✅ Badges are now written to Firebase automatically when loading friends - no login required! Just open the app and all your friends get their customBadge field set. You can then edit them in Firebase Console.'
+    '3.0.6': '🏷️ AUTO-BADGE: ✅ Badges are now written to Firebase automatically when loading friends - no login required! Just open the app and all your friends get their customBadge field set. You can then edit them in Firebase Console.',
+    '3.0.7': '🎨 CUSTOM BADGE COLORS: ✅ You can now set badge colors in Firebase! Add a customBadgeColor field (e.g. #FF5722, #9C27B0, #4CAF50) to any user and the badge background will use that color.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3273,7 +3274,6 @@ window.onerror = function(msg, url, line, col, error) {
     // Add badge if applicable - check customBadge field first (editable in Firebase Console)
     if (owner && owner.customBadge) {
       // Custom badge from Firebase - can be anything you set
-      var badgeColor = '#2196F3'; // Default blue
       var badgeStyle = {
         padding: '2px 5px',
         borderRadius: '3px',
@@ -3284,8 +3284,10 @@ window.onerror = function(msg, url, line, col, error) {
         textTransform: 'uppercase'
       };
       
-      // Set color based on badge type
-      if (owner.customBadge === 'CREATOR') {
+      // Check for custom color first, then fall back to defaults
+      if (owner.customBadgeColor) {
+        badgeStyle.background = owner.customBadgeColor;
+      } else if (owner.customBadge === 'CREATOR') {
         badgeStyle.background = '#2196F3'; // Blue
       } else if (owner.customBadge === 'FOUNDER') {
         badgeStyle.background = 'rgba(255,255,255,0.1)';
@@ -5655,6 +5657,7 @@ window.onerror = function(msg, url, line, col, error) {
       // Add badge if user has one - check customBadge first
       if (state.userData) {
         var badge = state.userData.customBadge;
+        var badgeColor = state.userData.customBadgeColor;
         var userEmail = state.user ? state.user.email : '';
         
         if (badge) {
@@ -5669,7 +5672,10 @@ window.onerror = function(msg, url, line, col, error) {
             textTransform: 'uppercase'
           };
           
-          if (badge === 'CREATOR') {
+          // Check for custom color first
+          if (badgeColor) {
+            badgeStyle.background = badgeColor;
+          } else if (badge === 'CREATOR') {
             badgeStyle.background = '#2196F3';
           } else if (badge === 'FOUNDER') {
             badgeStyle.background = 'rgba(255,255,255,0.1)';
@@ -5868,7 +5874,10 @@ window.onerror = function(msg, url, line, col, error) {
                       textTransform: 'uppercase'
                     };
                     
-                    if (friend.customBadge === 'CREATOR') {
+                    // Check for custom color first
+                    if (friend.customBadgeColor) {
+                      badgeStyle.background = friend.customBadgeColor;
+                    } else if (friend.customBadge === 'CREATOR') {
                       badgeStyle.background = '#2196F3';
                     } else if (friend.customBadge === 'FOUNDER') {
                       badgeStyle.background = 'rgba(255,255,255,0.1)';
@@ -6102,7 +6111,10 @@ window.onerror = function(msg, url, line, col, error) {
           textTransform: 'uppercase'
         };
         
-        if (friend.customBadge === 'CREATOR') {
+        // Check for custom color first
+        if (friend.customBadgeColor) {
+          badgeStyle.background = friend.customBadgeColor;
+        } else if (friend.customBadge === 'CREATOR') {
           badgeStyle.background = '#2196F3';
         } else if (friend.customBadge === 'FOUNDER') {
           badgeStyle.background = 'rgba(255,255,255,0.1)';
