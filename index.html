@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.4.0';
+var APP_VERSION = '2.4.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -252,7 +252,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.2.0': '🖼️ IMAGE CACHING: NO MORE FLASHING! Added imageCache{} + cachedImage() helper. ALL user-facing images now cached: postcard photos (outfit/main), song artwork, profile avatars (nav/header/profile/edit/requests), friend avatars (list/requests/add), group member avatars. 70 functions. Images stay in memory - instant like icons!',
     '2.3.0': '📡 OFFLINE MODE: App now works WITHOUT internet! Take photos/outfit offline - saved to pending queue in localStorage. Orange "Offline Mode" banner shows status. Green "Post Ready" banner when pending. Auto-syncs when back online with syncPendingPost(). Uses navigator.onLine + online/offline events. 74 functions. Upload anywhere! ✈️',
     '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!',
-    '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!'
+    '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!',
+    '2.4.1': '🔧 POLISH FIXES: ⌨️ Friend search fixed! Added stopPropagation() to all keyboard events - no more triggering buttons behind. Type freely! 📸 Offline photos fixed! Draft loading in offline catch handler + cachedImage() skips preload for data URLs. Photos taken offline now show up perfectly when back online. Careful work!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -261,7 +262,13 @@ window.onerror = function(msg, url, line, col, error) {
   function cachedImage(src, attrs) {
     var img = el('img', attrs);
     
-    // Preload the image if not already cached
+    // Data URLs don't need caching/preloading - they're already in memory
+    if (src && src.indexOf('data:') === 0) {
+      img.src = src;
+      return img;
+    }
+    
+    // Preload network images if not already cached
     if (!imageCache[src]) {
       var preloadImg = new Image();
       preloadImg.src = src;
@@ -516,6 +523,19 @@ window.onerror = function(msg, url, line, col, error) {
         }
       } catch (e) {
         console.error('[Offline] Failed to load cached user:', e);
+      }
+      
+      // Load draft postcard from localStorage if exists (same as online)
+      try {
+        var draftKey = 'postcard_draft_' + uid;
+        var savedDraft = localStorage.getItem(draftKey);
+        if (savedDraft) {
+          var draft = JSON.parse(savedDraft);
+          console.log('[Offline] Loaded postcard draft from localStorage:', draft);
+          state.np = draft;
+        }
+      } catch (e) {
+        console.error('[Offline] Failed to load draft:', e);
       }
       
       setState({view: 'feed'});
@@ -4625,8 +4645,21 @@ window.onerror = function(msg, url, line, col, error) {
             }
           });
           searchInput.oninput = function(e) {
+            e.stopPropagation();
             state.friendSearch = e.target.value;
             render();
+          };
+          searchInput.onclick = function(e) {
+            e.stopPropagation();
+          };
+          searchInput.onkeydown = function(e) {
+            e.stopPropagation();
+          };
+          searchInput.onkeyup = function(e) {
+            e.stopPropagation();
+          };
+          searchInput.onkeypress = function(e) {
+            e.stopPropagation();
           };
           searchWrap.appendChild(searchInput);
           friendsSection.appendChild(searchWrap);
