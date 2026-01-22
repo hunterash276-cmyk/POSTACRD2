@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.5.0';
+var APP_VERSION = '2.5.1';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -254,7 +254,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.3.1': '🔧 FLASH FIXES: ✅ Fixed image flashing! cachedImage() now uses Image() preloading - browser caches properly. ✅ Fixed login page flash! Initial view="loading" (not "auth"), shows loading screen until auth check completes. Auth only shows for logged-out users. Smooth startup!',
     '2.4.0': '✅ MAJOR FIXES: 👥 Friends collapsed - shows count + "View All" button with search bar. 🔒 Calendar privacy - MUST post today to view ANY friend postcards (except own). 🗑️ Removed red POSTCARD stamp from calendar. 📡 Offline works! App loads with cached user data, shows UI even offline. Can take photos + save pending. Error handling in loadUserData(). All tested!',
     '2.4.1': '🔧 POLISH FIXES: ⌨️ Friend search fixed! Added stopPropagation() to all keyboard events - no more triggering buttons behind. Type freely! 📸 Offline photos fixed! Draft loading in offline catch handler + cachedImage() skips preload for data URLs. Photos taken offline now show up perfectly when back online. Careful work!',
-    '2.5.0': '🎉 MAJOR OFFLINE UPDATE: ⌨️ Friend search ACTUALLY works! Updates only list container, not full page render. Type smoothly! 📝 DRAFT SYSTEM: Save postcards offline → show in Mailbox. Today\'s = upload to feed. Past = calendar only. Upload/delete buttons. 🖼️ Profile pic caches for offline! 📡 Music search shows offline warning (orange banner). 78 functions (+4: loadSavedDrafts, saveDraft, deleteDraft, uploadDraft). Complete offline experience!'
+    '2.5.0': '🎉 MAJOR OFFLINE UPDATE: ⌨️ Friend search ACTUALLY works! Updates only list container, not full page render. Type smoothly! 📝 DRAFT SYSTEM: Save postcards offline → show in Mailbox. Today\'s = upload to feed. Past = calendar only. Upload/delete buttons. 🖼️ Profile pic caches for offline! 📡 Music search shows offline warning (orange banner). 78 functions (+4: loadSavedDrafts, saveDraft, deleteDraft, uploadDraft). Complete offline experience!',
+    '2.5.1': '🎨 COLLAGE POLISH + OFFLINE FIX: 📅 Past collages show theme label (🎨 Theme: X). 📐 Photos preserve aspect ratio (portrait 3:4, landscape 4:3) instead of forced squares. ✨ Removed gaps between photos (gap: 0, flush together). 📡 OFFLINE: Music now optional! Can proceed past step 2 without music. Sets placeholder "No Music (Offline)". Draft system works perfectly offline! All features intact, 78 functions.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3458,8 +3459,18 @@ window.onerror = function(msg, url, line, col, error) {
         
         var btns = el('div', {style: {display: 'flex', gap: '12px', marginTop: '8px'}});
         btns.appendChild(el('span', {className: 'tap', style: {padding: '16px 24px', border: '1px solid ' + t.border, borderRadius: '14px', fontSize: '15px', color: t.text, background: t.card}, onClick: function() { setState({step: 1}); }}, '←'));
-        var canNext = state.np.songTitle && state.np.songArtist && state.np.loc;
-        var nextBtn = el('span', {className: 'tap', id: 'step2NextBtn', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: canNext ? t.accent : t.border, opacity: canNext ? '1' : '0.4'}, onClick: function() { if (state.np.songTitle && state.np.songArtist && state.np.loc) setState({step: 3}); }}, 'Next →');
+        
+        // When offline, music is optional (can't search). When online, music is required.
+        var canNext = state.np.loc && (state.online ? (state.np.songTitle && state.np.songArtist) : true);
+        var nextBtn = el('span', {className: 'tap', id: 'step2NextBtn', style: {flex: '1', color: '#fff', padding: '18px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: canNext ? t.accent : t.border, opacity: canNext ? '1' : '0.4'}, onClick: function() { 
+          if (state.np.loc && (state.online ? (state.np.songTitle && state.np.songArtist) : true)) {
+            // If offline and no music, set placeholder values
+            if (!state.online && !state.np.songTitle) {
+              setNp({songTitle: 'No Music', songArtist: '(Offline)'});
+            }
+            setState({step: 3});
+          }
+        }}, 'Next →');
         btns.appendChild(nextBtn);
         content.appendChild(btns);
         
@@ -4630,14 +4641,23 @@ window.onerror = function(msg, url, line, col, error) {
               var photoCount = dayPhotos ? Object.keys(dayPhotos).length : 0;
               
               dayItem.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '📅 ' + date));
-              dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
+              dayItem.appendChild(el('p', {style: {margin: '0 0 4px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
+              
+              // Show theme if available
+              if (group.themeHistory && group.themeHistory[date]) {
+                dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', fontWeight: '600', color: t.accent}}, '🎨 Theme: ' + group.themeHistory[date]));
+              } else {
+                dayItem.appendChild(el('div', {style: {height: '10px'}}));
+              }
               
               // ALWAYS show photo grid (no collage feature)
               if (dayPhotos && photoCount > 0) {
-                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px'}});
+                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0', overflow: 'hidden', borderRadius: '8px'}});
                 for (var odUserId in dayPhotos) {
                   var photo = dayPhotos[odUserId];
-                  grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px'}}));
+                  // Use the orientation from photo data to determine aspect ratio
+                  var aspectRatio = photo.orientation === 'portrait' ? '3/4' : '4/3';
+                  grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: aspectRatio, objectFit: 'cover', display: 'block'}}));
                 }
                 dayItem.appendChild(grid);
               }
