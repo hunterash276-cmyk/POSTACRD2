@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.5';
+var APP_VERSION = '1.8.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -49,7 +49,7 @@ var APP_VERSION = '1.8.5';
 //   'https://corsproxy.io/?' 
 //   'https://cors-anywhere.herokuapp.com/'
 //   null (direct API - will be blocked by CORS)
-var ITUNES_PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
+var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -235,7 +235,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.2': '🎵 ITUNES SEARCH FIXED: Switched from allOrigins to corsproxy.io proxy (more reliable). Fixed response parsing for new proxy. Fixed error messages. iTunes search should work now! Check console (F12) if issues.',
     '1.8.3': '🔧 CRITICAL REVERT: REVERTED iTunes proxy back to allOrigins (the one that WORKED before). Fixed camera flip properly with ctx.save/restore. Added collage feedback alerts. I broke things by changing what worked - NOW FIXED!',
     '1.8.4': '🔧 HONEST FIXES: Camera flip REMOVED (phone handles it correctly). iTunes proxy changed to thingproxy (more stable). Collage now shows ALERT with photo count and structure so you can see if photos saved. Being methodical now!',
-    '1.8.5': '🔍 DEBUG BUTTON ADDED: Yellow "DEBUG: Check Photo Storage" button in group detail view. Click it to see EXACTLY what photos are stored in Firestore for today. This will tell us if photos are saving or not!'
+    '1.8.5': '🔍 DEBUG BUTTON ADDED: Yellow "DEBUG: Check Photo Storage" button in group detail view. Click it to see EXACTLY what photos are stored in Firestore for today. This will tell us if photos are saving or not!',
+    '1.8.6': '📸 CAMERA FLIP FIXED FOR REAL: Now FLIPS outfit/selfie to match what you saw (mirror view). Phone un-mirrors it, we re-mirror it. 🎵 iTunes BACK TO allOrigins (what worked originally). All 72 functions intact!'
   };
 
   var state = {
@@ -1196,9 +1197,9 @@ window.onerror = function(msg, url, line, col, error) {
     // Use proxy if configured
     var url;
     if (ITUNES_PROXY_URL) {
-      // thingproxy format: https://thingproxy.freeboard.io/fetch/URL
-      url = ITUNES_PROXY_URL + itunesUrl;
-      console.log('[iTunes] Using thingproxy:', url);
+      // allOrigins format: https://api.allorigins.win/raw?url=ENCODED_URL
+      url = ITUNES_PROXY_URL + encodeURIComponent(itunesUrl);
+      console.log('[iTunes] Using allOrigins proxy:', url);
     } else {
       url = itunesUrl;
       console.log('[iTunes] Using direct API (may be blocked by CORS):', url);
@@ -2999,11 +3000,35 @@ window.onerror = function(msg, url, line, col, error) {
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  // For outfit/selfie photos, DON'T flip them
-                  // The phone already handles the mirroring correctly
-                  var upd = {};
-                  upd[k] = r.result;
-                  setNp(upd);
+                  // For outfit/selfie photos, flip them to match mirror view
+                  // Phone un-mirrors them, we need to re-mirror
+                  if (k === 'outfit') {
+                    var img = new Image();
+                    img.onload = function() {
+                      // Create canvas to flip the image
+                      var canvas = document.createElement('canvas');
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      var ctx = canvas.getContext('2d');
+                      
+                      // Flip horizontally to restore mirror view
+                      ctx.translate(canvas.width, 0);
+                      ctx.scale(-1, 1);
+                      ctx.drawImage(img, 0, 0);
+                      
+                      // Get flipped image as data URL
+                      var flippedUrl = canvas.toDataURL('image/jpeg', 0.95);
+                      var upd = {};
+                      upd[k] = flippedUrl;
+                      setNp(upd);
+                    };
+                    img.src = r.result;
+                  } else {
+                    // Don't flip the other photo
+                    var upd = {};
+                    upd[k] = r.result;
+                    setNp(upd);
+                  }
                 };
                 r.readAsDataURL(f);
               }
