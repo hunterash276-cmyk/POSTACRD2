@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.4';
+var APP_VERSION = '2.8.5';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -295,7 +295,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.1': '🏷️ BADGE TEXT: Changed all "FOUNDING" badges to "FOUNDER". Shows in: Feed ✓ Profile ✓ Friend Profile ✓ Friends List ✓. Cleaner, shorter text!',
     '2.8.2': '🚫 DUPLICATE FIX (FINAL): ✅ GLOBAL upload lock! Variable "uploadInProgress" survives re-renders. Set at start of submit(), released on success/error/draft save. Prevents race conditions. Logs: "🔒 Global upload lock SET" and "🔓 RELEASED". NO MORE DUPLICATES!',
     '2.8.3': '🎵 AUDIO FIX (FINAL): ✅ Complete rewrite! Uses CENTER-BASED detection. Finds card whose center is closest to viewport center + visibility ratio. Scroll event listener + IntersectionObserver. 50ms debounce. Logs which card is playing. ✅ Increased spacing: 16px→32px between posts. ACCURATE AUDIO!',
-    '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!'
+    '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!',
+    '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3043,7 +3044,7 @@ window.onerror = function(msg, url, line, col, error) {
     // Reactions - for friends' posts in feed (can react) or own posts (view only)
     var reactions = post.reactions || {};
     var myReaction = state.user ? (reactions[state.user.uid] || null) : null;
-    var reactionEmojis = ['❤️', '🔥', '😍', '👏', '✨'];
+    var reactionEmojis = ['❤️', '🔥', '😍', '👏', '😂', '😱'];
     
     // Check if post is within 24 hours (can still react)
     var postTime = post.createdAt ? new Date(post.createdAt).getTime() : new Date(post.date).getTime();
