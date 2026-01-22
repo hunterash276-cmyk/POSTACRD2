@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.7.4';
+var APP_VERSION = '1.7.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -227,7 +227,9 @@ window.onerror = function(msg, url, line, col, error) {
     '1.7.1': '✨ SPLASH SCREEN: Added beautiful splash screen on first open - tap Continue to enter app AND enable audio! Removed duplicate profile button from header (kept bottom nav only). Older posts NOT blurred (only todays posts if you havent posted). Clean UI!',
     '1.7.2': '🖼️ COLLAGES FIXED: Collages now clickable for full-screen view! Theme chooser can now CHANGE theme after setting it. Theme chooser sees "Theme set! Everyone can see this" message. All 72 functions intact!',
     '1.7.3': '🐛 CRITICAL FIXES: Profile button now shows avatar image in bottom nav! Theme NO LONGER disappears when someone joins (moved day reset check to detail view). Collage generation fixed with better photo structure handling + debug logging. All 72 functions intact!',
-    '1.7.4': '🔒 OLDER POSTS BLURRED: Older posts section NOW ALWAYS visible (shows separator so you know if anyone posted today). Both new AND old posts blurred until you post. Group invite notifications fixed with error logging - check console if invite not received!'
+    '1.7.4': '🔒 OLDER POSTS BLURRED: Older posts section NOW ALWAYS visible (shows separator so you know if anyone posted today). Both new AND old posts blurred until you post. Group invite notifications fixed with error logging - check console if invite not received!',
+    '1.7.5': '👑 THEME DISPLAY FIXED: Theme now displays IMMEDIATELY for theme chooser after setting it! Added loadGroups() call after setGroupTheme() so local state updates. Theme chooser sees theme + "Theme set! Everyone can see this" message instantly!',
+    '1.7.6': '🎵 ITUNES FIXED: Better error handling for iTunes search, handles allOrigins proxy response format. Fixed error message display. 🖼️ COLLAGE DEBUG: Added comprehensive logging to collage generation - check console (F12) to see photo data structure!'
   };
 
   var state = {
@@ -1199,11 +1201,16 @@ window.onerror = function(msg, url, line, col, error) {
     fetch(url)
       .then(function(response) { 
         console.log('[iTunes] Response received, status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status);
+        }
         return response.json(); 
       })
       .then(function(data) {
-        console.log('[iTunes] Data parsed, results count:', data.results ? data.results.length : 0);
-        var results = data.results || [];
+        console.log('[iTunes] Data parsed:', data);
+        // allOrigins wraps data in {contents: ...}
+        var results = data.contents ? JSON.parse(data.contents).results : (data.results || []);
+        console.log('[iTunes] Results count:', results.length);
         setState({itunesResults: results, itunesSearching: false});
         console.log('[iTunes] State updated with results');
       })
@@ -1212,7 +1219,7 @@ window.onerror = function(msg, url, line, col, error) {
         
         // Provide helpful error message based on error type
         var errorMsg = 'iTunes search is not available';
-        if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed')) {
+        if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Load failed'))) {
           if (ITUNES_PROXY_URL) {
             errorMsg = 'Could not reach iTunes proxy. Switching to manual entry...';
           } else {
@@ -1224,7 +1231,7 @@ window.onerror = function(msg, url, line, col, error) {
             setState({manualSongEntry: true, itunesSearching: false, itunesResults: []});
           }, 1000);
         } else {
-          errorMsg = 'iTunes search failed: ' + e.message;
+          errorMsg = 'iTunes search failed. Try manual entry instead.';
         }
         
         alert(errorMsg);
@@ -1957,6 +1964,8 @@ window.onerror = function(msg, url, line, col, error) {
           }
         }
       }
+      // Reload groups so theme displays immediately
+      loadGroups(state.user.uid);
       setState({groupTheme: ''});
     });
   }
@@ -4220,8 +4229,10 @@ window.onerror = function(msg, url, line, col, error) {
                 
                 // Button to generate collage
                 dayItem.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.accent, color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '500'}, onClick: function() {
+                  console.log('[Collage] Button clicked for date:', date);
+                  console.log('[Collage] Photos data:', dayPhotos);
                   generateGroupCollage(group.id, date, dayPhotos);
-                  alert('Generating collage... Please check back in a moment!');
+                  alert('Generating collage... Check browser console (F12) for progress. Reload page in 10 seconds!');
                 }}, '🖼️ Generate Collage'));
               }
               
