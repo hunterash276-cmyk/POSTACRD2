@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.8.7';
+var APP_VERSION = '2.8.8';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -298,7 +298,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.4': '🎨 OLDER POSTS: ✅ Removed opacity (0.7→1.0) - posts look normal now. ✅ Banner bigger: 16px→24px padding, 13px→16px font, bold text, accent background. Much more obvious!',
     '2.8.5': '😂 REACTIONS: Changed emojis! Now: ❤️ heart, 🔥 fire, 😍 love eyes, 👏 clap, 😂 laugh, 😱 shock. Removed ✨ sparkles.',
     '2.8.6': '🎵 MUSIC SEARCH OVERHAUL: Fetches 50 results, scores by relevance (exact match, starts with, contains, word matching), returns TOP 10 ONLY. 10sec timeout (was 15). Clean errors. Faster, more accurate, better results!',
-    '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!'
+    '2.8.7': '🎵 AUDIO EVERYWHERE: ✅ Older posts spacing 16px→32px (matches today). ✅ Calendar day view plays music (enablePreview added). ✅ Friend calendar plays music. Audio precision now consistent across entire app!',
+    '2.8.8': '🎨 MUSIC DESIGN: Album art 60px→45px, title 15px→13px, artist 12px→11px, gap 8px→4px. Removed 🎵 emoji. Cleaner, less cluttered. Works on all existing posts automatically!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2933,16 +2934,18 @@ window.onerror = function(msg, url, line, col, error) {
     right.appendChild(cachedImage(post.photo, {style: {width: '100%', height: '100%', objectFit: 'cover', objectPosition: (50 + (post.photoX || 0)) + '% ' + (50 + (post.photoY || 0)) + '%'}}));
     
     // Song
-    var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95),0 0 20px rgba(0,0,0,.5)', padding: '10px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+    var song = el('div', {style: {position: 'absolute', left: '0', right: '0', top: '50%', transform: 'translateY(-50%)', textAlign: 'center', textShadow: '0 2px 8px rgba(0,0,0,.95),0 0 20px rgba(0,0,0,.5)', padding: '10px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px'}});
     
-    // Show album artwork if available
+    // Show album artwork if available (smaller)
     if (post.song && post.song.artwork) {
-      var artwork = cachedImage(post.song.artwork, {style: {width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 2px 12px rgba(0,0,0,.7)', border: '2px solid rgba(255,255,255,.9)'}});
+      var artwork = cachedImage(post.song.artwork, {style: {width: '45px', height: '45px', borderRadius: '6px', objectFit: 'cover', boxShadow: '0 2px 12px rgba(0,0,0,.7)', border: '2px solid rgba(255,255,255,.9)'}});
       song.appendChild(artwork);
     }
     
-    song.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, '🎵 ' + (post.song ? post.song.title : '')));
-    song.appendChild(el('p', {style: {margin: '3px 0 0', fontSize: '12px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.artist : ''));
+    // Song title (no emoji, smaller font)
+    song.appendChild(el('p', {style: {margin: '0', fontSize: '13px', fontWeight: '600', color: color, fontFamily: font, textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.title : ''));
+    // Artist name (smaller font)
+    song.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '11px', color: color, fontFamily: font, opacity: '0.95', textAlign: 'center', width: '100%', maxWidth: '280px', padding: '0 20px', boxSizing: 'border-box'}}, post.song ? post.song.artist : ''));
     
     // Add hidden audio element for preview (will be controlled by IntersectionObserver)
     if (post.song && post.song.preview && opts.enablePreview) {
