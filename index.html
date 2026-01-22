@@ -426,7 +426,7 @@ window.onerror = function(msg, url, line, col, error) {
     '2.8.9': '🚫 DUPLICATE FIX V2: Added uploadingDates{} object. Tracks which dates are being uploaded RIGHT NOW. Blocks second upload attempt for same date immediately. Releases lock on success/error. Logs: "🔒 Marked date" and "🔓 Released date lock". FINAL FIX!',
     '2.9.0': '📏 POSTCARD FIXED HEIGHT: Bottom section minHeight: 120px. Prevents expansion when reactions added. All postcards same size regardless of reactions. Maintains 32px spacing for audio precision!',
     '2.9.1': '🎵 MUSIC SEARCH FIX + TEXT WRAP: ✅ Try direct iTunes API first, fallback to proxy. 20sec timeout. Better error messages. ✅ Song text: maxWidth 180px, word-wrap enabled, breaks at ~15 chars. Cleaner display!',
-    '3.0.0': '🎵 COMPLETE MUSIC SEARCH REWRITE: ✅ Uses JSONP (bypasses CORS entirely - loads as script, not fetch). ✅ Auto-search as you type (debounced). ✅ Smooth loading, no error popups. ✅ Removed manual entry. 🔄 FIREBASE VERSION CHECK: App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again!'
+    '3.0.0': '🔄 MAJOR UPDATE: ✅ FIREBASE VERSION CHECK - App checks Firestore for updates (not cached HTML). PWA can never get stuck on old version again! ✅ MUSIC SEARCH REWRITE - Uses JSONP (bypasses CORS entirely). Auto-search as you type. Smooth loading, no popups. No more glitchy searches!'
   };
 
   // Image cache to prevent re-downloading and flashing
