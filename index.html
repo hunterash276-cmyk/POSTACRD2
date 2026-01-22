@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.2';
+var APP_VERSION = '1.8.3';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -49,7 +49,7 @@ var APP_VERSION = '1.8.2';
 //   'https://corsproxy.io/?' 
 //   'https://cors-anywhere.herokuapp.com/'
 //   null (direct API - will be blocked by CORS)
-var ITUNES_PROXY_URL = 'https://corsproxy.io/?';
+var ITUNES_PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -232,7 +232,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.7.6': '🎵 ITUNES FIXED: Better error handling for iTunes search, handles allOrigins proxy response format. Fixed error message display. 🖼️ COLLAGE DEBUG: Added comprehensive logging to collage generation - check console (F12) to see photo data structure!',
     '1.8.0': '🔒 FINAL VERSION: REMOVED "Change Theme" button - once set, theme is FINAL! Older posts separator ALWAYS shows. Both today and older posts blurred until you post. All 72 functions verified. Everything working as requested!',
     '1.8.1': '🎵 MANUAL ENTRY REMOVED: Deleted manual song entry completely (it never played music anyway). 📸 SELFIE FLIP FIXED: Outfit/selfie photos now flipped horizontally so they match what you saw on screen! All 72 functions intact.',
-    '1.8.2': '🎵 ITUNES SEARCH FIXED: Switched from allOrigins to corsproxy.io proxy (more reliable). Fixed response parsing for new proxy. Fixed error messages. iTunes search should work now! Check console (F12) if issues.'
+    '1.8.2': '🎵 ITUNES SEARCH FIXED: Switched from allOrigins to corsproxy.io proxy (more reliable). Fixed response parsing for new proxy. Fixed error messages. iTunes search should work now! Check console (F12) if issues.',
+    '1.8.3': '🔧 CRITICAL REVERT: REVERTED iTunes proxy back to allOrigins (the one that WORKED before). Fixed camera flip properly with ctx.save/restore. Added collage feedback alerts. I broke things by changing what worked - NOW FIXED!'
   };
 
   var state = {
@@ -1211,7 +1212,6 @@ window.onerror = function(msg, url, line, col, error) {
       })
       .then(function(data) {
         console.log('[iTunes] Data parsed:', data);
-        // corsproxy.io returns data directly, not wrapped
         var results = data.results || [];
         console.log('[iTunes] Results count:', results.length);
         setState({itunesResults: results, itunesSearching: false});
@@ -1782,6 +1782,21 @@ window.onerror = function(msg, url, line, col, error) {
   // Generate a collage from the day's photos
   function generateGroupCollage(groupId, date, photos) {
     console.log('[Collage] Generating for', date, 'photos:', photos);
+    
+    // Show what we're working with
+    var photoCount = 0;
+    for (var userId in photos) {
+      if (photos[userId] && photos[userId].url) photoCount++;
+    }
+    
+    if (photoCount === 0) {
+      alert('No photos found for ' + date + '. Photos might not have been saved correctly.');
+      console.log('[Collage] No valid photos found');
+      return;
+    }
+    
+    alert('Generating collage with ' + photoCount + ' photo(s). This will take 10-15 seconds. Refresh the page after!');
+    
     var photoList = [];
     for (var userId in photos) {
       var photoData = photos[userId];
@@ -1800,6 +1815,7 @@ window.onerror = function(msg, url, line, col, error) {
     console.log('[Collage] Total photos:', photoList.length);
     if (photoList.length === 0) {
       console.log('[Collage] No photos found, aborting');
+      alert('Failed to process photos. They may not have URLs.');
       return;
     }
     
@@ -2981,14 +2997,11 @@ window.onerror = function(msg, url, line, col, error) {
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  var img = new Image();
-                  img.onload = function() {
-                    // Check EXIF data to detect if this is a front-facing camera
-                    // Front cameras typically save images mirrored
-                    // For outfit/selfie (left photo), flip it to match what user saw
-                    var shouldFlip = (k === 'outfit'); // Flip selfies/outfit photos
-                    
-                    if (shouldFlip) {
+                  // For outfit/selfie photos, always flip them
+                  // Front-facing cameras save images mirrored
+                  if (k === 'outfit') {
+                    var img = new Image();
+                    img.onload = function() {
                       // Create canvas to flip the image
                       var canvas = document.createElement('canvas');
                       canvas.width = img.width;
@@ -2996,23 +3009,24 @@ window.onerror = function(msg, url, line, col, error) {
                       var ctx = canvas.getContext('2d');
                       
                       // Flip horizontally
-                      ctx.translate(canvas.width, 0);
+                      ctx.save();
                       ctx.scale(-1, 1);
-                      ctx.drawImage(img, 0, 0);
+                      ctx.drawImage(img, -img.width, 0);
+                      ctx.restore();
                       
                       // Get flipped image as data URL
-                      var flippedUrl = canvas.toDataURL('image/jpeg', 0.9);
+                      var flippedUrl = canvas.toDataURL('image/jpeg', 0.95);
                       var upd = {};
                       upd[k] = flippedUrl;
                       setNp(upd);
-                    } else {
-                      // Don't flip the other photo
-                      var upd = {};
-                      upd[k] = r.result;
-                      setNp(upd);
-                    }
-                  };
-                  img.src = r.result;
+                    };
+                    img.src = r.result;
+                  } else {
+                    // Don't flip the other photo
+                    var upd = {};
+                    upd[k] = r.result;
+                    setNp(upd);
+                  }
                 };
                 r.readAsDataURL(f);
               }
