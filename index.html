@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.8';
+var APP_VERSION = '1.8.9';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -238,7 +238,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.5': '🔍 DEBUG BUTTON ADDED: Yellow "DEBUG: Check Photo Storage" button in group detail view. Click it to see EXACTLY what photos are stored in Firestore for today. This will tell us if photos are saving or not!',
     '1.8.6': '📸 CAMERA FLIP FIXED FOR REAL: Now FLIPS outfit/selfie to match what you saw (mirror view). Phone un-mirrors it, we re-mirror it. 🎵 iTunes BACK TO allOrigins (what worked originally). All 72 functions intact!',
     '1.8.7': '🖼️ COLLAGE FIX: Added "Re-generate Collage" button below existing collages. Added error detection for broken images. Added detailed logging to see why images fail to load (CORS issue likely). Click Re-generate!',
-    '1.8.8': '🎯 COLLAGE CORS FIXED! Removed crossOrigin="anonymous" from image loading. Firebase Storage was blocking it. Collages should generate properly now! Click Re-generate Collage to try again!'
+    '1.8.8': '🎯 COLLAGE CORS FIXED! Removed crossOrigin="anonymous" from image loading. Firebase Storage was blocking it. Collages should generate properly now! Click Re-generate Collage to try again!',
+    '1.8.9': '🛡️ CRASH PREVENTION: Added try-catch around canvas operations. Added safety checks for empty image arrays. Added detailed logging at every step. Collage generation wont crash the app anymore - will show error alerts instead!'
   };
 
   var state = {
@@ -1853,6 +1854,13 @@ window.onerror = function(msg, url, line, col, error) {
     var loadedCount = 0;
     
     function drawCollage() {
+      console.log('[Collage] Drawing collage with ' + loadedImages.length + ' images');
+      
+      if (loadedImages.length === 0) {
+        console.error('[Collage] No images loaded - cannot draw collage');
+        return; // Don't try to save if no images
+      }
+      
       for (var i = 0; i < loadedImages.length; i++) {
         var col = i % cols;
         var row = Math.floor(i / cols);
@@ -1911,13 +1919,23 @@ window.onerror = function(msg, url, line, col, error) {
       ctx.fillText('📸 ' + date, canvasWidth/2, 27);
       
       // Convert to data URL and save
-      var collageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      try {
+        var collageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        console.log('[Collage] Canvas converted to data URL, length:', collageDataUrl.length);
+      } catch (e) {
+        console.error('[Collage] Failed to convert canvas to data URL:', e);
+        alert('Failed to create collage image. Error: ' + e.message);
+        return;
+      }
       
       // Upload collage to storage
+      console.log('[Collage] Uploading to Firebase Storage...');
       var ref = storage.ref('groups/' + groupId + '/collages/' + date);
       ref.putString(collageDataUrl, 'data_url').then(function() {
+        console.log('[Collage] Upload successful, getting URL...');
         return ref.getDownloadURL();
       }).then(function(url) {
+        console.log('[Collage] Got download URL:', url);
         // Save collage URL to group
         var updateData = {};
         updateData['collages.' + date] = {
