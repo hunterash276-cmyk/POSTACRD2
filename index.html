@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.8.7';
+var APP_VERSION = '1.8.8';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -237,7 +237,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.4': '🔧 HONEST FIXES: Camera flip REMOVED (phone handles it correctly). iTunes proxy changed to thingproxy (more stable). Collage now shows ALERT with photo count and structure so you can see if photos saved. Being methodical now!',
     '1.8.5': '🔍 DEBUG BUTTON ADDED: Yellow "DEBUG: Check Photo Storage" button in group detail view. Click it to see EXACTLY what photos are stored in Firestore for today. This will tell us if photos are saving or not!',
     '1.8.6': '📸 CAMERA FLIP FIXED FOR REAL: Now FLIPS outfit/selfie to match what you saw (mirror view). Phone un-mirrors it, we re-mirror it. 🎵 iTunes BACK TO allOrigins (what worked originally). All 72 functions intact!',
-    '1.8.7': '🖼️ COLLAGE FIX: Added "Re-generate Collage" button below existing collages. Added error detection for broken images. Added detailed logging to see why images fail to load (CORS issue likely). Click Re-generate!'
+    '1.8.7': '🖼️ COLLAGE FIX: Added "Re-generate Collage" button below existing collages. Added error detection for broken images. Added detailed logging to see why images fail to load (CORS issue likely). Click Re-generate!',
+    '1.8.8': '🎯 COLLAGE CORS FIXED! Removed crossOrigin="anonymous" from image loading. Firebase Storage was blocking it. Collages should generate properly now! Click Re-generate Collage to try again!'
   };
 
   var state = {
@@ -1934,7 +1935,7 @@ window.onerror = function(msg, url, line, col, error) {
     for (var i = 0; i < photoList.length; i++) {
       (function(photo) {
         var img = new Image();
-        img.crossOrigin = 'anonymous';
+        // Don't set crossOrigin for Firebase Storage - it blocks it
         img.onload = function() {
           console.log('[Collage] Image loaded successfully:', photo.url.substring(0, 50));
           loadedImages.push({img: img, photo: photo});
