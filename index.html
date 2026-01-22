@@ -41,7 +41,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '1.9.1';
+var APP_VERSION = '2.0.0';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -241,7 +241,8 @@ window.onerror = function(msg, url, line, col, error) {
     '1.8.8': '🎯 COLLAGE CORS FIXED! Removed crossOrigin="anonymous" from image loading. Firebase Storage was blocking it. Collages should generate properly now! Click Re-generate Collage to try again!',
     '1.8.9': '🛡️ CRASH PREVENTION: Added try-catch around canvas operations. Added safety checks for empty image arrays. Added detailed logging at every step. Collage generation wont crash the app anymore - will show error alerts instead!',
     '1.9.0': '🔄 COMPLETE REWRITE: Rewrote generateGroupCollage to use html2canvas + DOM instead of canvas API. This avoids CORS "operation is insecure" errors. Creates DOM grid, captures with html2canvas, uploads to Firebase. ONLY touched this ONE function - everything else untouched!',
-    '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!'
+    '1.9.1': '⛔ COLLAGE DISABLED: Disabled collage generation entirely due to persistent CORS/image loading issues. The photo grid in history still shows all photos. generateGroupCollage now just shows a message. Everything else works perfectly!',
+    '2.0.0': '🎉 MAJOR UPDATE: ✅ REMOVED blank collages & generate buttons ✅ ALWAYS show photo grid in history ✅ REMOVED debug button ✅ Settings visible to ALL members (not just creator) ✅ Only creator can edit name/icon ✅ Everyone can see members & send friend requests. Careful restructure - all 72 functions intact!'
   };
 
   var state = {
@@ -3566,8 +3567,8 @@ window.onerror = function(msg, url, line, col, error) {
       else if (state.groupView === 'members') title = '👥 Members';
       header.appendChild(el('span', {style: {fontWeight: '600', color: t.text, fontSize: '16px'}}, title));
       
-      // Right button - info on list, settings on detail (for creator)
-      if (state.groupView === 'detail' && state.currentGroup && state.currentGroup.createdBy === state.user.uid) {
+      // Right button - info on list, settings on detail (for ALL members)
+      if (state.groupView === 'detail' && state.currentGroup) {
         header.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { setState({groupView: 'members'}); }}, '⚙️'));
       } else if (state.groupView === 'list' || !state.groupView) {
         header.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { setState({groupView: 'info'}); }}, 'ℹ️'));
@@ -3787,86 +3788,54 @@ window.onerror = function(msg, url, line, col, error) {
         page.appendChild(othersBox);
         
         // History Button
-        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() { setState({groupView: 'history'}); }}, '📅 View Past Collages'));
-        
-        // DEBUG: Check what photos are stored
-        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: '#ffeb3b', border: '1px solid #f57f17', color: '#000', textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() {
-          var today = getUTCDate();
-          var msg = '=== GROUP PHOTO DEBUG ===\n\n';
-          msg += 'Group: ' + group.name + '\n';
-          msg += 'Today: ' + today + '\n\n';
-          
-          if (!group.photos) {
-            alert(msg + 'NO PHOTOS OBJECT EXISTS!\nPhotos were never saved to this group.');
-            return;
-          }
-          
-          var todayPhotos = group.photos[today];
-          if (!todayPhotos) {
-            alert(msg + 'NO PHOTOS FOR TODAY!\nNo one has uploaded photos yet.');
-            return;
-          }
-          
-          var count = 0;
-          var details = '';
-          for (var uid in todayPhotos) {
-            count++;
-            details += '\nUser ' + count + ' (' + uid.substring(0, 8) + '):\n';
-            details += JSON.stringify(todayPhotos[uid], null, 2) + '\n';
-          }
-          
-          msg += 'Found ' + count + ' photo(s) for today:\n' + details;
-          alert(msg);
-        }}, '🔍 DEBUG: Check Photo Storage'));
+        page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() { setState({groupView: 'history'}); }}, '📅 View Past Photos'));
         
         app.appendChild(page);
         return;
       }
       
-      // Group Members Management View (creator only)
+      // Group Members View (visible to ALL members)
       if (state.groupView === 'members' && state.currentGroup) {
         var group = state.currentGroup;
         var isCreator = group.createdBy === state.user.uid;
         
-        if (!isCreator) {
-          setState({groupView: 'detail'});
-          return;
+        // ONLY CREATOR sees customization options
+        if (isCreator) {
+          var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
+          membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '🎨 Customize Group'));
+          
+          // Group Name
+          membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Name'));
+          var nameInput = el('input', {value: group.name, placeholder: 'Group name', maxLength: 50, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px'}});
+          nameInput.oninput = function(e) { state.editGroupName = e.target.value; };
+          membersBox.appendChild(nameInput);
+          
+          var nameBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
+            if (state.editGroupName && state.editGroupName.trim() && state.editGroupName !== group.name) {
+              updateGroupName(group.id, state.editGroupName.trim());
+            }
+          }}, 'Update Name');
+          membersBox.appendChild(nameBtn);
+          
+          // Group Icon (emoji, max 2 characters)
+          membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Icon (emoji, max 2 chars)'));
+          var iconInput = el('input', {value: (group.customTheme && group.customTheme.icon) || '👥', placeholder: '👥', maxLength: 2, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px', textAlign: 'center'}});
+          iconInput.oninput = function(e) { state.editGroupIcon = e.target.value; };
+          membersBox.appendChild(iconInput);
+          
+          var iconBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
+            if (state.editGroupIcon && state.editGroupIcon.length <= 2) {
+              updateGroupIcon(group.id, state.editGroupIcon);
+            }
+          }}, 'Update Icon');
+          membersBox.appendChild(iconBtn);
+          
+          page.appendChild(membersBox);
         }
         
-        var membersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border, marginBottom: '16px'}});
-        membersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '🎨 Customize Group'));
-        
-        // Group Name
-        membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Name'));
-        var nameInput = el('input', {value: group.name, placeholder: 'Group name', maxLength: 50, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '15px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px'}});
-        nameInput.oninput = function(e) { state.editGroupName = e.target.value; };
-        membersBox.appendChild(nameInput);
-        
-        var nameBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
-          if (state.editGroupName && state.editGroupName.trim() && state.editGroupName !== group.name) {
-            updateGroupName(group.id, state.editGroupName.trim());
-          }
-        }}, 'Update Name');
-        membersBox.appendChild(nameBtn);
-        
-        // Group Icon (emoji, max 2 characters)
-        membersBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Group Icon (emoji, max 2 chars)'));
-        var iconInput = el('input', {value: (group.customTheme && group.customTheme.icon) || '👥', placeholder: '👥', maxLength: 2, style: {width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid ' + t.border, background: t.bg, fontSize: '24px', color: t.text, outline: 'none', boxSizing: 'border-box', marginBottom: '8px', textAlign: 'center'}});
-        iconInput.oninput = function(e) { state.editGroupIcon = e.target.value; };
-        membersBox.appendChild(iconInput);
-        
-        var iconBtn = el('span', {className: 'tap', style: {display: 'inline-block', padding: '10px 20px', borderRadius: '8px', background: t.accent, color: '#fff', fontSize: '14px', fontWeight: '600', marginBottom: '20px'}, onClick: function() {
-          if (state.editGroupIcon && state.editGroupIcon.length <= 2) {
-            updateGroupIcon(group.id, state.editGroupIcon);
-          }
-        }}, 'Update Icon');
-        membersBox.appendChild(iconBtn);
-        
-        page.appendChild(membersBox);
-        
-        // Members management section
+        // EVERYONE sees members list
         var manageMembersBox = el('div', {style: {background: t.card, borderRadius: '16px', padding: '16px', border: '1px solid ' + t.border}});
-        manageMembersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '👥 Manage Members'));
+        manageMembersBox.appendChild(el('h3', {style: {margin: '0 0 16px', fontSize: '18px', fontWeight: '600', color: t.text}}, '👥 Group Members'));
         
         // Current members
         manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, 'Current Members (' + group.members.length + ')'));
@@ -3906,13 +3875,34 @@ window.onerror = function(msg, url, line, col, error) {
               });
             }
             
-            // Remove button (not for creator)
-            if (!isMe) {
+            // Creator: show remove button (not for self)
+            // Non-creator: show add friend button (if not already friends)
+            if (isCreator && !isMe) {
               memberItem.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '6px', background: '#ffebee', color: '#c62828', fontSize: '11px', fontWeight: '600'}, onClick: function() {
                 if (confirm('Remove this member from the group?')) {
                   removeMemberFromGroup(group.id, memberId);
                 }
               }}, 'Remove'));
+            } else if (!isCreator && !isMe) {
+              // Check if already friends
+              var isFriend = false;
+              for (var fi = 0; fi < state.friends.length; fi++) {
+                if (state.friends[fi].id === memberId) {
+                  isFriend = true;
+                  break;
+                }
+              }
+              
+              if (!isFriend) {
+                memberItem.appendChild(el('span', {className: 'tap', style: {padding: '6px 10px', borderRadius: '6px', background: t.accent, color: '#fff', fontSize: '11px', fontWeight: '600'}, onClick: function() {
+                  // Get member info to send friend request
+                  getMemberInfo(memberId, function(info) {
+                    if (info && info.username) {
+                      sendFriendRequest(info.username);
+                    }
+                  });
+                }}, 'Add Friend'));
+              }
             }
             
             membersList.appendChild(memberItem);
@@ -3945,11 +3935,12 @@ window.onerror = function(msg, url, line, col, error) {
           manageMembersBox.appendChild(pendingList);
         }
         
-        // Invite New Member - MOVED HERE, ABOVE THE FRIENDS LIST
-        manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, '➕ Invite New Member'));
-        
-        // Show friends not already in group
-        var availableFriends = state.friends.filter(function(f) {
+        // Invite New Member - CREATOR ONLY
+        if (isCreator) {
+          manageMembersBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', fontWeight: '600', color: t.muted}}, '➕ Invite New Member'));
+          
+          // Show friends not already in group
+          var availableFriends = state.friends.filter(function(f) {
           return group.members.indexOf(f.id) === -1 && (group.pendingInvites || []).indexOf(f.id) === -1;
         });
         
@@ -3976,6 +3967,7 @@ window.onerror = function(msg, url, line, col, error) {
           }
           manageMembersBox.appendChild(addList);
         }
+        } // End of isCreator block for invite section
         
         page.appendChild(manageMembersBox);
         app.appendChild(page);
@@ -4091,68 +4083,14 @@ window.onerror = function(msg, url, line, col, error) {
               dayItem.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '📅 ' + date));
               dayItem.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '12px', color: t.muted}}, photoCount + ' photo' + (photoCount !== 1 ? 's' : '')));
               
-              if (collage && collage.url) {
-                // Show the collage image - clickable for full view
-                var collageImg = el('img', {
-                  className: 'tap', 
-                  src: collage.url, 
-                  style: {width: '100%', borderRadius: '10px', display: 'block', cursor: 'pointer'}, 
-                  onClick: function() {
-                    setState({viewingCollage: collage.url});
-                  }
-                });
-                
-                // Add error handler for broken images
-                collageImg.onerror = function() {
-                  this.style.display = 'none';
-                  dayItem.appendChild(el('p', {style: {color: '#e53935', fontSize: '13px', fontWeight: '500', padding: '20px', textAlign: 'center', background: '#ffebee', borderRadius: '10px'}}, '⚠️ Collage failed to load'));
-                };
-                
-                dayItem.appendChild(collageImg);
-                
-                // Add re-generate button below collage
-                if (dayPhotos && photoCount > 0) {
-                  dayItem.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '8px', borderRadius: '8px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontSize: '12px', fontWeight: '500', marginTop: '8px'}, onClick: function() {
-                    if (confirm('Re-generate collage for ' + date + '? This will replace the current one.')) {
-                      generateGroupCollage(group.id, date, dayPhotos);
-                      alert('Generating new collage... Reload page in 15 seconds!');
-                    }
-                  }}, '🔄 Re-generate Collage'));
-                }
-              } else if (dayPhotos && photoCount > 0) {
-                // No collage yet, show photos grid and generate button
-                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px'}});
+              // ALWAYS show photo grid (no collage feature)
+              if (dayPhotos && photoCount > 0) {
+                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px'}});
                 for (var odUserId in dayPhotos) {
                   var photo = dayPhotos[odUserId];
                   grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px'}}));
                 }
                 dayItem.appendChild(grid);
-                
-                // Button to generate collage
-                dayItem.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '10px', borderRadius: '8px', background: t.accent, color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '500'}, onClick: function() {
-                  // Show what we have
-                  var photoCount = 0;
-                  var userIds = [];
-                  for (var uid in dayPhotos) {
-                    photoCount++;
-                    userIds.push(uid);
-                  }
-                  
-                  var msg = 'Found ' + photoCount + ' photo(s) for ' + date + '\n';
-                  msg += 'User IDs: ' + userIds.join(', ') + '\n\n';
-                  
-                  if (photoCount === 0) {
-                    alert('NO PHOTOS FOUND! Photos were not saved to Firestore.');
-                    return;
-                  }
-                  
-                  // Check first photo structure
-                  var firstPhoto = dayPhotos[userIds[0]];
-                  msg += 'First photo structure:\n' + JSON.stringify(firstPhoto, null, 2);
-                  alert(msg);
-                  
-                  generateGroupCollage(group.id, date, dayPhotos);
-                }}, '🖼️ Generate Collage'));
               }
               
               historyBox.appendChild(dayItem);
