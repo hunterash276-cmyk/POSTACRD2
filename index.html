@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '2.7.5';
+var APP_VERSION = '2.7.6';
 
 // iTunes API Proxy Configuration
 // Using allOrigins - a free public CORS proxy (no setup needed!)
@@ -266,7 +266,8 @@ window.onerror = function(msg, url, line, col, error) {
     '2.7.2': '✏️ DRAFT EDITING + CALENDAR: ✅ Edit drafts later! New "✏️ Edit" button loads draft into camera to add music when you have service. ⚠️ Shows "No music added" warning. 📅 Smart upload button: "Upload to Feed" (same day) or "Upload to Calendar" (past midnight). Editing preserves original date. Updates existing draft instead of creating new one!',
     '2.7.3': '🔧 MAJOR FIXES: ✅ Drafts now COUNT as posting (can\'t make 2nd postcard same day). ✅ Edit button goes to FULL upload page (step 1) not just music. ✅ iTunes search: 15sec timeout, better errors, handles "dont look back" searches. ✅ AbortController for timeouts. ✅ More helpful error messages. All careful fixes!',
     '2.7.4': '🚫 DUPLICATE FIX (CRITICAL): ✅ FINALLY FIXED duplicates! uploadPost now checks Firebase BEFORE uploading. Checks state.myPosts AND queries Firebase for today\'s date. Rejects with error if duplicate found. Will NOT waste storage/money on duplicates anymore! 🔤 iTunes search confirmed case-insensitive (always was). "dont look back" = "DONT LOOK BACK".',
-    '2.7.5': '🔓 DRAFT FIX (CRITICAL): ✅ FIXED! Draft now ONLY blocks camera (can\'t make 2nd postcard) BUT friends\' posts STAY BLURRED until you UPLOAD the draft! Two states: posted (unblurs) vs hasPostcardToday (blocks camera). Draft = can\'t use camera BUT still see blurred posts. Upload draft = posts unblur! Exactly as requested!'
+    '2.7.5': '🔓 DRAFT FIX (CRITICAL): ✅ FIXED! Draft now ONLY blocks camera (can\'t make 2nd postcard) BUT friends\' posts STAY BLURRED until you UPLOAD the draft! Two states: posted (unblurs) vs hasPostcardToday (blocks camera). Draft = can\'t use camera BUT still see blurred posts. Upload draft = posts unblur! Exactly as requested!',
+    '2.7.6': '🎵 AUDIO FIX (CRITICAL): ✅ FIXED wrong audio playing! IntersectionObserver now plays MOST VISIBLE post only (>50% visible). Calculates visibility ratio for each post. Prevents edge cases where 2 posts partially visible. Requires 50% visibility minimum. Multiple threshold checks (0-100%). Audio matches correct post now!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -5705,13 +5706,25 @@ window.onerror = function(msg, url, line, col, error) {
     }
     
     audioObserver = new IntersectionObserver(function(entries) {
+      // Find the MOST VISIBLE post (highest intersection ratio)
+      var mostVisible = null;
+      var highestRatio = 0;
+      
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting && entry.intersectionRatio > highestRatio) {
+          highestRatio = entry.intersectionRatio;
+          mostVisible = entry;
+        }
+      });
+      
+      // Only play audio for the MOST visible post
       entries.forEach(function(entry) {
         var audio = entry.target.querySelector('audio');
         if (!audio) return;
         
-        // Play as soon as ANY part is visible
-        if (entry.isIntersecting) {
-          // Post is in view, play audio immediately
+        // This is the most visible post - play it
+        if (entry === mostVisible && entry.intersectionRatio > 0.5) {
+          // Need at least 50% visible to play
           if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio.currentTime = 0;
@@ -5719,11 +5732,10 @@ window.onerror = function(msg, url, line, col, error) {
           
           audio.play().catch(function(e) {
             // Silently fail if browser blocks autoplay
-            // Will work after user interaction
           });
           currentlyPlayingAudio = audio;
         } else {
-          // Post is out of view, stop audio immediately
+          // Not the most visible, or not visible enough - stop this audio
           if (currentlyPlayingAudio === audio) {
             audio.pause();
             audio.currentTime = 0;
@@ -5732,7 +5744,7 @@ window.onerror = function(msg, url, line, col, error) {
         }
       });
     }, {
-      threshold: [0, 0.01], // Trigger as soon as ANY part visible
+      threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], // Check visibility at many points
       rootMargin: '0px'
     });
     
@@ -5747,28 +5759,35 @@ window.onerror = function(msg, url, line, col, error) {
       if (currentlyPlayingAudio) return;
       
       var postcards = document.querySelectorAll('[data-postcard-with-audio]');
+      var mostVisibleCard = null;
+      var highestVisibility = 0;
+      
       for (var i = 0; i < postcards.length; i++) {
         var card = postcards[i];
-        var audio = card.querySelector('audio');
-        if (!audio) continue;
-        
         var rect = card.getBoundingClientRect();
         var windowHeight = window.innerHeight || document.documentElement.clientHeight;
-        var windowWidth = window.innerWidth || document.documentElement.clientWidth;
         
-        var isVisible = (
-          rect.top < windowHeight &&
-          rect.bottom > 0 &&
-          rect.left < windowWidth &&
-          rect.right > 0
-        );
+        // Calculate what % of the card is visible
+        var visibleTop = Math.max(rect.top, 0);
+        var visibleBottom = Math.min(rect.bottom, windowHeight);
+        var visibleHeight = Math.max(0, visibleBottom - visibleTop);
+        var cardHeight = rect.height;
+        var visibilityRatio = cardHeight > 0 ? (visibleHeight / cardHeight) : 0;
         
-        if (isVisible) {
+        if (visibilityRatio > highestVisibility) {
+          highestVisibility = visibilityRatio;
+          mostVisibleCard = card;
+        }
+      }
+      
+      // Play the MOST visible card's audio
+      if (mostVisibleCard && highestVisibility > 0.5) {
+        var audio = mostVisibleCard.querySelector('audio');
+        if (audio) {
           audio.play().catch(function() {
             // Silently fail - will work after user interaction
           });
           currentlyPlayingAudio = audio;
-          break;
         }
       }
     };
