@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.2.0';
+var APP_VERSION = '3.2.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -544,7 +544,8 @@ function handleScriptError() {
     '3.1.2': '📋 USER LOOKUP TABLE: ✅ Added appConfig/userLookup document in Firebase that maps usernames to user IDs. Now you can easily find who is who! Just go to Firestore → appConfig → userLookup to see username → ID mappings.',
     '3.1.3': '🏷️ BADGE TEXT OUTLINE + OFFLINE FIX: ✅ Badge text now has thin black outline so light colors (yellow, white) are readable. ✅ Fixed offline mode - app now shows offline screen properly when no internet. ✅ Enabled Firestore persistence for better offline data caching.',
     '3.1.4': '🌍 TIMEZONE FIX: ✅ Friends across different timezones now see each other\'s posts! Feed shows posts from last 24 hours (not calendar date). Posting resets at YOUR local midnight. Calendar groups posts by YOUR local date. Timestamps display in YOUR timezone. No more missing posts between UK and Australia!',
-    '3.2.0': '🎨 ZINE REDESIGN: Complete visual overhaul! DIY zine/indie aesthetic with bold Syne typography, square corners, black borders, paper texture backgrounds, tape-style highlights, and raw photocopied look. Uppercase titles, monospace IBM Plex Mono body text. Fresh indie magazine vibe!'
+    '3.2.0': '🎨 ZINE REDESIGN: Complete visual overhaul! DIY zine/indie aesthetic with bold Syne typography, square corners, black borders, paper texture backgrounds, tape-style highlights, and raw photocopied look. Uppercase titles, monospace IBM Plex Mono body text. Fresh indie magazine vibe!',
+    '3.2.1': '🎨 UI POLISH: SVG icons replace emojis throughout UI (reactions/logs keep emojis). Fixed button contrast in dark mode. Auto-dismiss reaction notifications when viewing mailbox. Songs now loop continuously. Added spacing above first feed post. Cleaner, more consistent design!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3417,6 +3418,54 @@ function handleScriptError() {
     return e;
   }
 
+  // SVG Icon helper - creates inline SVG icons in zine style
+  function icon(name, size, color) {
+    size = size || 20;
+    color = color || 'currentColor';
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', color);
+    svg.setAttribute('stroke-width', '2.5');
+    svg.setAttribute('stroke-linecap', 'square');
+    svg.setAttribute('stroke-linejoin', 'miter');
+    svg.style.display = 'block';
+    
+    var paths = {
+      mail: 'M4 4h16v16H4V4zm0 0l8 8 8-8',
+      settings: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z',
+      users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+      plus: 'M12 5v14M5 12h14',
+      back: 'M19 12H5M12 19l-7-7 7-7',
+      close: 'M18 6L6 18M6 6l12 12',
+      camera: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2zM12 17a4 4 0 100-8 4 4 0 000 8z',
+      calendar: 'M4 4h16v16H4V4zM16 2v4M8 2v4M4 10h16',
+      search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
+      check: 'M20 6L9 17l-5-5',
+      send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+      user: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z',
+      heart: 'M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z',
+      image: 'M4 4h16v16H4V4zM4 16l4-4 3 3 5-5 4 4M9 9a1 1 0 100-2 1 1 0 000 2z',
+      music: 'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zM21 16a3 3 0 11-6 0 3 3 0 016 0z',
+      wifi: 'M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01',
+      wifiOff: 'M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01',
+      plane: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+      edit: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+      trash: 'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6',
+      download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+      info: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+      lock: 'M5 11h14v10H5V11zM7 11V7a5 5 0 0110 0v4',
+      userPlus: 'M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M8.5 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6'
+    };
+    
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', paths[name] || paths.info);
+    svg.appendChild(path);
+    return svg;
+  }
+
   function postcardEl(post, owner, opts) {
     opts = opts || {};
     var font = FONTS[post.songFont || 0].v;
@@ -3466,7 +3515,7 @@ function handleScriptError() {
     
     // Add hidden audio element for preview (will be controlled by IntersectionObserver)
     if (post.song && post.song.preview && opts.enablePreview) {
-      var audio = el('audio', {src: post.song.preview, preload: 'none', style: {display: 'none'}});
+      var audio = el('audio', {src: post.song.preview, preload: 'none', loop: 'true', style: {display: 'none'}});
       audio.setAttribute('data-post-id', post.id || 'preview');
       song.appendChild(audio);
     }
@@ -3760,7 +3809,9 @@ function handleScriptError() {
     if (!window.audioUnlocked && state.user) {
       var splash = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: t.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: '10000', padding: '40px'}});
       
-      splash.appendChild(el('div', {style: {fontSize: '72px', marginBottom: '24px'}}, '✈️'));
+      var splashIcon = el('div', {style: {marginBottom: '24px'}});
+      splashIcon.appendChild(icon('plane', 72, t.text));
+      splash.appendChild(splashIcon);
       splash.appendChild(el('h1', {className: 'zine-title', style: {margin: '0 0 12px', fontSize: '42px', fontWeight: '700', color: t.text, letterSpacing: '-2px'}}, 'POSTCARD'));
       splash.appendChild(el('p', {style: {margin: '0 0 40px', fontSize: '14px', color: t.muted, textAlign: 'center', letterSpacing: '1px', textTransform: 'uppercase'}}, 'Share your day with friends'));
       
@@ -3912,23 +3963,23 @@ function handleScriptError() {
       var fields = el('div', {style: {display: 'flex', flexDirection: 'column', gap: '12px'}});
       
       if (state.authMode === 'signup') {
-        var userField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
-        userField.appendChild(el('span', null, '👤'));
+        var userField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '0', border: '2px solid ' + t.border, background: t.card}});
+        userField.appendChild(icon('user', 20, t.muted));
         var userInput = el('input', {placeholder: 'Username', value: state.authData.username, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
         userInput.oninput = function(e) { state.authData.username = e.target.value; };
         userField.appendChild(userInput);
         fields.appendChild(userField);
       }
       
-      var emailField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
-      emailField.appendChild(el('span', null, '✉️'));
+      var emailField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '0', border: '2px solid ' + t.border, background: t.card}});
+      emailField.appendChild(icon('mail', 20, t.muted));
       var emailInput = el('input', {type: 'email', placeholder: 'Email', value: state.authData.email, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
       emailInput.oninput = function(e) { state.authData.email = e.target.value; };
       emailField.appendChild(emailInput);
       fields.appendChild(emailField);
       
-      var passField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
-      passField.appendChild(el('span', null, '🔒'));
+      var passField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '0', border: '2px solid ' + t.border, background: t.card}});
+      passField.appendChild(icon('lock', 20, t.muted));
       var passInput = el('input', {type: 'password', placeholder: 'Password (6+ chars)', value: state.authData.password, style: {flex: '1', background: 'transparent', border: 'none', fontSize: '15px', color: t.text, outline: 'none'}});
       passInput.oninput = function(e) { state.authData.password = e.target.value; };
       passField.appendChild(passInput);
@@ -3940,8 +3991,8 @@ function handleScriptError() {
       }
       
       if (state.authMode === 'signup') {
-        var bdayField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '14px', border: '1px solid ' + t.border, background: t.card}});
-        bdayField.appendChild(el('span', null, '🎂'));
+        var bdayField = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', borderRadius: '0', border: '2px solid ' + t.border, background: t.card}});
+        bdayField.appendChild(icon('calendar', 20, t.muted));
         var bdayInput = el('input', {type: 'date', value: state.authData.birthday, placeholder: 'YYYY-MM-DD', style: {flex: '1', background: 'transparent', border: 'none', fontSize: '16px', color: t.text, outline: 'none', minHeight: '24px', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none'}});
         bdayInput.oninput = function(e) { state.authData.birthday = e.target.value; };
         bdayInput.onfocus = function(e) { 
@@ -3957,7 +4008,7 @@ function handleScriptError() {
       
       page.appendChild(fields);
       
-      var submitBtn = el('span', {className: 'tap', style: {marginTop: '24px', color: '#fff', padding: '16px', borderRadius: '14px', fontSize: '16px', fontWeight: '600', textAlign: 'center', background: t.accent, opacity: state.authLoading ? '0.5' : '1', display: 'block'}, onClick: state.authMode === 'login' ? handleLogin : handleSignup}, state.authLoading ? 'Please wait...' : (state.authMode === 'login' ? 'Log In' : 'Create Account'));
+      var submitBtn = el('span', {className: 'tap', style: {marginTop: '24px', color: t.bg, padding: '16px', borderRadius: '0', fontSize: '14px', fontWeight: '600', textAlign: 'center', background: t.text, opacity: state.authLoading ? '0.5' : '1', display: 'block', letterSpacing: '1px', textTransform: 'uppercase', border: '2px solid ' + t.text}, onClick: state.authMode === 'login' ? handleLogin : handleSignup}, state.authLoading ? 'PLEASE WAIT...' : (state.authMode === 'login' ? 'LOG IN' : 'CREATE ACCOUNT'));
       page.appendChild(submitBtn);
       
       app.appendChild(page);
@@ -3969,22 +4020,24 @@ function handleScriptError() {
       var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px', position: 'relative', zIndex: '1', isolation: 'isolate'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '2px solid ' + t.border}});
-      var logoWrap = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px'}});
+      var logoWrap = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px'}});
       logoWrap.appendChild(el('span', {className: 'zine-title', style: {fontSize: '24px', fontWeight: '700', color: t.text, letterSpacing: '-1px'}}, 'POSTCARD'));
-      logoWrap.appendChild(el('span', {style: {fontSize: '16px'}}, '✈️'));
+      logoWrap.appendChild(icon('plane', 18, t.text));
       
       var btns = el('div', {style: {display: 'flex', gap: '4px', alignItems: 'center'}});
       
       // Mailbox/Notifications button
       var unreadCount = getUnreadCount();
-      var mailBtn = el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted, position: 'relative'}, onClick: function() { nav('notifications'); }});
-      mailBtn.appendChild(el('span', null, '📬'));
+      var mailBtn = el('span', {className: 'tap', style: {padding: '8px', color: t.muted, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('notifications'); }});
+      mailBtn.appendChild(icon('mail', 22, t.muted));
       if (unreadCount > 0) {
         mailBtn.appendChild(el('div', {style: {position: 'absolute', top: '2px', right: '2px', minWidth: '18px', height: '18px', borderRadius: '50%', background: '#e53935', color: '#fff', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + t.bg, padding: '0 4px'}}, unreadCount > 9 ? '9+' : unreadCount));
       }
       btns.appendChild(mailBtn);
       
-      btns.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '8px', color: t.muted}, onClick: function() { nav('settings'); }}, '⚙️'));
+      var settingsBtn = el('span', {className: 'tap', style: {padding: '8px', color: t.muted, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('settings'); }});
+      settingsBtn.appendChild(icon('settings', 22, t.muted));
+      btns.appendChild(settingsBtn);
       // Removed profile button from header - it's in bottom nav
       
       header.appendChild(logoWrap);
@@ -3993,8 +4046,9 @@ function handleScriptError() {
       
       // Offline mode banner
       if (!state.online) {
-        var offlineBanner = el('div', {style: {margin: '0 20px 16px', padding: '16px', borderRadius: '16px', background: '#ff9800', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px'}});
-        offlineBanner.appendChild(el('div', {style: {fontSize: '24px'}}, '📡'));
+        var offlineBanner = el('div', {style: {margin: '16px 20px 16px', padding: '16px', borderRadius: '0', background: '#ff9800', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px', border: '2px solid #e65100'}});
+        var wifiIcon = icon('wifiOff', 24, '#fff');
+        offlineBanner.appendChild(wifiIcon);
         var offlineText = el('div', {style: {flex: '1'}});
         offlineText.appendChild(el('div', {style: {fontSize: '14px', fontWeight: '600', marginBottom: '2px'}}, 'Offline Mode'));
         offlineText.appendChild(el('div', {style: {fontSize: '12px', opacity: '0.9'}}, 'You can still take photos. They\'ll upload when back online.'));
@@ -4004,8 +4058,8 @@ function handleScriptError() {
       
       // Check for pending posts (show reminder)
       if (state.user && localStorage.getItem('postcard_pending_' + state.user.uid)) {
-        var pendingBanner = el('div', {style: {margin: '0 20px 16px', padding: '16px', borderRadius: '16px', background: '#4caf50', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px'}});
-        pendingBanner.appendChild(el('div', {style: {fontSize: '24px'}}, '⏳'));
+        var pendingBanner = el('div', {style: {margin: '16px 20px 16px', padding: '16px', borderRadius: '0', background: '#4caf50', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px', border: '2px solid #2e7d32'}});
+        pendingBanner.appendChild(icon('send', 24, '#fff'));
         var pendingText = el('div', {style: {flex: '1'}});
         pendingText.appendChild(el('div', {style: {fontSize: '14px', fontWeight: '600', marginBottom: '2px'}}, 'Post Ready to Upload'));
         pendingText.appendChild(el('div', {style: {fontSize: '12px', opacity: '0.9'}}, state.online ? 'Uploading now...' : 'Will upload when back online'));
@@ -4020,10 +4074,12 @@ function handleScriptError() {
       
       // Show CTA to encourage posting (hide if draft or posted)
       if (!state.hasPostcardToday) {
-        var cta = el('div', {style: {margin: '0 20px 20px', padding: '24px', borderRadius: '20px', textAlign: 'center', border: '2px dashed ' + t.border, background: t.card}});
-        cta.appendChild(el('div', {style: {fontSize: '40px', marginBottom: '8px'}}, '📮'));
-        cta.appendChild(el('p', {style: {color: t.text, margin: '0 0 14px', fontSize: '15px'}}, "Share your day to see friends' postcards"));
-        cta.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', color: t.bg, padding: '14px 28px', borderRadius: '0', fontSize: '13px', fontWeight: '600', background: t.text, letterSpacing: '1px', textTransform: 'uppercase', border: '2px solid ' + t.text}, onClick: function() { nav('post'); }}, 'SEND POSTCARD ✉️'));
+        var cta = el('div', {style: {margin: '20px 20px 20px', padding: '24px', borderRadius: '0', textAlign: 'center', border: '2px dashed ' + t.border, background: t.card}});
+        var ctaIcon = el('div', {style: {marginBottom: '12px', display: 'flex', justifyContent: 'center'}});
+        ctaIcon.appendChild(icon('send', 40, t.text));
+        cta.appendChild(ctaIcon);
+        cta.appendChild(el('p', {style: {color: t.text, margin: '0 0 14px', fontSize: '14px'}}, "Share your day to see friends' postcards"));
+        cta.appendChild(el('span', {className: 'tap', style: {display: 'inline-block', color: t.bg, padding: '14px 28px', borderRadius: '0', fontSize: '13px', fontWeight: '600', background: t.text, letterSpacing: '1px', textTransform: 'uppercase', border: '2px solid ' + t.text}, onClick: function() { nav('post'); }}, 'SEND POSTCARD'));
         page.appendChild(cta);
       }
       
@@ -4073,7 +4129,7 @@ function handleScriptError() {
         page.appendChild(empty);
       }
       
-      var postsWrap = el('div', {style: {padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', zIndex: '1'}});
+      var postsWrap = el('div', {style: {padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', zIndex: '1'}});
       for (var i = 0; i < posts.length; i++) {
         (function(p) {
           var isMyPost = state.user && p.userId === state.user.uid;
@@ -4112,9 +4168,14 @@ function handleScriptError() {
               borderRadius: '16px',
               zIndex: '10'
             }});
-            overlay.appendChild(el('span', {style: {fontSize: '32px', marginBottom: '8px'}}, '🔒'));
+            var lockIconWrap = el('div', {style: {marginBottom: '8px'}});
+            lockIconWrap.appendChild(icon('lock', 32, t.text));
+            overlay.appendChild(lockIconWrap);
             overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, 'Post your postcard to see this'));
-            overlay.appendChild(el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '13px', fontWeight: '600'}, onClick: function() { nav('post'); }}, 'Send postcard ✉️'));
+            var sendBtn = el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.text, color: t.bg, borderRadius: '0', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase', border: '2px solid ' + t.text, display: 'flex', alignItems: 'center', gap: '8px'}, onClick: function() { nav('post'); }});
+            sendBtn.appendChild(icon('send', 14, t.bg));
+            sendBtn.appendChild(el('span', null, 'SEND POSTCARD'));
+            overlay.appendChild(sendBtn);
             item.appendChild(overlay);
           }
           
@@ -4214,9 +4275,14 @@ function handleScriptError() {
                 borderRadius: '0',
                 zIndex: '10'
               }});
-              overlay.appendChild(el('span', {style: {fontSize: '32px', marginBottom: '8px'}}, '🔒'));
+              var lockIconWrap2 = el('div', {style: {marginBottom: '8px'}});
+              lockIconWrap2.appendChild(icon('lock', 32, t.text));
+              overlay.appendChild(lockIconWrap2);
               overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, 'Post your postcard to see this'));
-              overlay.appendChild(el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '13px', fontWeight: '600'}, onClick: function() { nav('post'); }}, 'Send postcard ✉️'));
+              var sendBtn2 = el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.text, color: t.bg, borderRadius: '0', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase', border: '2px solid ' + t.text, display: 'flex', alignItems: 'center', gap: '8px'}, onClick: function() { nav('post'); }});
+              sendBtn2.appendChild(icon('send', 14, t.bg));
+              sendBtn2.appendChild(el('span', null, 'SEND POSTCARD'));
+              overlay.appendChild(sendBtn2);
               item.appendChild(overlay);
             }
             
@@ -4234,14 +4300,19 @@ function handleScriptError() {
       var navbar = el('nav', {style: {position: 'fixed', bottom: '0', left: '0', right: '0', margin: '0 auto', width: '100%', maxWidth: '430px', padding: '12px 16px 30px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: t.bg, zIndex: '10000', borderTop: '2px solid ' + t.border, pointerEvents: 'auto'}});
       
       // Groups button
-      navbar.appendChild(el('span', {className: 'tap', style: {fontSize: '20px', padding: '10px', opacity: '0.6', position: 'relative', zIndex: '10001', pointerEvents: 'auto'}, onClick: function() { nav('groups'); }}, '👥'));
+      var groupsBtn = el('span', {className: 'tap', style: {padding: '10px', opacity: '0.6', position: 'relative', zIndex: '10001', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('groups'); }});
+      groupsBtn.appendChild(icon('users', 24, t.text));
+      navbar.appendChild(groupsBtn);
       
       // + button - disabled if already have postcard today (draft OR posted)
       if (state.hasPostcardToday) {
-        var disabledBtn = el('span', {style: {width: '48px', height: '48px', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', color: t.bg, background: t.border, opacity: '0.5', border: '2px solid ' + t.border}}, '✓');
+        var disabledBtn = el('span', {style: {width: '48px', height: '48px', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.border, opacity: '0.5', border: '2px solid ' + t.border}});
+        disabledBtn.appendChild(icon('check', 24, t.bg));
         navbar.appendChild(disabledBtn);
       } else {
-        navbar.appendChild(el('span', {className: 'tap', style: {width: '48px', height: '48px', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', color: t.bg, background: t.text, position: 'relative', zIndex: '10001', pointerEvents: 'auto', border: '2px solid ' + t.border}, onClick: function() { nav('post'); }}, '+'));
+        var addBtn = el('span', {className: 'tap', style: {width: '48px', height: '48px', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.text, position: 'relative', zIndex: '10001', pointerEvents: 'auto', border: '2px solid ' + t.border}, onClick: function() { nav('post'); }});
+        addBtn.appendChild(icon('plus', 24, t.bg));
+        navbar.appendChild(addBtn);
       }
       
       // Profile button with avatar
@@ -4261,7 +4332,9 @@ function handleScriptError() {
     // Detail
     if (state.view === 'detail' && state.sel) {
       var page = el('div', {style: {minHeight: '100vh', padding: '16px'}});
-      page.appendChild(el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '12px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10'}, onClick: function() { nav('feed'); }}, '✕'));
+      var closeBtn = el('span', {className: 'tap', style: {position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.card, color: t.text, zIndex: '10', border: '2px solid ' + t.border}, onClick: function() { nav('feed'); }});
+      closeBtn.appendChild(icon('close', 18, t.text));
+      page.appendChild(closeBtn);
       var wrap = el('div', {style: {paddingTop: '40px'}});
       var isOwner = state.user && state.sel.userId === state.user.uid;
       wrap.appendChild(postcardEl(state.sel, state.sel.friend, {showPrivate: isOwner, isOwner: isOwner, showMenu: true, showStamp: true, enablePreview: true}));
@@ -4276,7 +4349,9 @@ function handleScriptError() {
       // EXCEPTION: Allow if editing a draft (editingDraftId is set)
       if (state.hasPostcardToday && !state.editingDraftId) {
         var page = el('div', {style: {minHeight: '100vh', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center'}});
-        page.appendChild(el('div', {style: {fontSize: '64px', marginBottom: '16px'}}, '✅'));
+        var checkIconWrap = el('div', {style: {marginBottom: '16px'}});
+        checkIconWrap.appendChild(icon('check', 64, t.text));
+        page.appendChild(checkIconWrap);
         page.appendChild(el('h2', {style: {margin: '0 0 8px', fontSize: '22px', fontWeight: '600', color: t.text}}, "You've posted today!"));
         page.appendChild(el('p', {style: {margin: '0 0 24px', fontSize: '15px', color: t.muted}}, 'Come back tomorrow to share another postcard.'));
         page.appendChild(el('span', {className: 'tap', style: {padding: '14px 28px', borderRadius: '0', background: t.text, color: t.bg, fontWeight: '600', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase', border: '2px solid ' + t.text}, onClick: function() { nav('feed'); }}, 'BACK TO FEED'));
@@ -4287,10 +4362,16 @@ function handleScriptError() {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { if (state.step > 1) setState({step: state.step - 1}); else nav('feed'); }}, '←'));
-      var titles = ['', '📸 Photos', '🎵 Details', '✏️ Edit', '✓ Preview'];
-      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, titles[state.step]));
-      header.appendChild(el('span', {style: {color: t.muted, padding: '8px 12px'}}, state.step + '/4'));
+      var backBtn = el('span', {className: 'tap', style: {padding: '8px 12px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { if (state.step > 1) setState({step: state.step - 1}); else nav('feed'); }});
+      backBtn.appendChild(icon('back', 24, t.text));
+      header.appendChild(backBtn);
+      var stepIcons = ['', 'camera', 'music', 'edit', 'check'];
+      var stepTitles = ['', 'Photos', 'Details', 'Edit', 'Preview'];
+      var titleWrap = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px'}});
+      titleWrap.appendChild(icon(stepIcons[state.step], 18, t.text));
+      titleWrap.appendChild(el('span', {style: {fontWeight: '600', color: t.text, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '14px'}}, stepTitles[state.step]));
+      header.appendChild(titleWrap);
+      header.appendChild(el('span', {style: {color: t.muted, padding: '8px 12px', fontSize: '13px'}}, state.step + '/4'));
       page.appendChild(header);
       
       // Step 1: Photos
@@ -4300,7 +4381,7 @@ function handleScriptError() {
         
         var grid = el('div', {style: {display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}});
         var keys = ['outfit', 'photo'];
-        var icons = ['👕', '📷'];
+        var iconNames = ['user', 'camera'];
         var labels = ['Outfit/Selfie', 'Best Photo'];
         var sublabels = ['of the day', 'of the day'];
         
@@ -4351,9 +4432,9 @@ function handleScriptError() {
             if (state.np[k]) {
               label.appendChild(el('img', {src: state.np[k], style: {width: '100%', height: '100%', objectFit: 'cover'}}));
             } else {
-              var ph = el('div', {style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '12px'}});
-              ph.appendChild(el('span', {style: {fontSize: '40px'}}, icons[idx]));
-              ph.appendChild(el('span', {style: {color: t.text, fontSize: '13px', fontWeight: '600', textAlign: 'center'}}, labels[idx]));
+              var ph = el('div', {style: {width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px'}});
+              ph.appendChild(icon(iconNames[idx], 40, t.muted));
+              ph.appendChild(el('span', {style: {color: t.text, fontSize: '13px', fontWeight: '600', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px'}}, labels[idx]));
               ph.appendChild(el('span', {style: {color: t.muted, fontSize: '11px', textAlign: 'center'}}, sublabels[idx]));
               label.appendChild(ph);
             }
@@ -4725,8 +4806,13 @@ function handleScriptError() {
     if (state.view === 'notifications') {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('feed'); }}, '←'));
-      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, '📬 Mailbox'));
+      var backBtn = el('span', {className: 'tap', style: {padding: '8px 12px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('feed'); }});
+      backBtn.appendChild(icon('back', 24, t.text));
+      header.appendChild(backBtn);
+      var headerTitle = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px'}});
+      headerTitle.appendChild(icon('mail', 20, t.text));
+      headerTitle.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, 'Mailbox'));
+      header.appendChild(headerTitle);
       header.appendChild(el('div', {style: {width: '48px'}}));
       page.appendChild(header);
       
@@ -4735,9 +4821,22 @@ function handleScriptError() {
       var reactionNotifs = state.notifications.filter(function(n) { return n && n.type === 'reaction' && n.data; });
       var weeklyNotifs = state.notifications.filter(function(n) { return n && n.type === 'weeklyLookback' && n.data; });
       
+      // AUTO-DISMISS: Mark all reaction notifications as read when viewing mailbox
+      var unreadReactions = reactionNotifs.filter(function(n) { return !n.read; });
+      if (unreadReactions.length > 0) {
+        setTimeout(function() {
+          unreadReactions.forEach(function(notif) {
+            removeNotification(notif.id);
+          });
+        }, 1500); // Auto-dismiss after 1.5 seconds so user can see them
+      }
+      
       // Friend Requests Section - ALWAYS SHOW HEADER
       var frSection = el('div', {style: {marginBottom: '24px'}});
-      frSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👋 Friend Requests'));
+      var frHeader = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+      frHeader.appendChild(icon('userPlus', 16, t.text));
+      frHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, 'Friend Requests'));
+      frSection.appendChild(frHeader);
       
       if (friendRequestNotifs.length > 0) {
         for (var i = 0; i < friendRequestNotifs.length; i++) {
@@ -4770,7 +4869,10 @@ function handleScriptError() {
       
       // Saved Drafts Section
       var draftsSection = el('div', {style: {marginBottom: '24px'}});
-      draftsSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📝 Saved Drafts'));
+      var draftsHeader = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+      draftsHeader.appendChild(icon('edit', 16, t.text));
+      draftsHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, 'Saved Drafts'));
+      draftsSection.appendChild(draftsHeader);
       
       if (state.savedDrafts && state.savedDrafts.length > 0) {
         for (var i = 0; i < state.savedDrafts.length; i++) {
@@ -4881,7 +4983,10 @@ function handleScriptError() {
       // Weekly Recaps Section - Compact with button to view all
       var weeklySection = el('div', {style: {marginBottom: '24px'}});
       var weeklyHeader = el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}});
-      weeklyHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '📅 Weekly Recaps'));
+      var weeklyTitleWrap = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px'}});
+      weeklyTitleWrap.appendChild(icon('calendar', 16, t.text));
+      weeklyTitleWrap.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, 'Weekly Recaps'));
+      weeklyHeader.appendChild(weeklyTitleWrap);
       
       var unreadWeeklyCount = weeklyNotifs.filter(function(n) { return !n.read; }).length;
       
@@ -4901,35 +5006,34 @@ function handleScriptError() {
       }
       page.appendChild(weeklySection);
       
-      // Reactions Section - Only show UNREAD reactions (dismiss to remove)
-      var unreadReactions = reactionNotifs.filter(function(n) { return !n.read; });
+      // Reactions Section - Auto-dismisses after viewing
+      var unreadReactionsDisplay = reactionNotifs.filter(function(n) { return !n.read; });
       var reactSection = el('div', {style: {marginBottom: '24px'}});
-      reactSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '❤️ New Reactions'));
+      var reactHeader = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+      reactHeader.appendChild(icon('heart', 16, t.text));
+      reactHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, 'New Reactions'));
+      reactSection.appendChild(reactHeader);
       
-      if (unreadReactions.length > 0) {
-        for (var i = 0; i < unreadReactions.length; i++) {
+      if (unreadReactionsDisplay.length > 0) {
+        for (var i = 0; i < unreadReactionsDisplay.length; i++) {
           (function(notif) {
             if (!notif || !notif.data) return; // Skip invalid notifications
             
-            var item = el('div', {className: 'tap', style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '14px', background: t.accent + '11', border: '1px solid ' + t.border, marginBottom: '8px'}, onClick: function() { 
-              // Remove from notifications (dismiss)
-              removeNotification(notif.id);
-            }});
+            var item = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', borderRadius: '0', background: t.card, border: '2px solid ' + t.border, marginBottom: '8px'}});
             
-            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '12px', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px'}}, notif.data.emoji || '❤️'));
+            item.appendChild(el('div', {style: {width: '44px', height: '44px', borderRadius: '0', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', border: '2px solid ' + t.border}}, notif.data.emoji || '❤️'));
             
             var info = el('div', {style: {flex: '1'}});
             info.appendChild(el('p', {style: {margin: '0', fontSize: '15px', fontWeight: '500', color: t.text}}, (notif.data.fromUsername || 'Someone') + ' reacted ' + (notif.data.emoji || '❤️')));
             info.appendChild(el('p', {style: {margin: '2px 0 0', fontSize: '12px', color: t.muted}}, 'to your postcard'));
             item.appendChild(info);
             
-            item.appendChild(el('span', {style: {fontSize: '12px', color: t.muted, padding: '4px 8px', background: t.bg, borderRadius: '6px'}}, 'Tap to dismiss'));
-            
             reactSection.appendChild(item);
-          })(unreadReactions[i]);
+          })(unreadReactionsDisplay[i]);
         }
+        reactSection.appendChild(el('p', {style: {margin: '8px 0 0', fontSize: '11px', color: t.muted, textAlign: 'center', fontStyle: 'italic'}}, 'These will clear automatically'));
       } else {
-        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '12px', border: '1px solid ' + t.border}}, 'No new reactions'));
+        reactSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', padding: '12px', background: t.card, borderRadius: '0', border: '2px solid ' + t.border}}, 'No new reactions'));
       }
       page.appendChild(reactSection);
       
@@ -4938,7 +5042,10 @@ function handleScriptError() {
         return n && (n.type === 'group_theme_chooser' || n.type === 'group_invite' || n.type === 'group_theme_set') && n.data && !n.read; 
       });
       var groupSection = el('div', {style: {marginBottom: '24px'}});
-      groupSection.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, '👥 Groups'));
+      var groupsHeader = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+      groupsHeader.appendChild(icon('users', 16, t.text));
+      groupsHeader.appendChild(el('p', {style: {margin: '0', fontSize: '14px', fontWeight: '700', color: t.text, textTransform: 'uppercase', letterSpacing: '0.5px'}}, 'Groups'));
+      groupSection.appendChild(groupsHeader);
       
       if (groupNotifs.length > 0) {
         for (var i = 0; i < groupNotifs.length; i++) {
@@ -6025,7 +6132,15 @@ function handleScriptError() {
       
       // Add friend
       var addWrap = el('div', {style: {width: '100%', marginBottom: '20px'}});
-      addWrap.appendChild(el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '14px', background: t.accent, color: '#fff', fontWeight: '600', fontSize: '14px'}, onClick: function() { setState({showAddFriend: !state.showAddFriend}); }}, state.showAddFriend ? '✕ Close' : '👥 Add Friends'));
+      var addFriendBtn = el('span', {className: 'tap', style: {display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '0', background: t.text, color: t.bg, fontWeight: '600', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase', border: '2px solid ' + t.border}, onClick: function() { setState({showAddFriend: !state.showAddFriend}); }});
+      if (state.showAddFriend) {
+        addFriendBtn.appendChild(icon('close', 16, t.bg));
+        addFriendBtn.appendChild(el('span', null, 'CLOSE'));
+      } else {
+        addFriendBtn.appendChild(icon('userPlus', 16, t.bg));
+        addFriendBtn.appendChild(el('span', null, 'ADD FRIENDS'));
+      }
+      addWrap.appendChild(addFriendBtn);
       if (state.showAddFriend) {
         var addBox = el('div', {style: {marginTop: '12px', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card}});
         addBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '13px', fontWeight: '600', color: t.text}}, 'Enter friend code:'));
@@ -6238,12 +6353,13 @@ function handleScriptError() {
           var isToday = isCurrent && d === now.getDate();
           var birthdays = getBirthdaysForDate(state.calDate.getMonth() + 1, d);
           var hasBirthday = birthdays.length > 0;
-          var cellBg = post ? t.accent : (hasBirthday ? '#fff3e0' : 'transparent');
+          var cellBg = post ? t.text : (hasBirthday ? t.highlight : 'transparent');
+          var cellColor = post ? t.bg : t.text;
           var isClickable = post || hasBirthday;
-          var cell = el('div', {className: isClickable ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: cellBg, color: post ? '#fff' : t.text, border: isToday ? '2px solid ' + t.accent : 'none', fontWeight: isToday ? '700' : '400', flexDirection: 'column', position: 'relative'}});
+          var cell = el('div', {className: isClickable ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0', background: cellBg, color: cellColor, border: isToday ? '2px solid ' + t.text : '1px solid transparent', fontWeight: isToday ? '700' : '400', flexDirection: 'column', position: 'relative'}});
           if (post) {
             cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
-            cell.appendChild(el('span', {style: {fontSize: '8px'}}, '📮'));
+            cell.appendChild(icon('send', 10, t.bg));
             cell.onclick = function() { setState({dayPost: post, view: 'dayDetail'}); };
           } else {
             cell.appendChild(el('span', {style: {fontSize: '12px'}}, d));
@@ -6462,14 +6578,14 @@ function handleScriptError() {
           }
           
           var isToday = isCurrent && d === now.getDate();
-          var cell = el('div', {className: post ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', background: post ? t.accent : 'transparent', color: post ? '#fff' : t.text, border: isToday ? '2px solid ' + t.accent : 'none', fontWeight: isToday ? '700' : '400', flexDirection: 'column'}});
+          var cell = el('div', {className: post ? 'tap' : '', style: {aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0', background: post ? t.text : 'transparent', color: post ? t.bg : t.text, border: isToday ? '2px solid ' + t.text : '1px solid transparent', fontWeight: isToday ? '700' : '400', flexDirection: 'column'}});
           if (post) {
             cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
-            cell.appendChild(el('span', {style: {fontSize: '8px'}}, '📮'));
+            cell.appendChild(icon('send', 10, t.bg));
             cell.onclick = function() {
               // Check if user has posted today
               if (!state.posted) {
-                alert('📮 Post a postcard today to view your friends\' postcards!');
+                alert('Post a postcard today to view your friends\' postcards!');
                 return;
               }
               setState({friendDayPost: post, view: 'friendDayDetail'});
