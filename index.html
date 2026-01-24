@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.2.2';
+var APP_VERSION = '3.2.3';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -582,7 +582,8 @@ function handleScriptError() {
     '3.1.4': '🌍 TIMEZONE FIX: ✅ Friends across different timezones now see each other\'s posts! Feed shows posts from last 24 hours (not calendar date). Posting resets at YOUR local midnight. Calendar groups posts by YOUR local date. Timestamps display in YOUR timezone. No more missing posts between UK and Australia!',
     '3.2.0': '🎨 ZINE REDESIGN: Complete visual overhaul! DIY zine/indie aesthetic with bold Syne typography, square corners, black borders, paper texture backgrounds, tape-style highlights, and raw photocopied look. Uppercase titles, monospace IBM Plex Mono body text. Fresh indie magazine vibe!',
     '3.2.1': '🎨 UI POLISH: SVG icons replace emojis throughout UI (reactions/logs keep emojis). Fixed button contrast in dark mode. Auto-dismiss reaction notifications when viewing mailbox. Songs now loop continuously. Added spacing above first feed post. Cleaner, more consistent design!',
-    '3.2.2': '🔄 REAL-TIME FIXES: ✅ Badge/tag changes now update instantly without restart! Added real-time listener for user data. ✅ Updates now auto-propagate: when you deploy a new version, Firebase updates automatically and other users see the notification instantly. No more manual Firebase edits needed!'
+    '3.2.2': '🔄 REAL-TIME FIXES: ✅ Badge/tag changes now update instantly without restart! Added real-time listener for user data. ✅ Updates now auto-propagate: when you deploy a new version, Firebase updates automatically and other users see the notification instantly. No more manual Firebase edits needed!',
+    '3.2.3': '🎨 UI CLEANUP: Moved settings button from home screen to profile tab (tap your avatar → settings icon in top right). Mailbox icon now sits alone on home screen header. Cleaner, more intuitive navigation!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -4087,24 +4088,16 @@ function handleScriptError() {
       logoWrap.appendChild(el('span', {className: 'zine-title', style: {fontSize: '24px', fontWeight: '700', color: t.text, letterSpacing: '-1px'}}, 'POSTCARD'));
       logoWrap.appendChild(icon('plane', 18, t.text));
       
-      var btns = el('div', {style: {display: 'flex', gap: '4px', alignItems: 'center'}});
-      
-      // Mailbox/Notifications button
+      // Mailbox/Notifications button (moved to right side, settings now in profile)
       var unreadCount = getUnreadCount();
       var mailBtn = el('span', {className: 'tap', style: {padding: '8px', color: t.muted, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('notifications'); }});
       mailBtn.appendChild(icon('mail', 22, t.muted));
       if (unreadCount > 0) {
         mailBtn.appendChild(el('div', {style: {position: 'absolute', top: '2px', right: '2px', minWidth: '18px', height: '18px', borderRadius: '50%', background: '#e53935', color: '#fff', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + t.bg, padding: '0 4px'}}, unreadCount > 9 ? '9+' : unreadCount));
       }
-      btns.appendChild(mailBtn);
-      
-      var settingsBtn = el('span', {className: 'tap', style: {padding: '8px', color: t.muted, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('settings'); }});
-      settingsBtn.appendChild(icon('settings', 22, t.muted));
-      btns.appendChild(settingsBtn);
-      // Removed profile button from header - it's in bottom nav
       
       header.appendChild(logoWrap);
-      header.appendChild(btns);
+      header.appendChild(mailBtn);
       page.appendChild(header);
       
       // Offline mode banner
@@ -6044,9 +6037,13 @@ function handleScriptError() {
     if (state.view === 'profile') {
       var page = el('div', {style: {minHeight: '100vh', padding: '0 20px 40px'}});
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0'}});
-      header.appendChild(el('span', {className: 'tap', style: {fontSize: '28px', padding: '8px 12px', color: t.text}, onClick: function() { nav('feed'); }}, '←'));
-      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, 'Profile'));
-      header.appendChild(el('div', {style: {width: '48px'}}));
+      var backBtn = el('span', {className: 'tap', style: {padding: '8px 12px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('feed'); }});
+      backBtn.appendChild(icon('back', 24, t.text));
+      header.appendChild(backBtn);
+      header.appendChild(el('span', {style: {fontWeight: '600', color: t.text, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '14px'}}, 'Profile'));
+      var settingsBtn = el('span', {className: 'tap', style: {padding: '8px 12px', color: t.muted, display: 'flex', alignItems: 'center', justifyContent: 'center'}, onClick: function() { nav('settings'); }});
+      settingsBtn.appendChild(icon('settings', 22, t.muted));
+      header.appendChild(settingsBtn);
       page.appendChild(header);
       
       var info = el('div', {style: {display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px'}});
