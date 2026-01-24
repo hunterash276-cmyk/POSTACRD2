@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.1.3';
+var APP_VERSION = '3.1.4';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -539,7 +539,8 @@ function handleScriptError() {
     '3.1.0': '🔄 LIVE UPDATE DETECTION: ✅ App now checks Firebase for updates every 2 minutes while running. When you upload a new version and update Firebase, users will see an update popup automatically - no need to restart the app!',
     '3.1.1': '🏷️ INSTANT BADGE UPDATES: ✅ Badge changes now update instantly for everyone! When you change customBadge or customBadgeColor in Firebase, all users see the change in real-time without refreshing.',
     '3.1.2': '📋 USER LOOKUP TABLE: ✅ Added appConfig/userLookup document in Firebase that maps usernames to user IDs. Now you can easily find who is who! Just go to Firestore → appConfig → userLookup to see username → ID mappings.',
-    '3.1.3': '🏷️ BADGE TEXT OUTLINE + OFFLINE FIX: ✅ Badge text now has thin black outline so light colors (yellow, white) are readable. ✅ Fixed offline mode - app now shows offline screen properly when no internet. ✅ Enabled Firestore persistence for better offline data caching.'
+    '3.1.3': '🏷️ BADGE TEXT OUTLINE + OFFLINE FIX: ✅ Badge text now has thin black outline so light colors (yellow, white) are readable. ✅ Fixed offline mode - app now shows offline screen properly when no internet. ✅ Enabled Firestore persistence for better offline data caching.',
+    '3.1.4': '🌍 TIMEZONE FIX: ✅ Friends across different timezones now see each other\'s posts! Feed shows posts from last 24 hours (not calendar date). Posting resets at YOUR local midnight. Calendar groups posts by YOUR local date. Timestamps display in YOUR timezone. No more missing posts between UK and Australia!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -742,7 +743,7 @@ function handleScriptError() {
     // Check if we're editing an existing draft
     var isEditing = state.editingDraftId !== null;
     var draftId = isEditing ? state.editingDraftId : Date.now().toString();
-    var draftDate = isEditing ? state.editingDraftDate : new Date().toISOString().split('T')[0];
+    var draftDate = isEditing ? state.editingDraftDate : getLocalDate();
     
     var draft = {
       id: draftId,
@@ -821,7 +822,7 @@ function handleScriptError() {
       return;
     }
     
-    var today = new Date().toISOString().split('T')[0];
+    var today = getLocalDate();
     var canUploadToFeed = draft.date === today;
     
     // Explain what will happen based on date
@@ -1209,23 +1210,24 @@ function handleScriptError() {
         // Save seen reactions
         localStorage.setItem('postcard_seen_reactions', JSON.stringify(seenReactions));
         
-        // Sort by date descending
+        // Sort by createdAt descending (newest first)
         posts.sort(function(a, b) {
-          return b.date.localeCompare(a.date);
+          var aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          var bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
         });
-        var today = new Date().toISOString().split('T')[0];
         
-        // Check if actually posted (for UNBLURRING friends' posts)
-        var hasPosted = false;
-        for (var i = 0; i < posts.length; i++) {
-          if (posts[i].date === today) hasPosted = true;
-        }
+        // Check if actually posted TODAY in user's LOCAL timezone (for UNBLURRING friends' posts)
+        var hasPosted = hasPostedInLocalDay(posts);
         
-        // Check if has draft or post (for BLOCKING camera)
+        // Check if has draft for today (for BLOCKING camera)
+        var todayLocal = getLocalDate();
         var hasPostcardToday = hasPosted;
         if (!hasPostcardToday && state.savedDrafts && state.savedDrafts.length > 0) {
           for (var i = 0; i < state.savedDrafts.length; i++) {
-            if (state.savedDrafts[i].date === today) {
+            // Check draft's date against local date
+            var draftLocalDate = state.savedDrafts[i].date;
+            if (draftLocalDate === todayLocal) {
               hasPostcardToday = true;
               console.log('[Drafts] Found draft for today - will block camera but NOT unblur posts');
               break;
@@ -1252,9 +1254,12 @@ function handleScriptError() {
             for (var k in data) p[k] = data[k];
             posts.push(p);
           });
-          posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
-          var today = new Date().toISOString().split('T')[0];
-          var hasPosted = posts.some(function(p) { return p.date === today; });
+          posts.sort(function(a, b) {
+            var aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            var bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+          var hasPosted = hasPostedInLocalDay(posts);
           setState({myPosts: posts, posted: hasPosted});
         });
       });
@@ -2215,8 +2220,8 @@ function handleScriptError() {
 
   function uploadPost(postData) {
     // CRITICAL: Check for duplicates before uploading
-    // Use provided date (for edited drafts) or today's date (for new posts)
-    var postDate = postData.date || new Date().toISOString().split('T')[0];
+    // Use provided date (for edited drafts) or today's LOCAL date (for new posts)
+    var postDate = postData.date || getLocalDate();
     console.log('[Upload] Uploading post for date:', postDate);
     
     // CRITICAL: Check if this date is already being uploaded RIGHT NOW
@@ -2231,9 +2236,10 @@ function handleScriptError() {
     
     var existingPost = null;
     
-    // Check in loaded posts
+    // Check in loaded posts - use local date from createdAt
     for (var i = 0; i < state.myPosts.length; i++) {
-      if (state.myPosts[i].date === postDate) {
+      var postLocalDate = getLocalDateFromTimestamp(state.myPosts[i].createdAt) || state.myPosts[i].date;
+      if (postLocalDate === postDate) {
         existingPost = state.myPosts[i];
         break;
       }
@@ -2514,11 +2520,7 @@ function handleScriptError() {
       for (var i = 0; i < state.myPosts.length; i++) {
         if (state.myPosts[i].id !== id) newPosts.push(state.myPosts[i]);
       }
-      var today = new Date().toISOString().split('T')[0];
-      var hasPosted = false;
-      for (var i = 0; i < newPosts.length; i++) {
-        if (newPosts[i].date === today) hasPosted = true;
-      }
+      var hasPosted = hasPostedInLocalDay(newPosts);
       state.myPosts = newPosts;
       setState({posted: hasPosted});
       nav('feed');
@@ -2531,6 +2533,72 @@ function handleScriptError() {
   function getUTCDate() {
     var now = new Date();
     return now.toISOString().split('T')[0];
+  }
+  
+  // Get today's date in viewer's LOCAL timezone (YYYY-MM-DD)
+  function getLocalDate() {
+    var now = new Date();
+    var year = now.getFullYear();
+    var month = String(now.getMonth() + 1);
+    if (month.length < 2) month = '0' + month;
+    var day = String(now.getDate());
+    if (day.length < 2) day = '0' + day;
+    return year + '-' + month + '-' + day;
+  }
+  
+  // Convert a UTC timestamp to viewer's local date string (YYYY-MM-DD)
+  function getLocalDateFromTimestamp(timestamp) {
+    if (!timestamp) return null;
+    var date = new Date(timestamp);
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1);
+    if (month.length < 2) month = '0' + month;
+    var day = String(date.getDate());
+    if (day.length < 2) day = '0' + day;
+    return year + '-' + month + '-' + day;
+  }
+  
+  // Check if a timestamp is within the last 24 hours
+  function isWithinLast24Hours(createdAt, fallbackDate) {
+    if (createdAt) {
+      var postTime = new Date(createdAt).getTime();
+      var now = Date.now();
+      var hoursDiff = (now - postTime) / (1000 * 60 * 60);
+      return hoursDiff <= 24 && hoursDiff >= 0;
+    }
+    // Fallback for old posts without createdAt - check if date matches today
+    if (fallbackDate) {
+      var todayLocal = getLocalDate();
+      return fallbackDate === todayLocal;
+    }
+    return false;
+  }
+  
+  // Check if user has posted today in their LOCAL timezone
+  function hasPostedInLocalDay(posts) {
+    if (!posts || posts.length === 0) return false;
+    var todayLocal = getLocalDate();
+    for (var i = 0; i < posts.length; i++) {
+      var postLocalDate = getLocalDateFromTimestamp(posts[i].createdAt);
+      // Fall back to date field for older posts without createdAt
+      if (!postLocalDate) postLocalDate = posts[i].date;
+      if (postLocalDate === todayLocal) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Get the start of today in viewer's local timezone (as timestamp)
+  function getLocalDayStart() {
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  }
+  
+  // Get the end of today in viewer's local timezone (as timestamp)
+  function getLocalDayEnd() {
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
   }
   
   // Convert UTC time to local time string
@@ -3224,10 +3292,10 @@ function handleScriptError() {
   }
 
   function getAllTodayPosts() {
-    var today = new Date().toISOString().split('T')[0];
+    // Get posts from the last 24 hours
     var result = [];
     for (var i = 0; i < state.myPosts.length; i++) {
-      if (state.myPosts[i].date === today) {
+      if (isWithinLast24Hours(state.myPosts[i].createdAt, state.myPosts[i].date)) {
         var p = {};
         for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
         p.friend = {};
@@ -3240,7 +3308,7 @@ function handleScriptError() {
       var f = state.friends[i];
       var posts = f.posts || [];
       for (var j = 0; j < posts.length; j++) {
-        if (posts[j].date === today) {
+        if (isWithinLast24Hours(posts[j].createdAt, posts[j].date)) {
           var p = {};
           for (var k in posts[j]) p[k] = posts[j][k];
           p.friend = f;
@@ -3257,9 +3325,14 @@ function handleScriptError() {
     if (month.length < 2) month = '0' + month;
     var dayStr = String(day);
     if (dayStr.length < 2) dayStr = '0' + dayStr;
-    var ds = d.getFullYear() + '-' + month + '-' + dayStr;
+    var targetDateStr = d.getFullYear() + '-' + month + '-' + dayStr;
+    
+    // Find post where createdAt falls on this local date
     for (var i = 0; i < state.myPosts.length; i++) {
-      if (state.myPosts[i].date === ds) return state.myPosts[i];
+      var postLocalDate = getLocalDateFromTimestamp(state.myPosts[i].createdAt);
+      // Fall back to date field for older posts without createdAt
+      if (!postLocalDate) postLocalDate = state.myPosts[i].date;
+      if (postLocalDate === targetDateStr) return state.myPosts[i];
     }
     return null;
   }
@@ -3481,18 +3554,21 @@ function handleScriptError() {
     
     meta.appendChild(userNameRow);
     
-    // Format date and time
-    var dateTimeStr = '📍 ' + post.location + ' · ' + post.date;
+    // Format date and time - display in viewer's local timezone
+    var displayDate = post.date; // Fallback to stored date
+    var timeStr = '';
     if (post.createdAt) {
       var postTime = new Date(post.createdAt);
+      // Get local date from UTC timestamp
+      displayDate = getLocalDateFromTimestamp(post.createdAt) || post.date;
       var hours = postTime.getHours();
       var minutes = postTime.getMinutes();
       var ampm = hours >= 12 ? 'pm' : 'am';
       hours = hours % 12;
       hours = hours ? hours : 12;
-      var timeStr = hours + ':' + (minutes < 10 ? '0' : '') + minutes + ampm;
-      dateTimeStr += ' · ' + timeStr;
+      timeStr = ' · ' + hours + ':' + (minutes < 10 ? '0' : '') + minutes + ampm;
     }
+    var dateTimeStr = '📍 ' + post.location + ' · ' + displayDate + timeStr;
     meta.appendChild(el('p', {style: {margin: '0', fontSize: '11px', color: t.muted}}, dateTimeStr));
     
     info.appendChild(avatar);
@@ -3750,9 +3826,10 @@ function handleScriptError() {
       box.appendChild(el('h3', {style: {margin: '0 0 8px', fontSize: '20px', fontWeight: '600', color: t.text}}, 'Delete Postcard?'));
       box.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', color: t.muted}}, 'This action cannot be undone.'));
       
-      // Check if this is today's post
-      var today = new Date().toISOString().split('T')[0];
-      if (state.deleteConfirm.date === today) {
+      // Check if this is today's post (in viewer's local timezone)
+      var postLocalDate = getLocalDateFromTimestamp(state.deleteConfirm.createdAt) || state.deleteConfirm.date;
+      var today = getLocalDate();
+      if (postLocalDate === today) {
         box.appendChild(el('p', {style: {margin: '0 0 20px', fontSize: '13px', color: t.accent, fontWeight: '500'}}, "✨ You'll be able to post a new postcard today if you delete this one."));
       } else {
         box.appendChild(el('div', {style: {height: '12px'}}));
@@ -3941,11 +4018,10 @@ function handleScriptError() {
       }
       
       var posts = [];
-      var today = new Date().toISOString().split('T')[0];
       
-      // Always add my own posts from today
+      // Add my own posts from the last 24 hours
       for (var i = 0; i < state.myPosts.length; i++) {
-        if (state.myPosts[i].date === today) {
+        if (isWithinLast24Hours(state.myPosts[i].createdAt, state.myPosts[i].date)) {
           var p = {};
           for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
           p.friend = {};
@@ -3958,12 +4034,12 @@ function handleScriptError() {
         }
       }
       
-      // Always add friends' posts (but mark as blurred if not posted)
+      // Add friends' posts from last 24 hours (but mark as blurred if not posted today)
       for (var i = 0; i < state.friends.length; i++) {
         var f = state.friends[i];
         var friendPosts = f.posts || [];
         for (var j = 0; j < friendPosts.length; j++) {
-          if (friendPosts[j].date === today) {
+          if (isWithinLast24Hours(friendPosts[j].createdAt, friendPosts[j].date)) {
             var p = {};
             for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
             p.friend = f;
@@ -3983,7 +4059,7 @@ function handleScriptError() {
       
       if (posts.length === 0 && state.posted) {
         var empty = el('div', {style: {padding: '40px 20px', textAlign: 'center'}});
-        empty.appendChild(el('p', {style: {color: t.muted, fontSize: '15px'}}, 'No postcards from friends today yet.'));
+        empty.appendChild(el('p', {style: {color: t.muted, fontSize: '15px'}}, 'No postcards from friends in the last 24 hours.'));
         page.appendChild(empty);
       }
       
@@ -4038,12 +4114,12 @@ function handleScriptError() {
       page.appendChild(postsWrap);
       
       // Add separator and older posts section (ALWAYS show, blur if not posted)
-      // Collect older posts (yesterday and before)
+      // Collect older posts (more than 24 hours old)
       var olderPosts = [];
       
       // My older posts
       for (var i = 0; i < state.myPosts.length; i++) {
-        if (state.myPosts[i].date !== today) {
+        if (!isWithinLast24Hours(state.myPosts[i].createdAt, state.myPosts[i].date)) {
           var p = {};
           for (var k in state.myPosts[i]) p[k] = state.myPosts[i][k];
           p.friend = {};
@@ -4062,7 +4138,7 @@ function handleScriptError() {
         var f = state.friends[i];
         var friendPosts = f.posts || [];
         for (var j = 0; j < friendPosts.length; j++) {
-          if (friendPosts[j].date !== today) {
+          if (!isWithinLast24Hours(friendPosts[j].createdAt, friendPosts[j].date)) {
             var p = {};
             for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
             p.friend = f;
@@ -4073,8 +4149,12 @@ function handleScriptError() {
         }
       }
       
-      // Sort older posts by date descending
-      olderPosts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+      // Sort older posts by createdAt descending
+      olderPosts.sort(function(a, b) {
+        var aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        var bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
       
       // Limit to last 10 older posts
       olderPosts = olderPosts.slice(0, 10);
@@ -4613,7 +4693,7 @@ function handleScriptError() {
           buttonText = 'Save Draft 💾';
         } else if (state.editingDraftDate) {
           // Editing a draft - check if it's still the same day
-          var today = new Date().toISOString().split('T')[0];
+          var today = getLocalDate();
           var canUploadToFeed = state.editingDraftDate === today;
           buttonText = canUploadToFeed ? '📤 Upload to Feed' : '📅 Upload to Calendar';
         } else {
@@ -4685,7 +4765,7 @@ function handleScriptError() {
       if (state.savedDrafts && state.savedDrafts.length > 0) {
         for (var i = 0; i < state.savedDrafts.length; i++) {
           (function(draft) {
-            var today = new Date().toISOString().split('T')[0];
+            var today = getLocalDate();
             var canUploadToFeed = draft.date === today;
             var draftDate = new Date(draft.date);
             var dateStr = draftDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
@@ -6352,16 +6432,19 @@ function handleScriptError() {
       }
       for (var day = 1; day <= daysInMonth; day++) {
         (function(d) {
-          // Find friend's post for this date
+          // Find friend's post for this date (using local date from createdAt)
           var month = String(state.friendCalDate.getMonth() + 1);
           if (month.length < 2) month = '0' + month;
           var dayStr = String(d);
           if (dayStr.length < 2) dayStr = '0' + dayStr;
-          var ds = state.friendCalDate.getFullYear() + '-' + month + '-' + dayStr;
+          var targetDateStr = state.friendCalDate.getFullYear() + '-' + month + '-' + dayStr;
           var post = null;
           if (friend.posts) {
             for (var j = 0; j < friend.posts.length; j++) {
-              if (friend.posts[j].date === ds) {
+              var postLocalDate = getLocalDateFromTimestamp(friend.posts[j].createdAt);
+              // Fall back to date field for older posts without createdAt
+              if (!postLocalDate) postLocalDate = friend.posts[j].date;
+              if (postLocalDate === targetDateStr) {
                 post = friend.posts[j];
                 break;
               }
