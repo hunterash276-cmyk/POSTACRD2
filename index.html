@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.2.1';
+var APP_VERSION = '3.2.2';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -277,8 +277,21 @@ function handleScriptError() {
         var serverV = parseVersion(serverVersion);
         var minV = parseVersion(minRequired);
         
+        // If local version is NEWER than server, update the server version!
+        // This makes updates propagate automatically when deploying new versions
+        if (localV > serverV) {
+          console.log('[Version] Local is NEWER! Updating server version to:', APP_VERSION);
+          db.collection('appConfig').doc('version').update({
+            current: APP_VERSION,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function() {
+            console.log('[Version] ✅ Server version updated to', APP_VERSION);
+          }).catch(function(e) {
+            console.log('[Version] Failed to update server version:', e);
+          });
+        }
         // If local version is older than minimum required, FORCE update
-        if (localV < minV) {
+        else if (localV < minV) {
           console.log('[Version] CRITICAL: Local version too old, forcing update');
           showForceUpdateScreen(serverVersion);
         }
@@ -336,6 +349,29 @@ function handleScriptError() {
   
   // Check for updates every 2 minutes while app is running
   setInterval(checkFirebaseVersion, 120000);
+  
+  // Real-time listener for version changes (instant update notifications)
+  db.collection('appConfig').doc('version').onSnapshot(function(doc) {
+    if (doc.exists) {
+      var data = doc.data();
+      var serverVersion = data.current || APP_VERSION;
+      
+      function parseVersion(v) {
+        var parts = v.split('.').map(function(n) { return parseInt(n) || 0; });
+        return parts[0] * 10000 + parts[1] * 100 + parts[2];
+      }
+      
+      var localV = parseVersion(APP_VERSION);
+      var serverV = parseVersion(serverVersion);
+      
+      if (localV < serverV && !document.getElementById('liveUpdateModal') && !document.getElementById('forceUpdateOverlay')) {
+        console.log('[Version] Real-time update detected:', serverVersion);
+        checkFirebaseVersion(); // This will show the modal
+      }
+    }
+  }, function(error) {
+    console.log('[Version] Real-time listener error:', error);
+  });
   
   // Global function to clear all caches and force reload
   window.clearAllCachesAndReload = function() {
@@ -545,7 +581,8 @@ function handleScriptError() {
     '3.1.3': '🏷️ BADGE TEXT OUTLINE + OFFLINE FIX: ✅ Badge text now has thin black outline so light colors (yellow, white) are readable. ✅ Fixed offline mode - app now shows offline screen properly when no internet. ✅ Enabled Firestore persistence for better offline data caching.',
     '3.1.4': '🌍 TIMEZONE FIX: ✅ Friends across different timezones now see each other\'s posts! Feed shows posts from last 24 hours (not calendar date). Posting resets at YOUR local midnight. Calendar groups posts by YOUR local date. Timestamps display in YOUR timezone. No more missing posts between UK and Australia!',
     '3.2.0': '🎨 ZINE REDESIGN: Complete visual overhaul! DIY zine/indie aesthetic with bold Syne typography, square corners, black borders, paper texture backgrounds, tape-style highlights, and raw photocopied look. Uppercase titles, monospace IBM Plex Mono body text. Fresh indie magazine vibe!',
-    '3.2.1': '🎨 UI POLISH: SVG icons replace emojis throughout UI (reactions/logs keep emojis). Fixed button contrast in dark mode. Auto-dismiss reaction notifications when viewing mailbox. Songs now loop continuously. Added spacing above first feed post. Cleaner, more consistent design!'
+    '3.2.1': '🎨 UI POLISH: SVG icons replace emojis throughout UI (reactions/logs keep emojis). Fixed button contrast in dark mode. Auto-dismiss reaction notifications when viewing mailbox. Songs now loop continuously. Added spacing above first feed post. Cleaner, more consistent design!',
+    '3.2.2': '🔄 REAL-TIME FIXES: ✅ Badge/tag changes now update instantly without restart! Added real-time listener for user data. ✅ Updates now auto-propagate: when you deploy a new version, Firebase updates automatically and other users see the notification instantly. No more manual Firebase edits needed!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -881,6 +918,12 @@ function handleScriptError() {
   });
 
   function loadUserData(uid) {
+    // Unsubscribe from previous user data listener
+    if (userDataUnsubscribe) {
+      userDataUnsubscribe();
+      userDataUnsubscribe = null;
+    }
+    
     db.collection('users').doc(uid).get().then(function(doc) {
       if (doc.exists) {
         var data = doc.data();
@@ -1070,6 +1113,25 @@ function handleScriptError() {
         // Check for update notification and trigger render if notification was added
         var notificationAdded = checkForUpdateNotification();
         
+        // Set up real-time listener for user data changes (badge updates, etc.)
+        // This runs AFTER initial setup to avoid re-running migration
+        if (userDataUnsubscribe) {
+          userDataUnsubscribe();
+        }
+        userDataUnsubscribe = db.collection('users').doc(uid).onSnapshot(function(doc) {
+          if (doc.exists) {
+            var newData = doc.data();
+            // Update state.userData with new data
+            for (var k in newData) {
+              state.userData[k] = newData[k];
+            }
+            console.log('[UserData] Real-time update received');
+            render();
+          }
+        }, function(error) {
+          console.error('[UserData] Real-time listener error:', error);
+        });
+        
         setState({view: 'feed'});
         
         // If notification was added, trigger an additional render to update badge
@@ -1136,6 +1198,7 @@ function handleScriptError() {
   var postsUnsubscribe = null;
   var friendsUnsubscribe = null;
   var friendPostsUnsubscribes = [];
+  var userDataUnsubscribe = null;
 
   function loadPosts(uid) {
     // Unsubscribe from previous listener
