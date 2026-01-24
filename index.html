@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.2.5';
+var APP_VERSION = '3.3.0';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -410,10 +410,32 @@ function handleScriptError() {
   }
   var L = {bg: '#f0efe8', card: '#fff', text: '#1a1a1a', muted: '#666', border: '#1a1a1a', accent: '#1a1a1a', highlight: '#ffeb99'};
   var D = {bg: '#1a1a1a', card: '#252525', text: '#f0efe8', muted: '#888', border: '#444', accent: '#f0efe8', highlight: '#ffeb99'};
+  
+  // All available themes
+  var themes = {
+    light: {name: 'Newsprint', emoji: '📰', bg: '#f0efe8', card: '#fff', text: '#1a1a1a', muted: '#666', border: '#1a1a1a', accent: '#1a1a1a', highlight: '#ffeb99'},
+    dark: {name: 'Darkroom', emoji: '🌙', bg: '#1a1a1a', card: '#252525', text: '#f0efe8', muted: '#888', border: '#444', accent: '#f0efe8', highlight: '#ffeb99'},
+    beach: {name: 'Beach', emoji: '🏖️', bg: '#e8dcc4', card: '#f5f0e6', text: '#1a5f7a', muted: '#5a8fa8', border: '#1a5f7a', accent: '#1a5f7a', highlight: '#7eb8da'},
+    terracotta: {name: 'Terracotta', emoji: '🏺', bg: '#d4a574', card: '#e8c9a8', text: '#5c3a21', muted: '#7a5540', border: '#5c3a21', accent: '#5c3a21', highlight: '#f5e6d3'},
+    sage: {name: 'Sage', emoji: '🌿', bg: '#b8c4a8', card: '#d4dcc8', text: '#3d4a35', muted: '#5a6650', border: '#3d4a35', accent: '#3d4a35', highlight: '#f0ebe0'},
+    slate: {name: 'Slate & Coral', emoji: '🪸', bg: '#4a5568', card: '#5a6578', text: '#f5ebe0', muted: '#a0aec0', border: '#e07a5f', accent: '#e07a5f', highlight: '#e07a5f'},
+    olive: {name: 'Olive & Peach', emoji: '🫒', bg: '#606c38', card: '#6b7a40', text: '#fefae0', muted: '#c8d4a8', border: '#fefae0', accent: '#dda15e', highlight: '#dda15e'},
+    rose: {name: 'Dusty Rose', emoji: '🌷', bg: '#c9a9a6', card: '#ddc4c0', text: '#4a3636', muted: '#6b5050', border: '#4a3636', accent: '#4a3636', highlight: '#f5e8e4'},
+    navy: {name: 'Navy & Gold', emoji: '⚓', bg: '#1e3a5f', card: '#284a70', text: '#f5f0e0', muted: '#8aa8c8', border: '#d4a84b', accent: '#d4a84b', highlight: '#d4a84b'}
+  };
+  var themeOrder = ['light', 'dark', 'beach', 'terracotta', 'sage', 'slate', 'olive', 'rose', 'navy'];
+  
   var t = L;
   
-  // Load dark mode preference from localStorage
+  // Load theme preference from localStorage (migrate from old darkmode)
+  var savedTheme = localStorage.getItem('postcard_theme');
   var savedDarkMode = localStorage.getItem('postcard_darkmode');
+  
+  // Migrate old dark mode setting to new theme system
+  if (!savedTheme && savedDarkMode) {
+    savedTheme = savedDarkMode === 'true' ? 'dark' : 'light';
+    localStorage.setItem('postcard_theme', savedTheme);
+  }
   
   // Load notifications from localStorage
   var savedNotifications = localStorage.getItem('postcard_notifications');
@@ -559,7 +581,8 @@ function handleScriptError() {
     '3.2.2': '🔄 REAL-TIME FIXES: ✅ Badge/tag changes now update instantly without restart! Added real-time listener for user data. ✅ Updates now auto-propagate: when you deploy a new version, Firebase updates automatically and other users see the notification instantly. No more manual Firebase edits needed!',
     '3.2.3': '🎨 UI CLEANUP: Moved settings button from home screen to profile tab (tap your avatar → settings icon in top right). Mailbox icon now sits alone on home screen header. Cleaner, more intuitive navigation!',
     '3.2.4': '🔧 STABILITY FIX: Reverted experimental real-time listeners that were causing data loading issues. Friends and posts should now load properly again. Stable release!',
-    '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!'
+    '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!',
+    '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -589,7 +612,8 @@ function handleScriptError() {
 
   var state = {
     view: 'loading',  // Start with loading, auth check will set correct view
-    dark: savedDarkMode === 'true',
+    theme: savedTheme || 'light',  // Theme key: light, dark, beach, terracotta, sage, slate, olive, rose, navy
+    themePreview: null,  // For previewing themes before applying
     user: null,
     userData: null,
     friends: [],
@@ -647,9 +671,9 @@ function handleScriptError() {
   };
 
   function setState(updates) {
-    // Save dark mode to localStorage when it changes
-    if (updates.hasOwnProperty('dark')) {
-      localStorage.setItem('postcard_darkmode', updates.dark ? 'true' : 'false');
+    // Save theme to localStorage when it changes
+    if (updates.hasOwnProperty('theme')) {
+      localStorage.setItem('postcard_theme', updates.theme);
     }
     // Save notifications to localStorage when they change
     if (updates.hasOwnProperty('notifications')) {
@@ -3814,7 +3838,9 @@ function handleScriptError() {
   }
 
   function render() {
-    t = state.dark ? D : L;
+    // Apply theme - use preview if active, otherwise use saved theme
+    var currentTheme = state.themePreview || state.theme || 'light';
+    t = themes[currentTheme] || themes.light;
     document.body.style.background = t.bg;
     var app = document.getElementById('app');
     app.innerHTML = '';
@@ -5321,16 +5347,95 @@ function handleScriptError() {
       }
       page.appendChild(profileSection);
       
-      // Dark mode toggle
-      var darkToggle = el('div', {style: {display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, marginBottom: '12px'}});
-      var darkInfo = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px'}});
-      darkInfo.appendChild(el('span', {style: {fontSize: '24px'}}, state.dark ? '🌙' : '☀️'));
-      darkInfo.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, (state.dark ? 'Dark' : 'Light') + ' mode'));
-      var toggle = el('span', {className: 'tap', style: {width: '50px', height: '30px', borderRadius: '15px', padding: '3px', background: state.dark ? t.accent : t.border, display: 'block'}, onClick: function() { setState({dark: !state.dark}); }});
-      toggle.appendChild(el('div', {style: {width: '24px', height: '24px', borderRadius: '12px', background: '#fff', transform: state.dark ? 'translateX(20px)' : 'translateX(0)', transition: 'transform .3s'}}));
-      darkToggle.appendChild(darkInfo);
-      darkToggle.appendChild(toggle);
-      page.appendChild(darkToggle);
+      // Theme selector
+      var currentThemeData = themes[state.theme] || themes.light;
+      var themeSection = el('div', {style: {padding: '16px', borderRadius: '0', border: '2px solid ' + t.border, background: t.card, marginBottom: '12px'}});
+      var themeHeader = el('div', {style: {display: 'flex', alignItems: 'center', justifyContent: 'space-between'}});
+      var themeInfo = el('div', {style: {display: 'flex', alignItems: 'center', gap: '12px'}});
+      themeInfo.appendChild(el('span', {style: {fontSize: '24px'}}, currentThemeData.emoji));
+      themeInfo.appendChild(el('span', {style: {fontWeight: '600', color: t.text}}, currentThemeData.name));
+      themeHeader.appendChild(themeInfo);
+      themeHeader.appendChild(el('span', {className: 'tap', style: {padding: '8px 16px', background: t.bg, color: t.text, fontSize: '13px', fontWeight: '600', borderRadius: '0', border: '2px solid ' + t.border}, onClick: function() { setState({themePreview: state.theme}); }}, 'CHANGE'));
+      themeSection.appendChild(themeHeader);
+      page.appendChild(themeSection);
+      
+      // Theme preview modal
+      if (state.themePreview) {
+        var previewTheme = themes[state.themePreview] || themes.light;
+        var overlay = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.8)', zIndex: '9999', display: 'flex', flexDirection: 'column', padding: '20px', overflow: 'auto'}});
+        
+        // Theme grid
+        var gridContainer = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', maxWidth: '500px', margin: '0 auto', width: '100%'}});
+        gridContainer.appendChild(el('h2', {style: {color: '#fff', margin: '0 0 16px', fontFamily: 'Syne, sans-serif', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px'}}, 'Choose Theme'));
+        
+        var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px'}});
+        
+        for (var i = 0; i < themeOrder.length; i++) {
+          (function(themeKey) {
+            var themeData = themes[themeKey];
+            var isSelected = state.themePreview === themeKey;
+            var chip = el('div', {className: 'tap', style: {
+              padding: '12px 8px',
+              background: themeData.bg,
+              border: isSelected ? '3px solid #fff' : '3px solid transparent',
+              borderRadius: '0',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: isSelected ? '0 0 0 2px ' + themeData.accent : 'none'
+            }, onClick: function() {
+              setState({themePreview: themeKey});
+            }});
+            chip.appendChild(el('span', {style: {fontSize: '20px'}}, themeData.emoji));
+            chip.appendChild(el('span', {style: {fontSize: '10px', fontWeight: '600', color: themeData.text, textAlign: 'center', lineHeight: '1.2'}}, themeData.name));
+            grid.appendChild(chip);
+          })(themeOrder[i]);
+        }
+        gridContainer.appendChild(grid);
+        
+        // Preview card
+        var previewCard = el('div', {style: {background: previewTheme.bg, border: '2px solid ' + previewTheme.border, padding: '16px', marginBottom: '16px'}});
+        var previewHeader = el('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', marginBottom: '12px', borderBottom: '2px solid ' + previewTheme.border}});
+        previewHeader.appendChild(el('span', {style: {fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: '700', color: previewTheme.text, letterSpacing: '-0.5px'}}, 'POSTCARD'));
+        var previewIcon = el('div', {style: {width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid ' + previewTheme.border}});
+        previewIcon.appendChild(icon('mail', 14, previewTheme.text));
+        previewHeader.appendChild(previewIcon);
+        previewCard.appendChild(previewHeader);
+        
+        var previewTape = el('div', {style: {width: '50px', height: '16px', background: previewTheme.highlight, transform: 'rotate(-2deg)', marginBottom: '10px', opacity: '0.85'}});
+        previewCard.appendChild(previewTape);
+        
+        var previewPost = el('div', {style: {background: previewTheme.card, border: '2px solid ' + previewTheme.border, padding: '12px'}});
+        var previewRow = el('div', {style: {display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px'}});
+        previewRow.appendChild(el('div', {style: {width: '36px', height: '36px', background: previewTheme.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewTheme.bg, fontWeight: '700', fontSize: '14px'}}, 'A'));
+        var previewNameCol = el('div');
+        previewNameCol.appendChild(el('span', {style: {fontFamily: 'Syne, sans-serif', fontWeight: '600', fontSize: '14px', color: previewTheme.text}}, 'ash '));
+        previewNameCol.appendChild(el('span', {style: {fontSize: '9px', padding: '2px 6px', background: previewTheme.highlight, color: previewTheme.text, fontWeight: '700'}}, 'FOUNDER'));
+        previewRow.appendChild(previewNameCol);
+        previewPost.appendChild(previewRow);
+        previewPost.appendChild(el('p', {style: {margin: '0', fontSize: '12px', color: previewTheme.text}}, "Today's postcard 📮"));
+        previewPost.appendChild(el('p', {style: {margin: '4px 0 0', fontSize: '11px', color: previewTheme.muted}}, 'London · 2:30 PM'));
+        previewCard.appendChild(previewPost);
+        
+        var previewBtn = el('div', {style: {marginTop: '12px', padding: '10px 16px', background: previewTheme.accent, color: previewTheme.bg, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', textAlign: 'center', border: '2px solid ' + previewTheme.accent}}, 'SEND POSTCARD');
+        previewCard.appendChild(previewBtn);
+        
+        gridContainer.appendChild(previewCard);
+        
+        // Action buttons
+        var actions = el('div', {style: {display: 'flex', gap: '12px'}});
+        actions.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', background: 'transparent', color: '#fff', fontSize: '14px', fontWeight: '600', textAlign: 'center', border: '2px solid #fff', borderRadius: '0'}, onClick: function() { setState({themePreview: null}); }}, 'CANCEL'));
+        actions.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '14px', background: '#fff', color: '#000', fontSize: '14px', fontWeight: '600', textAlign: 'center', border: '2px solid #fff', borderRadius: '0'}, onClick: function() { 
+          var newTheme = state.themePreview;
+          setState({theme: newTheme, themePreview: null}); 
+        }}, 'SAVE'));
+        gridContainer.appendChild(actions);
+        
+        overlay.appendChild(gridContainer);
+        app.appendChild(overlay);
+      }
       
       // Log out button
       page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600', marginTop: '20px'}, onClick: handleLogout}, 'Log Out'));
