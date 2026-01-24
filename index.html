@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.2.4';
+var APP_VERSION = '3.2.5';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -277,8 +277,18 @@ function handleScriptError() {
         var serverV = parseVersion(serverVersion);
         var minV = parseVersion(minRequired);
         
+        // If local version is NEWER than server, update Firebase so others get notified
+        if (localV > serverV) {
+          console.log('[Version] Updating Firebase version to:', APP_VERSION);
+          db.collection('appConfig').doc('version').update({
+            current: APP_VERSION,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch(function(e) {
+            console.log('[Version] Failed to update:', e);
+          });
+        }
         // If local version is older than minimum required, FORCE update
-        if (localV < minV) {
+        else if (localV < minV) {
           console.log('[Version] CRITICAL: Local version too old, forcing update');
           showForceUpdateScreen(serverVersion);
         }
@@ -334,8 +344,8 @@ function handleScriptError() {
   // Run version check on load
   checkFirebaseVersion();
   
-  // Check for updates every 2 minutes while app is running
-  setInterval(checkFirebaseVersion, 120000);
+  // Check for updates every 30 seconds while app is running
+  setInterval(checkFirebaseVersion, 30000);
   
   // Global function to clear all caches and force reload
   window.clearAllCachesAndReload = function() {
@@ -548,7 +558,8 @@ function handleScriptError() {
     '3.2.1': '🎨 UI POLISH: SVG icons replace emojis throughout UI (reactions/logs keep emojis). Fixed button contrast in dark mode. Auto-dismiss reaction notifications when viewing mailbox. Songs now loop continuously. Added spacing above first feed post. Cleaner, more consistent design!',
     '3.2.2': '🔄 REAL-TIME FIXES: ✅ Badge/tag changes now update instantly without restart! Added real-time listener for user data. ✅ Updates now auto-propagate: when you deploy a new version, Firebase updates automatically and other users see the notification instantly. No more manual Firebase edits needed!',
     '3.2.3': '🎨 UI CLEANUP: Moved settings button from home screen to profile tab (tap your avatar → settings icon in top right). Mailbox icon now sits alone on home screen header. Cleaner, more intuitive navigation!',
-    '3.2.4': '🔧 STABILITY FIX: Reverted experimental real-time listeners that were causing data loading issues. Friends and posts should now load properly again. Stable release!'
+    '3.2.4': '🔧 STABILITY FIX: Reverted experimental real-time listeners that were causing data loading issues. Friends and posts should now load properly again. Stable release!',
+    '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!'
   };
 
   // Image cache to prevent re-downloading and flashing
