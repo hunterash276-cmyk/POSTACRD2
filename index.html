@@ -43,7 +43,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.1.1';
+var APP_VERSION = '3.1.3';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -82,23 +82,97 @@ var APP_VERSION = '3.1.1';
 })();
 
 window.onerror = function(msg, url, line, col, error) {
+  // Check if we're offline first
+  if (!navigator.onLine) {
+    showOfflineMode();
+    return true;
+  }
   document.getElementById('loading').style.display = 'none';
   document.getElementById('error').style.display = 'block';
   document.getElementById('error').innerHTML = '<h2>⚠️ Error Loading App</h2><p style="margin:16px 0">This app needs to be hosted on a web server.</p><p style="font-size:12px;color:#666">If you uploaded this to a hosting service and still see this error, try refreshing the page.</p><p style="font-size:11px;margin-top:20px;color:#999">Error: ' + msg + '</p>';
   return true;
 };
+
+// Offline mode - show cached data if available
+function showOfflineMode() {
+  document.getElementById('loading').style.display = 'none';
+  
+  // Try to find cached user data
+  var cachedUser = null;
+  var cachedUserData = null;
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key && key.startsWith('postcard_user_')) {
+      try {
+        cachedUserData = JSON.parse(localStorage.getItem(key));
+        cachedUser = key.replace('postcard_user_', '');
+        break;
+      } catch (e) {}
+    }
+  }
+  
+  var app = document.getElementById('app');
+  var darkMode = localStorage.getItem('postcard_dark_mode') === 'true';
+  var bg = darkMode ? '#1a1a1a' : '#FAF9F6';
+  var text = darkMode ? '#F5F5F5' : '#2D2A26';
+  var muted = darkMode ? '#888' : '#8B8680';
+  var card = darkMode ? '#2a2a2a' : '#FFFFFF';
+  
+  document.body.style.background = bg;
+  
+  if (cachedUserData) {
+    app.innerHTML = '<div style="padding:20px;min-height:100vh;background:' + bg + '">' +
+      '<div style="text-align:center;padding:40px 20px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">📡</div>' +
+      '<h2 style="color:' + text + ';margin:0 0 12px;">You\'re Offline</h2>' +
+      '<p style="color:' + muted + ';margin:0 0 24px;line-height:1.5;">Connect to the internet to use Postcard.</p>' +
+      '<div style="background:' + card + ';border-radius:16px;padding:20px;margin-top:24px;text-align:left;">' +
+      '<p style="color:' + muted + ';font-size:12px;margin:0 0 8px;">LOGGED IN AS</p>' +
+      '<p style="color:' + text + ';font-size:18px;font-weight:600;margin:0;">' + (cachedUserData.username || 'User') + '</p>' +
+      '</div>' +
+      '<button onclick="location.reload()" style="margin-top:24px;background:#E07A5F;color:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">Try Again</button>' +
+      '</div></div>';
+  } else {
+    app.innerHTML = '<div style="padding:20px;min-height:100vh;background:' + bg + '">' +
+      '<div style="text-align:center;padding:40px 20px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">📡</div>' +
+      '<h2 style="color:' + text + ';margin:0 0 12px;">You\'re Offline</h2>' +
+      '<p style="color:' + muted + ';margin:0 0 24px;line-height:1.5;">Connect to the internet to use Postcard.</p>' +
+      '<button onclick="location.reload()" style="background:#E07A5F;color:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">Try Again</button>' +
+      '</div></div>';
+  }
+}
+
+// Check offline state immediately
+if (!navigator.onLine) {
+  showOfflineMode();
+}
+
+// Track script loading errors
+var scriptLoadErrors = 0;
+function handleScriptError() {
+  scriptLoadErrors++;
+  if (!navigator.onLine || scriptLoadErrors >= 2) {
+    showOfflineMode();
+  }
+}
 </script>
 
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js" onerror="handleScriptError()"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js" onerror="handleScriptError()"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js" onerror="handleScriptError()"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js" onerror="handleScriptError()"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js" onerror="console.log('html2canvas failed to load')"></script>
 
 <script>
 (function() {
   // Check if Firebase loaded
   if (typeof firebase === 'undefined') {
+    // If offline, show offline mode instead of error
+    if (!navigator.onLine) {
+      showOfflineMode();
+      return;
+    }
     document.getElementById('loading').style.display = 'none';
     document.getElementById('error').style.display = 'block';
     document.getElementById('error').innerHTML = '<h2>⚠️ Cannot Load</h2><p style="margin:16px 0">Please upload this file to a web hosting service like Netlify, Vercel, or GitHub Pages.</p><p style="font-size:12px;color:#666">Opening HTML files directly from your computer does not work due to browser security restrictions.</p>';
@@ -119,6 +193,21 @@ window.onerror = function(msg, url, line, col, error) {
   var db = firebase.firestore();
   var auth = firebase.auth();
   var storage = firebase.storage();
+  
+  // Enable Firestore offline persistence
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(function() {
+      console.log('[Offline] Firestore persistence enabled');
+    })
+    .catch(function(err) {
+      if (err.code === 'failed-precondition') {
+        console.log('[Offline] Persistence failed - multiple tabs open');
+      } else if (err.code === 'unimplemented') {
+        console.log('[Offline] Persistence not supported in this browser');
+      } else {
+        console.log('[Offline] Persistence error:', err);
+      }
+    });
   
   // Push Notifications Setup
   var messaging = null;
@@ -448,7 +537,9 @@ window.onerror = function(msg, url, line, col, error) {
     '3.0.8': '📜 SCROLL POSITION FIX: ✅ Friend profiles now start at the top (back arrow visible). ✅ When going back from a friend profile, you return to exactly where you were scrolled in the friends list.',
     '3.0.9': '🎨 PRE-FILLED BADGE COLORS: ✅ customBadgeColor field is now auto-written to Firebase alongside customBadge. CREATOR gets #2196F3 (blue), FOUNDER gets #888888 (gray). Just change the hex code in Firebase to any color you want!',
     '3.1.0': '🔄 LIVE UPDATE DETECTION: ✅ App now checks Firebase for updates every 2 minutes while running. When you upload a new version and update Firebase, users will see an update popup automatically - no need to restart the app!',
-    '3.1.1': '🏷️ INSTANT BADGE UPDATES: ✅ Badge changes now update instantly for everyone! When you change customBadge or customBadgeColor in Firebase, all users see the change in real-time without refreshing.'
+    '3.1.1': '🏷️ INSTANT BADGE UPDATES: ✅ Badge changes now update instantly for everyone! When you change customBadge or customBadgeColor in Firebase, all users see the change in real-time without refreshing.',
+    '3.1.2': '📋 USER LOOKUP TABLE: ✅ Added appConfig/userLookup document in Firebase that maps usernames to user IDs. Now you can easily find who is who! Just go to Firestore → appConfig → userLookup to see username → ID mappings.',
+    '3.1.3': '🏷️ BADGE TEXT OUTLINE + OFFLINE FIX: ✅ Badge text now has thin black outline so light colors (yellow, white) are readable. ✅ Fixed offline mode - app now shows offline screen properly when no internet. ✅ Enabled Firestore persistence for better offline data caching.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -927,6 +1018,20 @@ window.onerror = function(msg, url, line, col, error) {
         }
         console.log('=== END BADGE MIGRATION ===');
         
+        // Update user lookup table for easy admin access
+        // This creates a document at appConfig/userLookup with username -> uid mapping
+        if (data.username) {
+          var lookupUpdate = {};
+          lookupUpdate[data.username] = uid;
+          db.collection('appConfig').doc('userLookup').set(lookupUpdate, { merge: true })
+            .then(function() {
+              console.log('[Lookup] Updated userLookup:', data.username, '→', uid);
+            })
+            .catch(function(err) {
+              console.log('[Lookup] Failed to update:', err);
+            });
+        }
+        
         loadPosts(uid);
         loadFriends(uid);
         loadFriendRequests(uid);
@@ -1200,6 +1305,13 @@ window.onerror = function(msg, url, line, col, error) {
             // Update all fields from Firebase (including customBadge, customBadgeColor)
             for (var k in fdata) f[k] = fdata[k];
             f.id = fid; // Make sure ID stays set
+            
+            // Update user lookup table for this friend
+            if (fdata.username && isNew) {
+              var lookupUpdate = {};
+              lookupUpdate[fdata.username] = fid;
+              db.collection('appConfig').doc('userLookup').set(lookupUpdate, { merge: true }).catch(function() {});
+            }
             
             // Auto-write customBadge and customBadgeColor if missing
             if (!fdata.customBadge || !fdata.customBadgeColor) {
@@ -3314,7 +3426,8 @@ window.onerror = function(msg, url, line, col, error) {
         fontSize: '8px',
         fontWeight: '700',
         letterSpacing: '0.5px',
-        textTransform: 'uppercase'
+        textTransform: 'uppercase',
+        textShadow: '-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000'
       };
       
       // Check for custom color first, then fall back to defaults
@@ -5702,7 +5815,8 @@ window.onerror = function(msg, url, line, col, error) {
             fontSize: '10px',
             fontWeight: '700',
             letterSpacing: '0.5px',
-            textTransform: 'uppercase'
+            textTransform: 'uppercase',
+            textShadow: '-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000'
           };
           
           // Check for custom color first
@@ -5908,7 +6022,8 @@ window.onerror = function(msg, url, line, col, error) {
                       fontSize: '8px',
                       fontWeight: '700',
                       letterSpacing: '0.5px',
-                      textTransform: 'uppercase'
+                      textTransform: 'uppercase',
+                      textShadow: '-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000'
                     };
                     
                     // Check for custom color first
@@ -6149,7 +6264,8 @@ window.onerror = function(msg, url, line, col, error) {
           fontSize: '10px',
           fontWeight: '700',
           letterSpacing: '0.5px',
-          textTransform: 'uppercase'
+          textTransform: 'uppercase',
+          textShadow: '-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000'
         };
         
         // Check for custom color first
