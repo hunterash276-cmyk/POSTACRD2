@@ -66,13 +66,7 @@ var APP_VERSION = '3.4.0';
     });
   }
   
-  // Clear any service workers
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-      registrations.forEach(function(reg) { reg.unregister(); });
-      if (registrations.length > 0) console.log('[Update] Unregistered', registrations.length, 'service workers');
-    });
-  }
+  // Note: Service worker registration is handled in app.js
   
   // If version changed locally, show banner (backup - Firebase check is primary)
   if (storedVersion && storedVersion !== APP_VERSION && !bannerDismissed) {
