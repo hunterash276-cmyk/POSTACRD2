@@ -1877,13 +1877,11 @@
     
     console.log('[Notifications] Starting enablement process...');
     
-    // Step 1: Check if service worker is supported
     if (!('serviceWorker' in navigator)) {
       alert('Service workers not supported in this browser');
       return Promise.reject('Service workers not supported');
     }
     
-    // Step 2: Request notification permission
     console.log('[Notifications] Requesting permission...');
     return Notification.requestPermission()
       .then(function(permission) {
@@ -1892,28 +1890,13 @@
           throw new Error('Permission denied');
         }
         
-        // Step 3: Get existing service worker registration or register new one
-        console.log('[Notifications] Getting service worker registration...');
-        return navigator.serviceWorker.getRegistration().then(function(existingReg) {
-          if (existingReg) {
-            console.log('[Notifications] Using existing service worker registration');
-            return existingReg;
-          } else {
-            console.log('[Notifications] No existing registration, registering service worker...');
-            return navigator.serviceWorker.register('./service-worker.js');
-          }
-        });
-      })
-      .then(function(registration) {
-        console.log('[Notifications] Service worker registered:', registration);
-        
-        // Wait for service worker to be ready
+        console.log('[Notifications] Waiting for service worker to be ready...');
         return navigator.serviceWorker.ready;
       })
       .then(function(registration) {
-        console.log('[Notifications] Service worker ready, getting FCM token...');
+        console.log('[Notifications] Service worker is ready:', registration);
+        console.log('[Notifications] Getting FCM token...');
         
-        // Step 4: Get FCM token with service worker registration
         return messaging.getToken({ 
           vapidKey: VAPID_KEY,
           serviceWorkerRegistration: registration
@@ -1928,7 +1911,6 @@
         console.log('[Notifications] FCM token received:', token.substring(0, 20) + '...');
         console.log('[Notifications] Saving to Firestore...');
         
-        // Step 5: Save token to Firestore
         return db.collection('users').doc(state.user.uid).update({
           fcmToken: token,
           notificationsEnabled: true
