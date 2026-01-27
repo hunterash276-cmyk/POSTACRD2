@@ -1892,9 +1892,17 @@
           throw new Error('Permission denied');
         }
         
-        // Step 3: Register service worker
-        console.log('[Notifications] Registering service worker...');
-        return navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+        // Step 3: Get existing service worker registration or register new one
+        console.log('[Notifications] Getting service worker registration...');
+        return navigator.serviceWorker.getRegistration().then(function(existingReg) {
+          if (existingReg) {
+            console.log('[Notifications] Using existing service worker registration');
+            return existingReg;
+          } else {
+            console.log('[Notifications] No existing registration, registering service worker...');
+            return navigator.serviceWorker.register('service-worker.js');
+          }
+        });
       })
       .then(function(registration) {
         console.log('[Notifications] Service worker registered:', registration);
