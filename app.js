@@ -5316,6 +5316,37 @@
         app.appendChild(overlay);
       }
       
+      
+      // Push Notifications Settings
+      if (messaging) {
+        var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
+        notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
+        notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when you\'re chosen as theme chooser, when themes are set, or someone reacts to your postcard'));
+        
+        var notifEnabled = state.userData && state.userData.notificationsEnabled || false;
+        
+        if (notifEnabled) {
+          var status = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
+          status.appendChild(el('span', {style: {fontSize: '16px'}}, '✅'));
+          status.appendChild(el('span', {style: {fontSize: '13px', color: t.text}}, 'Enabled'));
+          notifSection.appendChild(status);
+          
+          notifSection.appendChild(el('span', {
+            className: 'tap',
+            style: {display: 'inline-block', padding: '10px 16px', background: t.border, color: t.text, borderRadius: '10px', fontSize: '13px', fontWeight: '600'},
+            onClick: disableNotifications
+          }, 'Disable'));
+        } else {
+          notifSection.appendChild(el('span', {
+            className: 'tap',
+            style: {display: 'inline-block', padding: '12px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: '600'},
+            onClick: enableNotifications
+          }, 'Enable Notifications'));
+        }
+        
+        page.appendChild(notifSection);
+      }
+
       // Log out button
       page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600', marginTop: '20px'}, onClick: handleLogout}, 'Log Out'));
       app.appendChild(page);
@@ -6393,39 +6424,6 @@
       
       info.appendChild(cal);
       
-      // Push Notifications Settings
-      if (messaging) {
-        var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
-        notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
-        notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when you\'re chosen as theme chooser, when themes are set, or someone reacts to your postcard'));
-        
-        var notifEnabled = state.userData && state.userData.notificationsEnabled || false;
-        
-        if (notifEnabled) {
-          var status = el('div', {style: {display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}});
-          status.appendChild(el('span', {style: {fontSize: '16px'}}, '✅'));
-          status.appendChild(el('span', {style: {fontSize: '13px', color: t.text}}, 'Enabled'));
-          notifSection.appendChild(status);
-          
-          notifSection.appendChild(el('span', {
-            className: 'tap',
-            style: {display: 'inline-block', padding: '10px 16px', background: t.border, color: t.text, borderRadius: '10px', fontSize: '13px', fontWeight: '600'},
-            onClick: disableNotifications
-          }, 'Disable'));
-        } else {
-          notifSection.appendChild(el('span', {
-            className: 'tap',
-            style: {display: 'inline-block', padding: '12px 20px', background: t.accent, color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: '600'},
-            onClick: enableNotifications
-          }, 'Enable Notifications'));
-        }
-        
-        info.appendChild(notifSection);
-      }
-      
-      page.appendChild(info);
-      app.appendChild(page);
-      return;
     }
     
     // Friend Profile view
