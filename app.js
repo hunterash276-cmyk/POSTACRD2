@@ -47,9 +47,11 @@
   var VAPID_KEY = 'BPuXi68utLVRVSqfuRbtlvAvX0vb8Rfr1Wc2sB7NRa8c2Xe85D5Bcv2yZnk6EXija2K8nMqgQBcnGk5JAPH7Q9w';
   
   try {
+    console.log('[Notifications] Checking if messaging is supported...');
     if (firebase.messaging.isSupported()) {
+      console.log('[Notifications] Messaging IS supported, initializing...');
       messaging = firebase.messaging();
-      console.log('[Notifications] Firebase Messaging initialized');
+      console.log('[Notifications] Firebase Messaging initialized successfully:', messaging);
       
       // Handle foreground messages
       messaging.onMessage(function(payload) {
@@ -64,9 +66,11 @@
         document.body.appendChild(notif);
         setTimeout(function() { notif.remove(); }, 5000);
       });
+    } else {
+      console.log('[Notifications] Messaging NOT supported in this browser');
     }
   } catch (e) {
-    console.log('[Notifications] Not supported:', e);
+    console.error('[Notifications] Error during initialization:', e);
   }
   
   // Set auth persistence to LOCAL so users stay logged in
@@ -5317,10 +5321,14 @@
       }
       
       
-      // Push Notifications Settings
-      if (messaging) {
-        var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
-        notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
+      // Push Notifications Settings - ALWAYS SHOW
+      var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
+      notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
+      
+      if (!messaging) {
+        // Messaging not supported
+        notifSection.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted}}, '❌ Not supported in this browser. Try Chrome, Firefox, or Edge on HTTPS.'));
+      } else {
         notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when you\'re chosen as theme chooser, when themes are set, or someone reacts to your postcard'));
         
         var notifEnabled = state.userData && state.userData.notificationsEnabled || false;
@@ -5343,9 +5351,9 @@
             onClick: enableNotifications
           }, 'Enable Notifications'));
         }
-        
-        page.appendChild(notifSection);
       }
+      
+      page.appendChild(notifSection);
 
       // Log out button
       page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '16px', borderRadius: '16px', border: '1px solid ' + t.border, background: t.card, textAlign: 'center', color: '#e53935', fontWeight: '600', marginTop: '20px'}, onClick: handleLogout}, 'Log Out'));
