@@ -1900,7 +1900,7 @@
             return existingReg;
           } else {
             console.log('[Notifications] No existing registration, registering service worker...');
-            return navigator.serviceWorker.register('service-worker.js');
+            return navigator.serviceWorker.register('./service-worker.js');
           }
         });
       })
@@ -6966,7 +6966,7 @@
 // Register service worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('service-worker.js')
+    navigator.serviceWorker.register('./service-worker.js')
       .then(function(registration) {
         console.log('[SW] Registered:', registration.scope);
       })
