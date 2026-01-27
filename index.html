@@ -46,7 +46,7 @@
 
 <script>
 // App version - CHANGE THIS when you update the app
-var APP_VERSION = '3.3.0';
+var APP_VERSION = '3.3.1';
 
 // Force update check for iOS PWA
 (function checkForUpdates() {
@@ -582,7 +582,8 @@ function handleScriptError() {
     '3.2.3': '🎨 UI CLEANUP: Moved settings button from home screen to profile tab (tap your avatar → settings icon in top right). Mailbox icon now sits alone on home screen header. Cleaner, more intuitive navigation!',
     '3.2.4': '🔧 STABILITY FIX: Reverted experimental real-time listeners that were causing data loading issues. Friends and posts should now load properly again. Stable release!',
     '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!',
-    '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!'
+    '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!',
+    '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2601,6 +2602,48 @@ function handleScriptError() {
     return year + '-' + month + '-' + day;
   }
   
+  // Check if user posted on a specific date (YYYY-MM-DD format)
+  function didUserPostOnDate(dateStr) {
+    if (!dateStr || !state.myPosts) return false;
+    for (var i = 0; i < state.myPosts.length; i++) {
+      var postDate = getLocalDateFromTimestamp(state.myPosts[i].createdAt);
+      if (!postDate) postDate = state.myPosts[i].date;
+      if (postDate === dateStr) return true;
+    }
+    return false;
+  }
+  
+  // Determine if a friend's post should be blurred and why
+  // Returns: { blurred: boolean, reason: 'today' | 'missed' | null }
+  function getPostBlurStatus(postDate, isLast24Hours) {
+    var todayStr = getLocalDate();
+    
+    // For posts from last 24 hours, use simple "posted today" logic
+    if (isLast24Hours) {
+      return {
+        blurred: !state.posted,
+        reason: !state.posted ? 'today' : null
+      };
+    }
+    
+    // For older posts, check if user posted on THAT specific day
+    var userPostedThatDay = didUserPostOnDate(postDate);
+    
+    if (userPostedThatDay) {
+      // Permanent unlock - user posted on the same day
+      return { blurred: false, reason: null };
+    }
+    
+    // User didn't post that day - check if they posted today for temporary unlock
+    if (state.posted) {
+      // Temporary unlock - user posted today
+      return { blurred: false, reason: null };
+    }
+    
+    // Blurred - user didn't post that day AND hasn't posted today
+    return { blurred: true, reason: 'missed' };
+  }
+  
   // Check if a timestamp is within the last 24 hours
   function isWithinLast24Hours(createdAt, fallbackDate) {
     if (createdAt) {
@@ -4231,7 +4274,7 @@ function handleScriptError() {
           }
           p.friend.id = state.user ? state.user.uid : null;
           p.isOwn = true;
-          p.isBlurred = !state.posted; // Blur if haven't posted today
+          p.isBlurred = false; // Own posts are never blurred
           olderPosts.push(p);
         }
       }
@@ -4246,7 +4289,11 @@ function handleScriptError() {
             for (var k in friendPosts[j]) p[k] = friendPosts[j][k];
             p.friend = f;
             p.isOwn = false;
-            p.isBlurred = !state.posted; // Blur if haven't posted today
+            // Get blur status based on whether user posted on that day
+            var postDate = getLocalDateFromTimestamp(friendPosts[j].createdAt) || friendPosts[j].date;
+            var blurStatus = getPostBlurStatus(postDate, false);
+            p.isBlurred = blurStatus.blurred;
+            p.blurReason = blurStatus.reason;
             olderPosts.push(p);
           }
         }
@@ -4283,7 +4330,7 @@ function handleScriptError() {
               enablePreview: !p.isBlurred  // Only enable audio if NOT blurred
             });
             
-            // Blur older posts if haven't posted today
+            // Blur older posts if needed
             if (p.isBlurred) {
               postcard.style.filter = 'blur(12px)';
               postcard.style.pointerEvents = 'none';
@@ -4293,6 +4340,7 @@ function handleScriptError() {
             
             // Add overlay for blurred older posts
             if (p.isBlurred) {
+              var blurMessage = p.blurReason === 'missed' ? "You didn't post on this day, post today to unlock" : 'Post your postcard to see this';
               var overlay = el('div', {style: {
                 position: 'absolute',
                 top: '0',
@@ -4310,7 +4358,7 @@ function handleScriptError() {
               var lockIconWrap2 = el('div', {style: {marginBottom: '8px'}});
               lockIconWrap2.appendChild(icon('lock', 32, t.text));
               overlay.appendChild(lockIconWrap2);
-              overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, 'Post your postcard to see this'));
+              overlay.appendChild(el('p', {style: {color: t.text, fontSize: '14px', fontWeight: '600', textAlign: 'center', padding: '0 20px'}}, blurMessage));
               var sendBtn2 = el('span', {className: 'tap', style: {marginTop: '12px', padding: '10px 20px', background: t.text, color: t.bg, borderRadius: '0', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase', border: '2px solid ' + t.text, display: 'flex', alignItems: 'center', gap: '8px'}, onClick: function() { nav('post'); }});
               sendBtn2.appendChild(icon('send', 14, t.bg));
               sendBtn2.appendChild(el('span', null, 'SEND POSTCARD'));
@@ -6697,14 +6745,19 @@ function handleScriptError() {
           if (post) {
             cell.appendChild(el('span', {style: {fontSize: '10px'}}, d));
             cell.appendChild(icon('send', 10, t.bg));
-            cell.onclick = function() {
-              // Check if user has posted today
-              if (!state.posted) {
-                alert('Post a postcard today to view your friends\' postcards!');
-                return;
-              }
-              setState({friendDayPost: post, view: 'friendDayDetail'});
-            };
+            // Capture post and date in closure, but check blur status at click time
+            var postDateStr = targetDateStr;
+            cell.onclick = (function(thePost, theDateStr) {
+              return function() {
+                // Recalculate blur status at click time (user may have posted since render)
+                var blurStatus = getPostBlurStatus(theDateStr, false);
+                if (!blurStatus.blurred) {
+                  setState({friendDayPost: thePost, view: 'friendDayDetail'});
+                } else {
+                  alert("You didn't post on this day. Post today to unlock!");
+                }
+              };
+            })(post, postDateStr);
           } else {
             cell.appendChild(el('span', {style: {fontSize: '12px'}}, d));
           }
