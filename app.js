@@ -6432,6 +6432,9 @@
       
       info.appendChild(cal);
       
+      page.appendChild(info);
+      app.appendChild(page);
+      return;
     }
     
     // Friend Profile view
