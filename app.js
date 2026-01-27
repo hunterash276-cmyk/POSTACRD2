@@ -44,7 +44,7 @@
   
   // Push Notifications Setup
   var messaging = null;
-  var VAPID_KEY = 'BAEePtLTG9oA2febDPeGUgjxS2Ue-UHxz8OnatRMEtq9zblCq9Z76bB2Mwa3d_0k-3ufwS5vdLMAIWA2yBnCXAc';
+  var VAPID_KEY = 'BPuXi68utLVRVSqfuRbtlvAvX0vb8Rfr1Wc2sB7NRa8c2Xe85D5Bcv2yZnk6EXija2K8nMqgQBcnGk5JAPH7Q9w';
   
   try {
     if (firebase.messaging.isSupported()) {
@@ -1896,7 +1896,7 @@
         if (state.userData) {
           state.userData.notificationsEnabled = true;
         }
-        alert('✅ Notifications enabled! You\'ll be notified when friends post.');
+        alert('✅ Notifications enabled! You\'ll be notified when you\'re the theme chooser, when the theme is set, or someone reacts to your postcard.');
         render();
       })
       .catch(function(e) {
@@ -6396,7 +6396,7 @@
       if (messaging) {
         var notifSection = el('div', {style: {width: '100%', marginTop: '20px', padding: '16px', background: t.card, borderRadius: '16px', border: '1px solid ' + t.border}});
         notifSection.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', fontWeight: '600', color: t.text}}, '🔔 Push Notifications'));
-        notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when friends post'));
+        notifSection.appendChild(el('p', {style: {margin: '0 0 16px', fontSize: '13px', color: t.muted}}, 'Get notified when you\'re chosen as theme chooser, when themes are set, or someone reacts to your postcard'));
         
         var notifEnabled = state.userData && state.userData.notificationsEnabled || false;
         
