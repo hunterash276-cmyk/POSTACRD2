@@ -1,12 +1,67 @@
 // Service Worker - Postcard PWA
+const CACHE_NAME = 'postcard-v1';
+const urlsToCache = [
+  './',
+  './index.html',
+  './app.js',
+  'https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js',
+  'https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js'
+];
+
 self.addEventListener('install', function(event) {
   console.log('[SW] Installing...');
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(function(cache) {
+        console.log('[SW] Caching app shell');
+        return cache.addAll(urlsToCache);
+      })
+      .then(function() {
+        return self.skipWaiting();
+      })
+  );
 });
 
 self.addEventListener('activate', function(event) {
   console.log('[SW] Activating...');
-  return self.clients.claim();
+  event.waitUntil(
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.map(function(cacheName) {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(function() {
+      return self.clients.claim();
+    })
+  );
+});
+
+// Fetch handler - network first, then cache
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    fetch(event.request)
+      .then(function(response) {
+        // Cache successful responses
+        if (response && response.status === 200) {
+          var responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(function() {
+        // Network failed, try cache
+        return caches.match(event.request);
+      })
+  );
 });
 
 // Import Firebase scripts for service worker
