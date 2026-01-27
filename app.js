@@ -1875,29 +1875,59 @@
       return Promise.reject('Not supported');
     }
     
-    console.log('[Notifications] Requesting permission...');
+    console.log('[Notifications] Starting enablement process...');
     
+    // Step 1: Check if service worker is supported
+    if (!('serviceWorker' in navigator)) {
+      alert('Service workers not supported in this browser');
+      return Promise.reject('Service workers not supported');
+    }
+    
+    // Step 2: Request notification permission
+    console.log('[Notifications] Requesting permission...');
     return Notification.requestPermission()
       .then(function(permission) {
+        console.log('[Notifications] Permission result:', permission);
         if (permission !== 'granted') {
           throw new Error('Permission denied');
         }
         
-        console.log('[Notifications] Permission granted, getting token...');
-        return messaging.getToken({ vapidKey: VAPID_KEY });
+        // Step 3: Register service worker
+        console.log('[Notifications] Registering service worker...');
+        return navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+      })
+      .then(function(registration) {
+        console.log('[Notifications] Service worker registered:', registration);
+        
+        // Wait for service worker to be ready
+        return navigator.serviceWorker.ready;
+      })
+      .then(function(registration) {
+        console.log('[Notifications] Service worker ready, getting FCM token...');
+        
+        // Step 4: Get FCM token with service worker registration
+        return messaging.getToken({ 
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration
+        });
       })
       .then(function(token) {
-        if (!token) throw new Error('No token');
+        if (!token) {
+          console.error('[Notifications] No token received');
+          throw new Error('Failed to get FCM token');
+        }
         
-        console.log('[Notifications] Token received, saving to Firestore...');
+        console.log('[Notifications] FCM token received:', token.substring(0, 20) + '...');
+        console.log('[Notifications] Saving to Firestore...');
         
+        // Step 5: Save token to Firestore
         return db.collection('users').doc(state.user.uid).update({
           fcmToken: token,
           notificationsEnabled: true
         });
       })
       .then(function() {
-        console.log('[Notifications] Saved successfully');
+        console.log('[Notifications] Successfully enabled!');
         if (state.userData) {
           state.userData.notificationsEnabled = true;
         }
@@ -1907,9 +1937,9 @@
       .catch(function(e) {
         console.error('[Notifications] Error:', e);
         if (e.message === 'Permission denied') {
-          alert('❌ Notification permission denied. Please enable in browser settings.');
+          alert('❌ Notification permission denied. Please enable notifications in your browser settings.');
         } else {
-          alert('Failed to enable notifications. Try again.');
+          alert('❌ Unable to enable notifications. Error: ' + e.message + '\n\nPlease check the browser console for details.');
         }
       });
   }
