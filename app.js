@@ -413,7 +413,8 @@
     '3.2.4': '🔧 STABILITY FIX: Reverted experimental real-time listeners that were causing data loading issues. Friends and posts should now load properly again. Stable release!',
     '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!',
     '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!',
-    '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.'
+    '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.',
+    '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.'
   };
 
   // Image cache to prevent re-downloading and flashing
