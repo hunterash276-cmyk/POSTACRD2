@@ -104,6 +104,18 @@ self.addEventListener('notificationclick', function(event) {
   
   // Open the app when notification is clicked
   event.waitUntil(
-    clients.openWindow('/')
+    clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(clientList) {
+      // If app is already open, focus it
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url === 'https://hunterash276-cmyk.github.io/POSTACRD2/' && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow('https://hunterash276-cmyk.github.io/POSTACRD2/');
+      }
+    })
   );
 });
