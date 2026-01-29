@@ -294,7 +294,7 @@
   } catch(e) {}
   
   // App version
-  var APP_VERSION = '3.4.4';
+  var APP_VERSION = '3.4.5';
   
   // App update notes
   var UPDATE_NOTES = {
@@ -425,7 +425,8 @@
     '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.',
     '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!',
     '3.4.3': '🗑️ GROUP PHOTO DELETE: Can now delete and reupload your group photo! Red \"Delete & Reupload\" button appears after submitting. Removed \"upload is FINAL\" warnings since you can now change your mind.',
-    '3.4.4': '💾 STORAGE OPTIMIZATION: Group photos now use consistent compression (1200px @ 70% quality instead of 85%). Saves ~20% storage per photo while maintaining quality. All new uploads automatically optimized - reduces Firebase costs!'
+    '3.4.4': '💾 STORAGE OPTIMIZATION: Group photos now use consistent compression (1200px @ 70% quality instead of 85%). Saves ~20% storage per photo while maintaining quality. All new uploads automatically optimized - reduces Firebase costs!',
+    '3.4.5': '🔔 NOTIFICATION FIXES: Shows actual user name instead of \"Someone\" in reaction notifications. Clicking notification now scrolls to the specific post that was reacted to. Fixed duplicate notifications - each reaction only sends ONE notification to post owner.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -4009,6 +4010,14 @@
     
     // Feed
     if (state.view === 'feed') {
+      // Check for scrollTo parameter from notification
+      var urlParams = new URLSearchParams(window.location.search);
+      var scrollToPostId = urlParams.get('scrollTo');
+      if (scrollToPostId) {
+        // Clear the parameter from URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+      
       var page = el('div', {style: {minHeight: '100vh', paddingBottom: '100px', position: 'relative', zIndex: '1', isolation: 'isolate'}});
       
       var header = el('header', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '2px solid ' + t.border}});
@@ -4117,7 +4126,7 @@
       for (var i = 0; i < posts.length; i++) {
         (function(p) {
           var isMyPost = state.user && p.userId === state.user.uid;
-          var item = el('div', {style: {position: 'relative'}});
+          var item = el('div', {id: 'post-' + p.id, style: {position: 'relative'}});
           
           // Create postcard
           var postcard = postcardEl(p, p.friend, {
@@ -4164,6 +4173,13 @@
           }
           
           postsWrap.appendChild(item);
+          
+          // Scroll to this post if it matches the scrollTo parameter
+          if (scrollToPostId && p.id === scrollToPostId) {
+            setTimeout(function() {
+              item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }
         })(posts[i]);
       }
       page.appendChild(postsWrap);
