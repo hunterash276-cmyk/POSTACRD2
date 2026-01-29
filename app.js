@@ -5564,7 +5564,72 @@
           photoBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: t.muted}}, '⚠️ Upload is FINAL - no deleting!'));
           
           if (group.theme || isThemeChooser) {
-            photoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupPhotoOrientation: myOrientation, groupView: 'camera'}); }}, '📷 Take Photo'));
+            // Hidden file inputs for camera and library
+            var fileInput = el('input', {type: 'file', accept: 'image/*', style: {display: 'none'}, id: 'groupLibraryInput'});
+            fileInput.onchange = function(e) {
+              var f = e.target.files[0];
+              if (f) {
+                var r = new FileReader();
+                r.onloadend = function() {
+                  var img = new Image();
+                  img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    var maxSize = 1200;
+                    var w = img.width;
+                    var h = img.height;
+                    if (w > h && w > maxSize) {
+                      h = h * maxSize / w;
+                      w = maxSize;
+                    } else if (h > maxSize) {
+                      w = w * maxSize / h;
+                      h = maxSize;
+                    }
+                    canvas.width = w;
+                    canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
+                  };
+                  img.src = r.result;
+                };
+                r.readAsDataURL(f);
+              }
+            };
+            photoBox.appendChild(fileInput);
+            
+            var cameraInput = el('input', {type: 'file', accept: 'image/*', capture: 'environment', style: {display: 'none'}, id: 'groupCameraCapture'});
+            cameraInput.onchange = function(e) {
+              var f = e.target.files[0];
+              if (f) {
+                var r = new FileReader();
+                r.onloadend = function() {
+                  var img = new Image();
+                  img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    var maxSize = 1200;
+                    var w = img.width;
+                    var h = img.height;
+                    if (w > h && w > maxSize) {
+                      h = h * maxSize / w;
+                      w = maxSize;
+                    } else if (h > maxSize) {
+                      w = w * maxSize / h;
+                      h = maxSize;
+                    }
+                    canvas.width = w;
+                    canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
+                  };
+                  img.src = r.result;
+                };
+                r.readAsDataURL(f);
+              }
+            };
+            photoBox.appendChild(cameraInput);
+            
+            photoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({showGroupCameraOptions: true, groupPhotoOrientation: myOrientation}); }}, '📷 Upload Photo'));
           } else {
             photoBox.appendChild(el('p', {style: {margin: '0', fontSize: '13px', color: t.muted, fontStyle: 'italic', textAlign: 'center', padding: '20px', background: t.bg, borderRadius: '10px'}}, 'Wait for the theme to be set before taking your photo'));
           }
@@ -5597,6 +5662,36 @@
           }
         }
         page.appendChild(othersBox);
+        
+        // Show upload options modal on detail page
+        if (state.showGroupCameraOptions) {
+          var modal = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.7)', zIndex: '9999', display: 'flex', alignItems: 'flex-end', justifyContent: 'center'}, onClick: function(e) {
+            if (e.target === modal) setState({showGroupCameraOptions: false});
+          }});
+          
+          var sheet = el('div', {style: {background: t.card, width: '100%', maxWidth: '500px', borderRadius: '20px 20px 0 0', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px'}});
+          
+          var title = el('p', {style: {margin: '0 0 8px', fontSize: '15px', fontWeight: '600', color: t.text, textAlign: 'center'}}, 'Choose Photo Source');
+          sheet.appendChild(title);
+          
+          var cameraBtn = el('label', {for: 'groupCameraCapture', className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+          cameraBtn.appendChild(el('span', {style: {fontSize: '20px'}}, '📷'));
+          cameraBtn.appendChild(el('span', null, 'Take Photo'));
+          sheet.appendChild(cameraBtn);
+          
+          var libraryBtn = el('label', {for: 'groupLibraryInput', className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+          libraryBtn.appendChild(el('span', {style: {fontSize: '20px'}}, '🖼️'));
+          libraryBtn.appendChild(el('span', null, 'Choose from Photos'));
+          sheet.appendChild(libraryBtn);
+          
+          var cancelBtn = el('span', {className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.muted}, onClick: function() {
+            setState({showGroupCameraOptions: false});
+          }}, 'Cancel');
+          sheet.appendChild(cancelBtn);
+          
+          modal.appendChild(sheet);
+          page.appendChild(modal);
+        }
         
         // History Button
         page.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '14px', borderRadius: '12px', background: t.bg, border: '1px solid ' + t.border, color: t.text, textAlign: 'center', fontWeight: '500', marginBottom: '16px'}, onClick: function() { setState({groupView: 'history'}); }}, '📅 View Past Photos'));
@@ -5807,8 +5902,9 @@
         
         if (state.groupPhoto) {
           // Preview
-          var previewWrap = el('div', {style: {flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}});
-          previewWrap.appendChild(el('img', {src: state.groupPhoto, style: {maxWidth: '100%', maxHeight: '60vh', borderRadius: '12px', transform: state.groupPhotoOrientation === 'landscape' ? 'none' : 'none'}}));
+          var previewWrap = el('div', {style: {flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto'}});
+          var aspectRatio = state.groupPhotoOrientation === 'portrait' ? '3/4' : '4/3';
+          previewWrap.appendChild(el('img', {src: state.groupPhoto, style: {maxWidth: '100%', maxHeight: '70vh', width: 'auto', height: 'auto', borderRadius: '12px', objectFit: 'contain', aspectRatio: aspectRatio}}));
           camPage.appendChild(previewWrap);
           
           var confirmBtns = el('div', {style: {padding: '20px', display: 'flex', gap: '12px'}});
@@ -5981,12 +6077,14 @@
               
               // ALWAYS show photo grid (no collage feature)
               if (dayPhotos && photoCount > 0) {
-                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0', overflow: 'hidden', borderRadius: '8px'}});
+                var grid = el('div', {style: {display: 'flex', flexWrap: 'wrap', gap: '0', overflow: 'hidden', borderRadius: '8px'}});
                 for (var odUserId in dayPhotos) {
                   var photo = dayPhotos[odUserId];
                   // Use the orientation from photo data to determine aspect ratio
                   var aspectRatio = photo.orientation === 'portrait' ? '3/4' : '4/3';
-                  grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: aspectRatio, objectFit: 'cover', display: 'block'}}));
+                  // Calculate width based on number of photos to fit nicely
+                  var photoWidth = photoCount === 1 ? '100%' : photoCount === 2 ? '50%' : '33.333%';
+                  grid.appendChild(el('img', {src: photo.url, style: {width: photoWidth, aspectRatio: aspectRatio, objectFit: 'cover', display: 'block'}}));
                 }
                 dayItem.appendChild(grid);
               }
