@@ -294,7 +294,7 @@
   } catch(e) {}
   
   // App version
-  var APP_VERSION = '3.4.2';
+  var APP_VERSION = '3.4.3';
   
   // App update notes
   var UPDATE_NOTES = {
@@ -423,7 +423,8 @@
     '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.',
     '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.',
     '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.',
-    '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!'
+    '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!',
+    '3.4.3': '🗑️ GROUP PHOTO DELETE: Can now delete and reupload your group photo! Red \"Delete & Reupload\" button appears after submitting. Removed \"upload is FINAL\" warnings since you can now change your mind.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -3119,6 +3120,72 @@
     });
   }
   
+  // Delete group photo
+  function deleteGroupPhoto(groupId) {
+    if (!confirm('Delete your photo? You can upload a new one after deleting.')) return;
+    
+    var uid = state.user.uid;
+    var today = getUTCDate();
+    
+    // Get the photo URL to delete from storage
+    db.collection('groups').doc(groupId).get().then(function(doc) {
+      if (!doc.exists) throw new Error('Group not found');
+      
+      var group = doc.data();
+      var todayPhotos = group.photos && group.photos[today];
+      if (!todayPhotos || !todayPhotos[uid]) {
+        alert('No photo found to delete');
+        return;
+      }
+      
+      var photoUrl = todayPhotos[uid].url;
+      
+      // Delete from Firestore
+      var updatePath = 'photos.' + today + '.' + uid;
+      var updateData = {};
+      updateData[updatePath] = firebase.firestore.FieldValue.delete();
+      
+      return db.collection('groups').doc(groupId).update(updateData).then(function() {
+        // Try to delete from storage (may fail if path doesn't match exactly, but that's ok)
+        try {
+          var storageRef = storage.refFromURL(photoUrl);
+          return storageRef.delete().catch(function(e) {
+            console.log('[Group] Storage delete failed (non-critical):', e);
+          });
+        } catch(e) {
+          console.log('[Group] Could not parse storage URL:', e);
+        }
+      });
+    }).then(function() {
+      console.log('[Group] Photo deleted successfully');
+      
+      // Reload the group to get fresh data
+      return db.collection('groups').doc(groupId).get();
+    }).then(function(doc) {
+      if (doc.exists) {
+        var updatedGroup = doc.data();
+        updatedGroup.id = doc.id;
+        
+        // Update in groups array
+        for (var i = 0; i < state.groups.length; i++) {
+          if (state.groups[i].id === groupId) {
+            state.groups[i] = updatedGroup;
+            break;
+          }
+        }
+        
+        // Update current group
+        state.currentGroup = updatedGroup;
+        console.log('[Group] Group data reloaded after deletion');
+      }
+      
+      setState({});
+    }).catch(function(e) {
+      console.error('[Group] Delete failed:', e);
+      alert('Failed to delete photo: ' + e.message);
+    });
+  }
+  
   // Check if user has submitted photo today
   function hasSubmittedToday(group) {
     if (!group || !group.photos) return false;
@@ -5559,10 +5626,10 @@
         if (hasSubmitted) {
           var myPhoto = todayPhotos[state.user.uid];
           photoBox.appendChild(el('p', {style: {margin: '0 0 10px', fontSize: '13px', color: '#4CAF50', fontWeight: '500'}}, '✅ Photo submitted!'));
-          photoBox.appendChild(el('img', {src: myPhoto.url, style: {width: '100%', borderRadius: '10px', maxHeight: '200px', objectFit: 'cover'}}));
+          photoBox.appendChild(el('img', {src: myPhoto.url, style: {width: '100%', borderRadius: '10px', maxHeight: '200px', objectFit: 'cover', marginBottom: '12px'}}));
+          photoBox.appendChild(el('span', {className: 'tap', style: {display: 'block', padding: '12px', borderRadius: '10px', background: '#ff4444', color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: '14px'}, onClick: function() { deleteGroupPhoto(state.currentGroup.id); }}, '🗑️ Delete & Reupload'));
         } else {
           photoBox.appendChild(el('p', {style: {margin: '0 0 8px', fontSize: '14px', color: t.text}}, 'Your orientation: ' + (myOrientation === 'portrait' ? '📱 Portrait' : '🖼️ Landscape')));
-          photoBox.appendChild(el('p', {style: {margin: '0 0 12px', fontSize: '12px', color: t.muted}}, '⚠️ Upload is FINAL - no deleting!'));
           
           if (group.theme || isThemeChooser) {
             // Hidden file inputs for camera and library
@@ -5912,8 +5979,6 @@
           confirmBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '16px', borderRadius: '12px', background: '#333', color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { setState({groupPhoto: null}); }}, 'Retake'));
           confirmBtns.appendChild(el('span', {className: 'tap', style: {flex: '1', padding: '16px', borderRadius: '12px', background: t.accent, color: '#fff', textAlign: 'center', fontWeight: '600'}, onClick: function() { uploadGroupPhoto(state.currentGroup.id, state.groupPhoto, state.groupPhotoOrientation); }}, 'Submit ✓'));
           camPage.appendChild(confirmBtns);
-          
-          camPage.appendChild(el('p', {style: {color: '#888', fontSize: '12px', textAlign: 'center', padding: '0 20px 30px'}}, '⚠️ This upload is FINAL and cannot be deleted'));
         } else {
           // Camera input
           var camWrap = el('div', {style: {flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'}});
