@@ -6077,14 +6077,14 @@
               
               // ALWAYS show photo grid (no collage feature)
               if (dayPhotos && photoCount > 0) {
-                var grid = el('div', {style: {display: 'flex', flexWrap: 'wrap', gap: '0', overflow: 'hidden', borderRadius: '8px'}});
+                // Use grid but adjust columns based on photo count to avoid gaps
+                var columns = photoCount === 1 ? '1fr' : photoCount === 2 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)';
+                var grid = el('div', {style: {display: 'grid', gridTemplateColumns: columns, gap: '0', overflow: 'hidden', borderRadius: '8px'}});
                 for (var odUserId in dayPhotos) {
                   var photo = dayPhotos[odUserId];
                   // Use the orientation from photo data to determine aspect ratio
                   var aspectRatio = photo.orientation === 'portrait' ? '3/4' : '4/3';
-                  // Calculate width based on number of photos to fit nicely
-                  var photoWidth = photoCount === 1 ? '100%' : photoCount === 2 ? '50%' : '33.333%';
-                  grid.appendChild(el('img', {src: photo.url, style: {width: photoWidth, aspectRatio: aspectRatio, objectFit: 'cover', display: 'block'}}));
+                  grid.appendChild(el('img', {src: photo.url, style: {width: '100%', aspectRatio: aspectRatio, objectFit: 'cover', display: 'block'}}));
                 }
                 dayItem.appendChild(grid);
               }
