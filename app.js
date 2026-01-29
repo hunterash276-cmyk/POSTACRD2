@@ -1875,41 +1875,21 @@
       return Promise.reject('Not supported');
     }
     
-    console.log('[Notifications] Starting enablement process...');
-    
-    if (!('serviceWorker' in navigator)) {
-      alert('Service workers not supported in this browser');
-      return Promise.reject('Service workers not supported');
-    }
-    
     console.log('[Notifications] Requesting permission...');
+    
     return Notification.requestPermission()
       .then(function(permission) {
-        console.log('[Notifications] Permission result:', permission);
         if (permission !== 'granted') {
           throw new Error('Permission denied');
         }
         
-        console.log('[Notifications] Waiting for service worker to be ready...');
-        return navigator.serviceWorker.ready;
-      })
-      .then(function(registration) {
-        console.log('[Notifications] Service worker is ready:', registration);
-        console.log('[Notifications] Getting FCM token...');
-        
-        return messaging.getToken({ 
-          vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: registration
-        });
+        console.log('[Notifications] Permission granted, getting token...');
+        return messaging.getToken({ vapidKey: VAPID_KEY });
       })
       .then(function(token) {
-        if (!token) {
-          console.error('[Notifications] No token received');
-          throw new Error('Failed to get FCM token');
-        }
+        if (!token) throw new Error('No token');
         
-        console.log('[Notifications] FCM token received:', token.substring(0, 20) + '...');
-        console.log('[Notifications] Saving to Firestore...');
+        console.log('[Notifications] Token received, saving to Firestore...');
         
         return db.collection('users').doc(state.user.uid).update({
           fcmToken: token,
@@ -1917,7 +1897,7 @@
         });
       })
       .then(function() {
-        console.log('[Notifications] Successfully enabled!');
+        console.log('[Notifications] Saved successfully');
         if (state.userData) {
           state.userData.notificationsEnabled = true;
         }
@@ -1927,9 +1907,9 @@
       .catch(function(e) {
         console.error('[Notifications] Error:', e);
         if (e.message === 'Permission denied') {
-          alert('❌ Notification permission denied. Please enable notifications in your browser settings.');
+          alert('❌ Notification permission denied. Please enable in browser settings.');
         } else {
-          alert('❌ Unable to enable notifications. Error: ' + e.message + '\n\nPlease check the browser console for details.');
+          alert('Failed to enable notifications. Try again.');
         }
       });
   }
@@ -4330,35 +4310,10 @@
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  // For outfit/selfie photos, flip them to match mirror view
-                  // Phone un-mirrors them, we need to re-mirror
-                  if (k === 'outfit') {
-                    var img = new Image();
-                    img.onload = function() {
-                      // Create canvas to flip the image
-                      var canvas = document.createElement('canvas');
-                      canvas.width = img.width;
-                      canvas.height = img.height;
-                      var ctx = canvas.getContext('2d');
-                      
-                      // Flip horizontally to restore mirror view
-                      ctx.translate(canvas.width, 0);
-                      ctx.scale(-1, 1);
-                      ctx.drawImage(img, 0, 0);
-                      
-                      // Get flipped image as data URL
-                      var flippedUrl = canvas.toDataURL('image/jpeg', 0.95);
-                      var upd = {};
-                      upd[k] = flippedUrl;
-                      setNp(upd);
-                    };
-                    img.src = r.result;
-                  } else {
-                    // Don't flip the other photo
-                    var upd = {};
-                    upd[k] = r.result;
-                    setNp(upd);
-                  }
+                  // Don't flip any photos - let the camera app handle it
+                  var upd = {};
+                  upd[k] = r.result;
+                  setNp(upd);
                 };
                 r.readAsDataURL(f);
               }
@@ -4694,7 +4649,7 @@
           outfitY: state.np.outfitY,
           photoX: state.np.photoX,
           photoY: state.np.photoY,
-          song: {title: state.np.songTitle, artist: state.np.songArtist},
+          song: {title: state.np.songTitle, artist: state.np.songArtist, artwork: state.np.songArtwork},
           songFont: state.np.songFont,
           songColor: state.np.songColor,
           location: state.np.loc,
@@ -5865,7 +5820,7 @@
           orientGuide.appendChild(el('span', {style: {color: '#666', fontSize: '14px'}}, 'Hold phone ' + (state.groupPhotoOrientation === 'portrait' ? 'vertically' : 'horizontally')));
           camWrap.appendChild(orientGuide);
           
-          var fileInput = el('input', {type: 'file', accept: 'image/*', capture: 'environment', style: {display: 'none'}, id: 'groupCameraInput'});
+          var fileInput = el('input', {type: 'file', accept: 'image/*', style: {display: 'none'}, id: 'groupCameraInput'});
           fileInput.onchange = function(e) {
             var f = e.target.files[0];
             if (f) {
@@ -6948,7 +6903,7 @@
 // Register service worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('./service-worker.js')
+    navigator.serviceWorker.register('service-worker.js')
       .then(function(registration) {
         console.log('[SW] Registered:', registration.scope);
       })
