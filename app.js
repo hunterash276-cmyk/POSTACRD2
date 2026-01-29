@@ -294,7 +294,7 @@
   } catch(e) {}
   
   // App version
-  var APP_VERSION = '3.4.3';
+  var APP_VERSION = '3.4.4';
   
   // App update notes
   var UPDATE_NOTES = {
@@ -424,7 +424,8 @@
     '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.',
     '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.',
     '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!',
-    '3.4.3': '🗑️ GROUP PHOTO DELETE: Can now delete and reupload your group photo! Red \"Delete & Reupload\" button appears after submitting. Removed \"upload is FINAL\" warnings since you can now change your mind.'
+    '3.4.3': '🗑️ GROUP PHOTO DELETE: Can now delete and reupload your group photo! Red \"Delete & Reupload\" button appears after submitting. Removed \"upload is FINAL\" warnings since you can now change your mind.',
+    '3.4.4': '💾 STORAGE OPTIMIZATION: Group photos now use consistent compression (1200px @ 70% quality instead of 85%). Saves ~20% storage per photo while maintaining quality. All new uploads automatically optimized - reduces Firebase costs!'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -5639,26 +5640,10 @@
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  var img = new Image();
-                  img.onload = function() {
-                    var canvas = document.createElement('canvas');
-                    var maxSize = 1200;
-                    var w = img.width;
-                    var h = img.height;
-                    if (w > h && w > maxSize) {
-                      h = h * maxSize / w;
-                      w = maxSize;
-                    } else if (h > maxSize) {
-                      w = w * maxSize / h;
-                      h = maxSize;
-                    }
-                    canvas.width = w;
-                    canvas.height = h;
-                    var ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
-                  };
-                  img.src = r.result;
+                  // Use compressImage for consistent optimization
+                  compressImage(r.result, 1200, 0.7).then(function(compressed) {
+                    setState({groupPhoto: compressed, groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
+                  });
                 };
                 r.readAsDataURL(f);
               }
@@ -5671,26 +5656,10 @@
               if (f) {
                 var r = new FileReader();
                 r.onloadend = function() {
-                  var img = new Image();
-                  img.onload = function() {
-                    var canvas = document.createElement('canvas');
-                    var maxSize = 1200;
-                    var w = img.width;
-                    var h = img.height;
-                    if (w > h && w > maxSize) {
-                      h = h * maxSize / w;
-                      w = maxSize;
-                    } else if (h > maxSize) {
-                      w = w * maxSize / h;
-                      h = maxSize;
-                    }
-                    canvas.width = w;
-                    canvas.height = h;
-                    var ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
-                  };
-                  img.src = r.result;
+                  // Use compressImage for consistent optimization
+                  compressImage(r.result, 1200, 0.7).then(function(compressed) {
+                    setState({groupPhoto: compressed, groupPhotoOrientation: myOrientation, showGroupCameraOptions: false, groupView: 'camera'});
+                  });
                 };
                 r.readAsDataURL(f);
               }
@@ -5994,27 +5963,10 @@
             if (f) {
               var r = new FileReader();
               r.onloadend = function() {
-                // Resize image
-                var img = new Image();
-                img.onload = function() {
-                  var canvas = document.createElement('canvas');
-                  var maxSize = 1200;
-                  var w = img.width;
-                  var h = img.height;
-                  if (w > h && w > maxSize) {
-                    h = h * maxSize / w;
-                    w = maxSize;
-                  } else if (h > maxSize) {
-                    w = w * maxSize / h;
-                    h = maxSize;
-                  }
-                  canvas.width = w;
-                  canvas.height = h;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(img, 0, 0, w, h);
-                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), showGroupCameraOptions: false});
-                };
-                img.src = r.result;
+                // Use compressImage for optimization
+                compressImage(r.result, 1200, 0.7).then(function(compressed) {
+                  setState({groupPhoto: compressed, showGroupCameraOptions: false});
+                });
               };
               r.readAsDataURL(f);
             }
@@ -6028,27 +5980,10 @@
             if (f) {
               var r = new FileReader();
               r.onloadend = function() {
-                // Resize image
-                var img = new Image();
-                img.onload = function() {
-                  var canvas = document.createElement('canvas');
-                  var maxSize = 1200;
-                  var w = img.width;
-                  var h = img.height;
-                  if (w > h && w > maxSize) {
-                    h = h * maxSize / w;
-                    w = maxSize;
-                  } else if (h > maxSize) {
-                    w = w * maxSize / h;
-                    h = maxSize;
-                  }
-                  canvas.width = w;
-                  canvas.height = h;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(img, 0, 0, w, h);
-                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), showGroupCameraOptions: false});
-                };
-                img.src = r.result;
+                // Use compressImage for optimization
+                compressImage(r.result, 1200, 0.7).then(function(compressed) {
+                  setState({groupPhoto: compressed, showGroupCameraOptions: false});
+                });
               };
               r.readAsDataURL(f);
             }
