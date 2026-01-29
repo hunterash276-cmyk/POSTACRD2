@@ -294,7 +294,7 @@
   } catch(e) {}
   
   // App version
-  var APP_VERSION = '3.4.1';
+  var APP_VERSION = '3.4.2';
   
   // App update notes
   var UPDATE_NOTES = {
@@ -422,7 +422,8 @@
     '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!',
     '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.',
     '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.',
-    '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.'
+    '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.',
+    '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!'
   };
 
   // Image cache to prevent re-downloading and flashing
