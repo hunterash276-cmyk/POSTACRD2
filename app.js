@@ -293,6 +293,9 @@
     }
   } catch(e) {}
   
+  // App version
+  var APP_VERSION = '3.4.1';
+  
   // App update notes
   var UPDATE_NOTES = {
     '1.0.9': 'Added notifications center with friend requests, reactions, and weekly lookbacks. You can now see all your updates in one place!',
@@ -418,7 +421,8 @@
     '3.2.5': '🔄 UPDATE FIX: App now auto-updates Firebase version when you deploy, so other users see update notifications within 30 seconds (was 2 minutes). No more needing to manually edit Firebase!',
     '3.3.0': '🎨 COLOR THEMES: 9 beautiful themes to personalize your app! Choose from Newsprint, Darkroom, Beach, Terracotta, Sage, Slate & Coral, Olive & Peach, Dusty Rose, or Navy & Gold. Go to Settings → tap CHANGE to preview and select your theme!',
     '3.3.1': '🔒 SMARTER BLUR: Posts from days you posted are always visible! Posts from days you missed are blurry until you post today (temporary unlock). Your own posts are never blurred. Friend calendar now shows "You didn\'t post on this day, post today to unlock" for missed days.',
-    '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.'
+    '3.4.0': '🔔 PUSH NOTIFICATIONS: Enable push notifications in Settings to get notified when you\'re chosen as theme chooser, when themes are set in groups, or when someone reacts to your postcard. Requires browser notification permission.',
+    '3.4.1': '🐛 BUG FIXES: Fixed album artwork disappearing in post preview. Removed automatic photo flipping (camera handles it correctly now). Groups: Can now choose photos from camera roll instead of being forced to take new photo. Notification clicks now open app correctly without 404 error.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -503,7 +507,8 @@
     groupPhoto: null,
     groupPhotoOrientation: null, // 'portrait' or 'landscape'
     groupTheme: '',
-    showGroupInfo: false
+    showGroupInfo: false,
+    showGroupCameraOptions: false
   };
 
   function setState(updates) {
@@ -5820,6 +5825,7 @@
           orientGuide.appendChild(el('span', {style: {color: '#666', fontSize: '14px'}}, 'Hold phone ' + (state.groupPhotoOrientation === 'portrait' ? 'vertically' : 'horizontally')));
           camWrap.appendChild(orientGuide);
           
+          // Camera input (hidden)
           var fileInput = el('input', {type: 'file', accept: 'image/*', style: {display: 'none'}, id: 'groupCameraInput'});
           fileInput.onchange = function(e) {
             var f = e.target.files[0];
@@ -5844,7 +5850,7 @@
                   canvas.height = h;
                   var ctx = canvas.getContext('2d');
                   ctx.drawImage(img, 0, 0, w, h);
-                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85)});
+                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), showGroupCameraOptions: false});
                 };
                 img.src = r.result;
               };
@@ -5853,13 +5859,80 @@
           };
           camWrap.appendChild(fileInput);
           
-          var camBtn = el('label', {className: 'tap', for: 'groupCameraInput', style: {width: '80px', height: '80px', borderRadius: '50%', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'}});
+          // Camera input for taking photo (hidden)
+          var cameraInput = el('input', {type: 'file', accept: 'image/*', capture: 'environment', style: {display: 'none'}, id: 'groupCameraCapture'});
+          cameraInput.onchange = function(e) {
+            var f = e.target.files[0];
+            if (f) {
+              var r = new FileReader();
+              r.onloadend = function() {
+                // Resize image
+                var img = new Image();
+                img.onload = function() {
+                  var canvas = document.createElement('canvas');
+                  var maxSize = 1200;
+                  var w = img.width;
+                  var h = img.height;
+                  if (w > h && w > maxSize) {
+                    h = h * maxSize / w;
+                    w = maxSize;
+                  } else if (h > maxSize) {
+                    w = w * maxSize / h;
+                    h = maxSize;
+                  }
+                  canvas.width = w;
+                  canvas.height = h;
+                  var ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, w, h);
+                  setState({groupPhoto: canvas.toDataURL('image/jpeg', 0.85), showGroupCameraOptions: false});
+                };
+                img.src = r.result;
+              };
+              r.readAsDataURL(f);
+            }
+          };
+          camWrap.appendChild(cameraInput);
+          
+          // Upload button that shows options
+          var camBtn = el('span', {className: 'tap', style: {width: '80px', height: '80px', borderRadius: '50%', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'}, onClick: function() {
+            setState({showGroupCameraOptions: true});
+          }});
           camBtn.appendChild(el('span', null, '📷'));
           camWrap.appendChild(camBtn);
           
-          camWrap.appendChild(el('p', {style: {color: '#888', fontSize: '13px', marginTop: '16px', textAlign: 'center'}}, 'Take a ' + state.groupPhotoOrientation + ' photo'));
+          camWrap.appendChild(el('p', {style: {color: '#888', fontSize: '13px', marginTop: '16px', textAlign: 'center'}}, 'Upload a ' + state.groupPhotoOrientation + ' photo'));
           
           camPage.appendChild(camWrap);
+          
+          // Show upload options modal
+          if (state.showGroupCameraOptions) {
+            var modal = el('div', {style: {position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.7)', zIndex: '9999', display: 'flex', alignItems: 'flex-end', justifyContent: 'center'}, onClick: function(e) {
+              if (e.target === modal) setState({showGroupCameraOptions: false});
+            }});
+            
+            var sheet = el('div', {style: {background: t.card, width: '100%', maxWidth: '500px', borderRadius: '20px 20px 0 0', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px'}});
+            
+            var title = el('p', {style: {margin: '0 0 8px', fontSize: '15px', fontWeight: '600', color: t.text, textAlign: 'center'}}, 'Choose Photo Source');
+            sheet.appendChild(title);
+            
+            var cameraBtn = el('label', {for: 'groupCameraCapture', className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+            cameraBtn.appendChild(el('span', {style: {fontSize: '20px'}}, '📷'));
+            cameraBtn.appendChild(el('span', null, 'Take Photo'));
+            sheet.appendChild(cameraBtn);
+            
+            var libraryBtn = el('label', {for: 'groupCameraInput', className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}});
+            libraryBtn.appendChild(el('span', {style: {fontSize: '20px'}}, '🖼️'));
+            libraryBtn.appendChild(el('span', null, 'Choose from Photos'));
+            sheet.appendChild(libraryBtn);
+            
+            var cancelBtn = el('span', {className: 'tap', style: {padding: '16px', background: t.bg, borderRadius: '12px', textAlign: 'center', fontSize: '15px', color: t.muted}, onClick: function() {
+              setState({showGroupCameraOptions: false});
+            }}, 'Cancel');
+            sheet.appendChild(cancelBtn);
+            
+            modal.appendChild(sheet);
+            camPage.appendChild(modal);
+          }
         }
         
         app.appendChild(camPage);
