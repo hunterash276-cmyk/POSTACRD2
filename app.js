@@ -294,7 +294,7 @@
   } catch(e) {}
   
   // App version
-  var APP_VERSION = '3.4.5';
+  var APP_VERSION = '3.4.6';
   
   // App update notes
   var UPDATE_NOTES = {
@@ -426,7 +426,8 @@
     '3.4.2': '📸 GROUP FIXES: Removed annoying black camera screen - upload popup now appears directly! Photo preview now shows full image without cropping. Collage grid adjusts columns (1/2/3) based on photo count - no more empty gaps when members don\'t contribute!',
     '3.4.3': '🗑️ GROUP PHOTO DELETE: Can now delete and reupload your group photo! Red \"Delete & Reupload\" button appears after submitting. Removed \"upload is FINAL\" warnings since you can now change your mind.',
     '3.4.4': '💾 STORAGE OPTIMIZATION: Group photos now use consistent compression (1200px @ 70% quality instead of 85%). Saves ~20% storage per photo while maintaining quality. All new uploads automatically optimized - reduces Firebase costs!',
-    '3.4.5': '🔔 NOTIFICATION FIXES: Shows actual user name instead of \"Someone\" in reaction notifications. Clicking notification now scrolls to the specific post that was reacted to. Fixed duplicate notifications - each reaction only sends ONE notification to post owner.'
+    '3.4.5': '🔔 NOTIFICATION FIXES: Shows actual user name instead of \"Someone\" in reaction notifications. Clicking notification now scrolls to the specific post that was reacted to. Fixed duplicate notifications - each reaction only sends ONE notification to post owner.',
+    '3.4.6': '👑 FAIR THEME CHOOSER: Theme chooser now cycles through ALL group members before anyone can be chosen twice! Still random, but ensures everyone gets a turn. Prevents the same person being chosen multiple days in a row.'
   };
 
   // Image cache to prevent re-downloading and flashing
@@ -2979,8 +2980,27 @@
       
       // New day - reset theme chooser and orientations
       var members = group.members;
-      var newThemeChooserIndex = Math.floor(Math.random() * members.length);
-      var newThemeChooserId = members[newThemeChooserIndex];
+      
+      // Track who has been theme chooser - cycle through everyone before repeating
+      var themeChooserHistory = group.themeChooserHistory || [];
+      
+      // Get members who haven't been chosen yet
+      var availableMembers = members.filter(function(m) {
+        return themeChooserHistory.indexOf(m) === -1;
+      });
+      
+      // If everyone has been chosen, reset the history (start a new cycle)
+      if (availableMembers.length === 0) {
+        themeChooserHistory = [];
+        availableMembers = members.slice();
+      }
+      
+      // Randomly pick from available members
+      var newThemeChooserIndex = Math.floor(Math.random() * availableMembers.length);
+      var newThemeChooserId = availableMembers[newThemeChooserIndex];
+      
+      // Add to history
+      themeChooserHistory.push(newThemeChooserId);
       
       // New random orientations
       var orientations = {};
@@ -2995,6 +3015,7 @@
       db.collection('groups').doc(group.id).update({
         currentDate: today,
         themeChooserId: newThemeChooserId,
+        themeChooserHistory: themeChooserHistory,
         theme: firebase.firestore.FieldValue.delete(),
         orientations: orientations
       }).then(function() {
